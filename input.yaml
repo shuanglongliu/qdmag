@@ -1,0 +1,202 @@
+spins:
+  - 2.0
+  - 2.0
+  - 2.0
+  - 2.5
+
+positions:
+  - [12.51569793,     13.74818925,     13.68511578] 
+  - [10.88336169,     10.92089994,     13.68511578] 
+  - [14.14803418,     10.92089994,     13.68511578] 
+  - [12.51569793,     11.86332971,     16.75477640] 
+
+exchange:
+  - pair: [1, 2]
+    coupling_matrix: [-2.43,  0.00,  0.00, 0.00,  -2.43,  0.00, 0.00,  0.00,  -2.43]
+    reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
+
+  - pair: [2, 3]
+    coupling_matrix: [-2.43,  0.00,  0.00, 0.00,  -2.43,  0.00, 0.00,  0.00,  -2.43]
+    reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
+
+  - pair: [3, 1]
+    coupling_matrix: [-2.43,  0.00,  0.00, 0.00,  -2.43,  0.00, 0.00,  0.00,  -2.43]
+    reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
+
+  - pair: [1, 4]
+    coupling_matrix: [-5.18,  0.00,  0.00, 0.00,  -5.18,  0.00, 0.00,  0.00,  -5.18]
+    reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
+
+  - pair: [2, 4]
+    coupling_matrix: [-5.18,  0.00,  0.00, 0.00,  -5.18,  0.00, 0.00,  0.00,  -5.18]
+    reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
+
+  - pair: [3, 4]
+    coupling_matrix: [-5.18,  0.00,  0.00, 0.00,  -5.18,  0.00, 0.00,  0.00,  -5.18]
+    reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
+
+anisotropy:
+  - site: 1
+    ks: [2, 2]
+    qs: [0, 2]
+    Bkqs: [-0.025, -0.001425]
+    reference_frame: [-0.078089171,     0.948256469,     0.307752744,     0.021622746,    -0.307011810,     0.951460039,     0.996711863,     0.080953185,     0.003470389]
+
+  - site: 2
+    ks: [2, 2]
+    qs: [0, 2]
+    Bkqs: [-0.025, -0.001425]
+    reference_frame: [-0.782169606,    -0.541755440,     0.307752744,     0.255068654,     0.172231752,     0.951460039,    -0.568463446,     0.822701201,     0.003470389]
+
+  - site: 3
+    ks: [2, 2]
+    qs: [0, 2]
+    Bkqs: [-0.025, -0.001425]
+    reference_frame: [0.860258777,    -0.406501028,     0.307752744,    -0.276691400,     0.134780058,     0.951460039,    -0.428248417,    -0.903654386,     0.003470389]
+  
+  - site: 4
+    ks: [2, 2]
+    qs: [0, 2]
+    Bkqs: [-0.001, -0.000006]
+    reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
+  
+gfactor:
+  - site: 1
+    gs: [1.977923,  -0.001793,  -0.000082,  -0.001706,   1.996250,  -0.000005,  -0.000069,  -0.000036,   1.996733]
+    reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
+
+  - site: 2
+    gs: [1.977923,  -0.001793,  -0.000082,  -0.001706,   1.996250,  -0.000005,  -0.000069,  -0.000036,   1.996733]
+    reference_frame: [-0.500000000,     0.866025404,     0.000000000,    -0.866025404,    -0.500000000,     0.000000000,     0.000000000,     0.000000000,     1.000000000]
+
+  - site: 3
+    gs: [1.977923,  -0.001793,  -0.000082,  -0.001706,   1.996250,  -0.000005,  -0.000069,  -0.000036,   1.996733]
+    reference_frame: [-0.500000000,    -0.866025404,     0.000000000,     0.866025404,    -0.500000000,     0.000000000,     0.000000000,     0.000000000,     1.000000000]
+
+  - site: 4
+    gs: [2.002085,   0.000000,  -0.000000,  -0.000000,   2.002085,  -0.000000,  -0.000000,   0.000000,   2.002082 ]
+    reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
+
+dipole:
+  - pair: [1, 2]
+    alpha: 0.0
+    pi: [0.0, 0.0,-0.0]
+    reference_frame: [1., 0., 0.,  0., 1., 0.,  0., 0., 1.]
+
+  - pair: [2, 3]
+    alpha: 0.0
+    pi: [0.0, 0.0, 0.0]
+    reference_frame: [1., 0., 0.,  0., 1., 0.,  0., 0., 1.]
+
+  - pair: [3, 1]
+    alpha: 0.0
+    pi: [0.0, 0.0, 0.0]
+    reference_frame: [1., 0., 0.,  0., 1., 0.,  0., 0., 1.]
+
+  - pair: [1, 4]
+    alpha: 0.0
+    pi: [0.0, 0.0, 0.0]
+    reference_frame: [1., 0., 0.,  0., 1., 0.,  0., 0., 1.]
+
+  - pair: [2, 4]
+    alpha: 0.0
+    pi: [0.0, 0.0, 0.0]
+    reference_frame: [1., 0., 0.,  0., 1., 0.,  0., 0., 1.]
+
+  - pair: [3, 4]
+    alpha: 0.0
+    pi: [0.0, 0.0, 0.0]
+    reference_frame: [1., 0., 0.,  0., 1., 0.,  0., 0., 1.]
+
+ext_field: [0., 90., 0., 0., 0., 0.] # B, thetaB, phiB, E, thetaE, phiE
+
+BET_Bgrid:
+  - [0., 60., 0.5, 0., 0.] # Bmin, Bmax, Bstep, thetaB, phiB 
+  - [0., 0., 0.] # E, thetaE, phiE
+  - [2.0] # [2.0, 10.0, 20.0, 40.0] # T1, T2, ..., Tn
+
+BET_Egrid:
+  - [0., 0., 0.] # B, thetaB, phiB 
+  - [0., 10., 11., 0., 0.] # Emin, Emax, Estep, thetaE, phiE
+  - [2.0] # T1, T2, ..., Tn
+
+BET_BEgrid:
+  - [0., 200., 0.1, 0., 0.] # Bmin, Bmax, Bstep, thetaB, phiB 
+  - [0., 10., 11., 0., 0.] # Emin, Emax, Estep, thetaE, phiE
+  - [2.0] # T1, T2, ..., Tn
+
+BET_Tgrid:
+  - [0., 0.5, 1., 0., 0.] # B1, B2, ..., Bn, thetaB, phiB
+  - [0., 1.0, 5., 10., 50., 100., 0., 0.] # E1, E2, ..., En, thetaE, phiE
+  - [0.2, 1, 0.2, 2, 10, 2, 20, 300, 20] # Tmin1, Tmax1, Tstep1, Tmin2, Tmax2, Tstep2, ..., Tminn, Tmaxn, Tstepn
+
+fit_problem:
+  - l_fit: true
+    #  true: fit exchange coupling constants
+    # false: do not fit exchange coupling constants
+    n_par: 2
+    initial_values: [-2.43, -5.18]
+    lower_limits:   [-4.00, -7.00]
+    upper_limits:   [-1.00, -3.00]
+    current_values: [-2.43, -5.18]
+    elements_to_vary:
+        - pair: 1
+          element: [0, 0]
+        - pair: 4
+          element: [0, 0]
+    constrain_pairs: # Which pairs are the same in the specified reference frames
+        - [1, 2, 3]
+        - [4, 5, 6] 
+    constrain_elements:
+        # element2 = factor * element1
+        # pair should be the first element of each entry of constrain_pairs if present there
+        - pair: 1
+          element1: [0, 0]
+          element2: [1, 1]
+          factor: 1
+        - pair: 1
+          element1: [0, 0]
+          element2: [2, 2]
+          factor: 1
+        - pair: 4
+          element1: [0, 0]
+          element2: [1, 1]
+          factor: 1
+        - pair: 4
+          element1: [0, 0]
+          element2: [2, 2]
+          factor: 1
+
+  - l_fit: true
+    #  true: fit ZFS parameters
+    # false: do not fit ZFS parameters
+    n_par: 4
+    initial_values: [-0.03, 0.03, -0.01, 0.01] # B20, B22/B20 if B22 is to be fitted
+    lower_limits:   [-0.50, 0.00, -0.05, 0.00] 
+    upper_limits:   [-0.00, 1.00, -0.00, 1.00]
+    current_values: [-0.03, 0.03, -0.01, 0.01]
+    elements_to_vary:
+        - site: 1
+          i_Bkq: 0
+          is_B22: false
+        - site: 1
+          i_Bkq: 1
+          is_B22: true
+        - site: 4
+          i_Bkq: 0
+          is_B22: false
+        - site: 4
+          i_Bkq: 1
+          is_B22: true
+    constrain_sites: # Which sites are the same in the specified reference frames
+        - [1, 2, 3]
+
+  - l_fit: true
+    #  true: scale the experimental data by a linear factor [and add a linear constant if l_shift = true]
+    # false: do not scale the experimental data
+    l_shift: false # one entry if false for the options in the following four lines, two entries if true
+    initial_values: [1.14]
+    lower_limits: [1.00]
+    upper_limits: [1.30]
+    current_values: [1.14]
+
