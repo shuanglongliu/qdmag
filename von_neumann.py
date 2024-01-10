@@ -4,6 +4,7 @@ from common import sph2cart_deg
 from constants import Kelvin2wavenumber, Tesla2wavenumber
 from constants import const1
 import pickle
+import ray
 
 # =======================================================================
 # Functions for basis transformation
@@ -69,12 +70,12 @@ def get_pulse(cs, tmin, tmax, deltat):
     Magnetic pulse field
     """
 
-    nt = int( (tmax - tmin)/deltat ) + 1
-    ts = np.linspace(tmin, tmax, nt, endpoint=True)
+    nt = int( (tmax - tmin)/deltat )
+    ts = np.linspace(tmin, tmax, nt, endpoint=False)
 
     Bs = cs(ts)
 
-    deltat = (tmax - tmin) / (nt - 1)
+    deltat = (tmax - tmin) / nt
 
     return (nt, ts, Bs, deltat)
 
@@ -113,13 +114,13 @@ def get_h_Zeeman_h0basis(Mv_tot, Bv, coord):
 
     return h_zee
 
-def get_h_h0basis(h0, Mv_tot, Bs, theta_B, phi_B, iB):
+def get_h_h0basis(h0, Mv_tot, B, theta_B, phi_B):
     """
     Both h0 and Mv_tot should be on the basis of eigenvectors of h0.
     Return hs = [h(t1), h(t2), ..., h(tn)]
     """
 
-    h_zee = get_h_Zeeman_h0basis(Mv_tot, [Bs[iB], theta_B, phi_B], 'spherical')
+    h_zee = get_h_Zeeman_h0basis(Mv_tot, [B, theta_B, phi_B], 'spherical')
     h = h0 + h_zee
 
     return h
@@ -174,11 +175,11 @@ def get_DeltaU(h0, Mv_tot, Bs, theta_B, phi_B, iB, jB, deltat):
     Note: The first letter "D" in DeltaU here is a capital letter, indicating time evolution over a period which may be long.
     """
 
-    h = get_h_h0basis(h0, Mv_tot, Bs, theta_B, phi_B, iB)
+    h = get_h_h0basis(h0, Mv_tot, Bs[iB], theta_B, phi_B)
     DeltaU = get_deltaU(h, deltat)
 
     for i in range(iB+1, jB+1):
-        h = get_h_h0basis(h0, Mv_tot, Bs, theta_B, phi_B, i)
+        h = get_h_h0basis(h0, Mv_tot, Bs[i], theta_B, phi_B)
         deltaU = get_deltaU(h, deltat)
         DeltaU = np.matmul(deltaU, DeltaU)
 
@@ -204,11 +205,11 @@ def get_DeltaU_ray(args):
 
     h0, Mv_tot, nB, Bs, theta_B, phi_B, deltat = args
 
-    h = get_h_h0basis(h0, Mv_tot, Bs, theta_B, phi_B, 0)
+    h = get_h_h0basis(h0, Mv_tot, Bs[0], theta_B, phi_B)
     DeltaU = get_deltaU(h, deltat)
 
     for i in range(1, nB):
-        h = get_h_h0basis(h0, Mv_tot, Bs, theta_B, phi_B, i)
+        h = get_h_h0basis(h0, Mv_tot, Bs[i], theta_B, phi_B)
         deltaU = get_deltaU(h, deltat)
         DeltaU = np.matmul(deltaU, DeltaU)
 
@@ -217,6 +218,22 @@ def get_DeltaU_ray(args):
 
 
 def get_DeltaUs_ray(h0, Mv_tot, theta_B, phi_B, tmin, tmax, deltat, nperiod):
+    """
+    Get TIME EVOLUTION OPERATORS DeltaUs.
+    DeltaU (not deltaU) is defined as deltaU(ts[nt]) \cdot deltaU(ts[nt-1]) \codt ... \cdot deltaU(ts[1]) \cdot deltaU(ts[0]).
+
+    Input: 
+      h0: Spin Hamiltonian under zero field on the basis of of eigenvectors of h0. 
+      Mv_tot: Magnetization operators on the basis of of eigenvectors of h0.
+      theta_B: polar angle of Bs. Unit: deg.
+      phi_B: azimuthal angle of Bs. Unit: deg.
+      tmin: initial time
+      tmax: final time
+      deltat: time step
+      nperiod: number of time periods, one time period can have many deltats.
+
+    Output: DeltaUs = [DeltaU_n, ..., DeltaU_2, DeltaU_1]
+    """
 
     cs = load_cs()
 
@@ -228,7 +245,32 @@ def get_DeltaUs_ray(h0, Mv_tot, theta_B, phi_B, tmin, tmax, deltat, nperiod):
         print("nperiod should be smaller than the number of time steps. Stopping ...")
         exit()
 
-    # Resume here.
+    # Divide ts into nperiod time periods
+
+    nt_per_period = nt // nperiod
+    nt_left_over = nt % nperiod
+
+    # get a list of arguments for get_DeltaU_ray
+
+    list_of_args = []
+
+    for iperiod in range(nperiod):
+        iB = iperiod * nt_per_period
+        jB = iB + nt_per_period
+        list_of_args.append( (h0, Mv_tot, nt_per_period, Bs[iB: jB], theta_B, phi_B, deltat) )
+
+    if nt_left_over != 0:
+        iB = nperiod * nt_per_period
+        list_of_args.append( (h0, Mv_tot, nt_left_over, Bs[iB: nt], theta_B, phi_B, deltat) )
+
+        nperiod = nperiod + 1
+
+    # Parallel calculations of DeltaUs
+
+    futures = [ get_DeltaU_ray.remote(list_of_args[i]) for i in range(nperiod) ]
+    DeltaUs = ray.get(futures)
+
+    return DeltaUs
 
 
 
@@ -271,6 +313,37 @@ def evolve_Deltat(rho, DeltaU):
     rho_new = np.matmul(DeltaU, np.matmul(rho, DeltaU_dagger))
 
     return rho_new
+
+
+
+def evolve_Deltats(rho, DeltaUs):
+    """
+    Evolve the density matrix rho by Deltats: rho_new = DeltaU_n ... DeltaU_2 DeltaU_1 rho DeltaU_1_dagger DeltaU_2_dagger ... DeltaU_n_dagger.
+    Both rho and DeltaU should be on the basis of eigenvectors of h0
+    """
+
+    nDeltaU = len(DeltaUs)
+
+    rho_new = evolve_Deltat(rho, DeltaUs[0])
+
+    for i in range(1, nDeltaU):
+        rho_new = evolve_Deltat(rho_new, DeltaUs[i])
+
+    return rho_new
+
+
+
+def save_rho(rho, t):
+    """
+    Save the density matrix at time t. Unit for time: ps.
+    """
+
+    fname = "rho_t{:.6f}ps.pickle".format(t)
+
+    with open(fname, "wb") as f:
+        pickle.dump(rho, f)
+
+    return
 
 
 

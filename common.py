@@ -273,6 +273,9 @@ def check_unitary(op):
         print("It is not unitary.")
     return
 
+def get_commutation(O1, O2):
+    return np.matmul(O1, O2) - np.matmul(O2, O1) 
+
 def check_commutation(O1, O2):
     x = np.matmul(O1, O2) 
     y = np.matmul(O2, O1) 
@@ -408,7 +411,7 @@ def save_spins(spins, eigen):
                 for alpha in range(3):
                     f.write("{:8.3f} ".format(E_local_spins[i_site][alpha]))
             for alpha in range(3):
-                f.write("{:8.3f} ".format(E_Sv_tot[alpha]))
+                f.write("{:12.8f} ".format(E_Sv_tot[alpha]))
             f.write("{:8.3f} ".format(E_S2_tot))
             f.write("{:8.3f}\n".format(E_S_tot))
 
@@ -450,6 +453,18 @@ def get_total_spin_for_all_eigenstates(spins, eigen):
         results.append([E_S_tot] + E_Sv_tot)
 
     return results
+
+def get_total_Sz_for_all_eigenstates(spins, eigen):
+
+    list_of_Sz_tot = []
+
+    for i in range(eigen.dim):
+        state = eigen.eigenvectors[:, eigen.indices[i]]
+        list_of_Sz_tot.append( np.real(np.dot(np.conjugate(state), np.matmul(spins.Sv_tot[2], state))) )
+
+    #print((eigen.dim * "{:12.6f}\n").format(*list_of_Sz_tot))
+        
+    return list_of_Sz_tot
 
 ## =================================================================
 ## Functions for magnetic exchange interaction.
