@@ -2,6 +2,7 @@ import numpy as np
 from constants import const1, Kelvin2wavenumber
 from common import get_total_Sz_for_all_eigenstates
 from common import get_commutation
+from schrodinger import get_habc, get_habc_reuse_ha
 
 """
 Codes for solving the quantum master equation described in the Eq. 2.7 of
@@ -66,23 +67,22 @@ def Phi(T, omega):
 
     return ( spectral_density(omega) - spectral_density(-omega) ) / ( np.exp(beta * energy) - 1 )
 
-def construct_X(spins, eigen):
+def construct_X(total_Sz_for_all_eigenstates):
     """
     Construct the operator in the spin space, which couples to phonons.
     X_{ij} = 1 if | M_{iz} - M_{jz} | = 1. Otherwise, X_{ij} = 0. 
     """
 
-    list_of_Sz_tot = get_total_Sz_for_all_eigenstates(spins, eigen)
-    n = eigen.dim
+    n = len(total_Sz_for_all_eigenstates)
     X = np.zeros((n, n))
     for i in range(n):
         for j in range(n):
-            diff = abs(list_of_Sz_tot[i] - list_of_Sz_tot[j])
+            diff = abs(total_Sz_for_all_eigenstates[i] - total_Sz_for_all_eigenstates[j])
             # When a B field of 1e-9 T is added to the isotropic qunatum Heisenberg Hamiltonian, 
             # the deviation in Sz from half integers is within 1e-8 mu_B.
             if abs(diff - 1.0) < 1e-6:
                 X[i, j] = 1.0
-            #print("{:5d}::{:8.3f},   {:5d}::{:8.3f},   {:5.1f}".format(i, list_of_Sz_tot[i], j, list_of_Sz_tot[j], X[i, j]))
+            #print("{:5d}::{:8.3f},   {:5d}::{:8.3f},   {:5.1f}".format(i, total_Sz_for_all_eigenstates[i], j, total_Sz_for_all_eigenstates[j], X[i, j]))
     return X
 
 
@@ -111,7 +111,7 @@ def construct_Rhbar(T, X, eigen):
 
     #print(np.max(np.absolute(Rhbar)))
 
-    #np.savetxt("Rhbar.dat", Rhbar, fmt="%12.6f")
+    #np.savetxt("./output/Rhbar.dat", Rhbar, fmt="%12.6f")
 
     return Rhbar
 

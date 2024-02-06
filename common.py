@@ -221,6 +221,12 @@ class eigen_spin_hamiltonian:
 ## Functions for common mathematics.
 ## =================================================================
 
+def kronecker_delta(i, j):
+    k = 0
+    if i == j:
+        k = 1
+    return k
+
 def get_kronecker_product(ops,nop):
     if nop == 1:
         prod = ops[-1]
@@ -553,6 +559,32 @@ def get_h_Zeeman(spins, Bv, coord):
 
     return h_zee
 
+def get_h_Zeeman_Mv_tot(Mv_tot, Bv, coord):
+    """ 
+    Zeeman term H_Zee = - \vec{\mu} \cdot \vec{B} 
+
+    In the last line, B takes unit of energy (cm^-1 per \mu_B), and mu takes unit of \mu_b.
+    
+    coord: 's*' (for spherical) or else (for cartesian).
+
+    Units: Tesla for B, deg for angles.
+
+    Mv_tot can be given in arbitrary basis. 
+    """
+
+    if coord[0] == 's' or coord[0] == 'S':
+        Bv = Tesla2wavenumber*np.array(sph2cart_deg(Bv))
+    else:
+        Bv = Tesla2wavenumber*np.array(Bv)
+
+    dim = Mv_tot[0].shape[0]
+    
+    h_zee = np.zeros((dim, dim), dtype=complex)
+    for i in range(3):
+        h_zee = h_zee - Bv[i]*Mv_tot[i]
+
+    return h_zee
+
 ## =================================================================
 ## Functions for the Stark term.
 ## =================================================================
@@ -591,6 +623,28 @@ def get_energy_levels_vs_B(spins, h_ex, h_ani, Bgrid):
     for i in range(nB):
         B = Bmin + i*Bstep
         h_zee = get_h_Zeeman(spins, [B,theta_B,phi_B], 'spherical')
+        h = h0 + h_zee
+        eigen = eigen_spin_hamiltonian(h)
+        eigenvalues[i] = eigen.eigenvalues[eigen.indices]
+    eigenvalues = eigenvalues - energy0
+
+    with open("./output/Zeeman.dat", "w") as f:
+        for i in range(nB):
+            B = Bmin + i*Bstep
+            f.write((" {:12.6f}" + eigen.dim*" {:15.9f}" + "\n").format(B, *eigenvalues[i]))
+
+def get_energy_levels_vs_B_Mv_tot(h0, Mv_tot, Bgrid):
+
+    Bmin, Bmax, Bstep, theta_B, phi_B = Bgrid
+    nB = int((Bmax-Bmin)/Bstep) + 1
+
+    eigen = eigen_spin_hamiltonian(h0)
+    energy0 = eigen.eigenvalues[eigen.indices[0]]
+
+    eigenvalues = np.zeros((nB, eigen.dim))
+    for i in range(nB):
+        B = Bmin + i*Bstep
+        h_zee = get_h_Zeeman_Mv_tot(Mv_tot, [B,theta_B,phi_B], 'spherical')
         h = h0 + h_zee
         eigen = eigen_spin_hamiltonian(h)
         eigenvalues[i] = eigen.eigenvalues[eigen.indices]
@@ -752,6 +806,21 @@ def get_magnetic_moment(spins, eigen, T, Z):
         state = eigen.eigenvectors[:, eigen.indices[i]]
         for j in range(3):
             M[j] = M[j] + np.real(np.dot(np.conjugate(state), np.matmul(spins.Mv_tot[j], state))) * np.exp(-beta*eigenvalue)
+    M = M/Z
+    return M
+    
+def get_magnetic_moment_Mv_tot(Mv_tot, eigen, T, Z):
+
+    e_ref = eigen.eigenvalues[eigen.indices[0]]
+
+    beta = 1/(Kelvin2wavenumber * T)
+
+    M = np.array([0., 0., 0.])
+    for i in range(eigen.dim):
+        eigenvalue = eigen.eigenvalues[eigen.indices[i]] - e_ref
+        state = eigen.eigenvectors[:, eigen.indices[i]]
+        for j in range(3):
+            M[j] = M[j] + np.real(np.dot(np.conjugate(state), np.matmul(Mv_tot[j], state))) * np.exp(-beta*eigenvalue)
     M = M/Z
     return M
     
@@ -958,6 +1027,30 @@ def get_M_at_BET_plain(args):
     eigen = eigen_spin_hamiltonian(h)
     Z = get_partition_function(eigen, T)
     M = get_magnetic_moment(spins, eigen, T, Z)
+
+    return M
+
+
+
+def get_M_at_BET_Mv_tot(args):
+
+    """
+    B: Magnitude of B field
+    theta_B: polar angle of B field in deg
+    phi_B: azimuthal angle of B field in deg
+    E: Magnitude of E field in meV/Ang
+    theta_E: polar angle of E field in deg
+    phi_E: azimuthal angle of E field in deg
+    T: temperature
+    """
+
+    h0, Mv_tot, B, theta_B, phi_B, E, theta_E, phi_E, T = args
+
+    h_zee   = get_h_Zeeman_Mv_tot(Mv_tot, [B, theta_B, phi_B], "spherical")
+    h = h0 + h_zee
+    eigen = eigen_spin_hamiltonian(h)
+    Z = get_partition_function(eigen, T)
+    M = get_magnetic_moment_Mv_tot(Mv_tot, eigen, T, Z)
 
     return M
 

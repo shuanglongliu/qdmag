@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.linalg import expm
 from common import sph2cart_deg
+from common import get_h_Zeeman_Mv_tot
 from constants import Kelvin2wavenumber, Tesla2wavenumber
 from constants import const1
 import pickle
@@ -84,43 +85,13 @@ def get_pulse(cs, tmin, tmax, deltat):
 # Functions for obtaining the time-dependent Hamiltonian H(B(t))
 # =======================================================================
 
-def get_h_Zeeman_h0basis(Mv_tot, Bv, coord):
-    """ 
-    This function works on the basis of eigenvectors of h0.
-    Assumption: Mv_tot is written on the basis of eigenvectors of h0.
-
-    The function get_h_Zeeman in common.py works on the Sz basis.
-
-    Zeeman term H_Zee = - \vec{\mu} \cdot \vec{B} = \mu_B/\hbar \vec{B}[i] g_s[i,j] \vec{S}[j]
-                      = \vec{B}[i] g_s[i,j] \vec{S}[j]
-
-    In the last line, B takes unit of energy (cm^-1 per \mu_B), and spin takes unit of \hbar.
-    
-    coord: 's*' (for spherical) or else (for cartesian).
-
-    Units: Tesla for B, deg for angles.
-    """
-
-    if coord[0] == 's' or coord[0] == 'S':
-        Bv = Tesla2wavenumber*np.array(sph2cart_deg(Bv))
-    else:
-        Bv = Tesla2wavenumber*np.array(Bv)
-
-    dim = Mv_tot[0].shape[0]
-    
-    h_zee = np.zeros((dim, dim), dtype=complex)
-    for i in range(3):
-        h_zee = h_zee - Bv[i]*Mv_tot[i]
-
-    return h_zee
-
 def get_h_h0basis(h0, Mv_tot, B, theta_B, phi_B):
     """
     Both h0 and Mv_tot should be on the basis of eigenvectors of h0.
     Return hs = [h(t1), h(t2), ..., h(tn)]
     """
 
-    h_zee = get_h_Zeeman_h0basis(Mv_tot, [B, theta_B, phi_B], 'spherical')
+    h_zee = get_h_Zeeman_Mv_tot(Mv_tot, [B, theta_B, phi_B], 'spherical')
     h = h0 + h_zee
 
     return h

@@ -86,6 +86,12 @@ if __name__ == "__main__":
     #np.savetxt("Mz.dat", Mv_tot[2], fmt="%6.2f")
 
 
+
+    # Expectation of Sz_tot for all states
+
+    total_Sz_for_all_eigenstates = get_total_Sz_for_all_eigenstates(spins, eigen0)
+
+
     # Initial density matrix
 
     rho0 = get_rho0(eigen0, T)
@@ -114,7 +120,7 @@ if __name__ == "__main__":
 
     # Operators for constructing the \Gamma operator for spin-phonon coupling
 
-    X = construct_X(spins, eigen0)
+    X = construct_X(total_Sz_for_all_eigenstates)
     Rhbar = construct_Rhbar(T, X, eigen0)
 
 

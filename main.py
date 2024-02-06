@@ -7,6 +7,7 @@ from fitting import fit_magnetization
 from von_neumann import *
 from schrodinger import *
 from quantum_master import *
+from effective_basis import * 
 
 
 
@@ -53,14 +54,14 @@ if __name__ == "__main__":
     #check_commutation(h_ex, h_zee)
 
 
-    #start = time.time()
+    start = time.time()
 
     # Control parameters for time evolution
 
     T = 2.0 # Temperature in K
     tmin = 0.0 # Initial time in ps
-    tmax = 1.0 # Finial time in ps
-    deltat = 1e-4 # Time step in ps
+    tmax = 1e3 # Finial time in ps
+    deltat = 0.001 # Time step in ps
     theta_B = 90.0 # Polar angle of magnetic field in deg
     phi_B = 0.0 # Azimuthal angle of magnetic field in deg
     lambda_ = 0.0 # Spin phonon coupling constant in cm-1
@@ -86,16 +87,55 @@ if __name__ == "__main__":
     #np.savetxt("Mz.dat", Mv_tot[2], fmt="%6.2f")
 
 
+    # Expectation of Sz_tot for all states
+
+    total_Sz_for_all_eigenstates = get_total_Sz_for_all_eigenstates(spins, eigen0)
+
+
+    # Get the effective Hamiltonian
+
+    selected_states = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+
+    h0_eff, Mv_tot_eff = set_up_the_effective_system(h0, Mv_tot, selected_states)
+
+    Mz_tot_eff_re = np.real(Mv_tot_eff[2])
+    Mz_tot_eff_im = np.imag(Mv_tot_eff[2])
+
+    np.savetxt("./output/Mz_tot_eff_re.dat", Mz_tot_eff_re, fmt="%8.4f")
+    np.savetxt("./output/Mz_tot_eff_im.dat", Mz_tot_eff_im, fmt="%8.4f")
+
+    exit()
+
+
+    # Energy levels vs B field
+
+    #get_energy_levels_vs_B_Mv_tot(h0_eff, Mv_tot_eff, BET_Bgrid[0])
+
+
+    # Eigenvalues and eigenvectors of the effective Hamiltonian
+
+    eigen0_eff = eigen_spin_hamiltonian(h0_eff)
+
+
+
     # Initial density matrix
 
-    rho0 = get_rho0(eigen0, T)
-    #np.savetxt("rho0.dat", rho0, fmt="%12.6f")
+    rho0_eff = get_rho0(eigen0_eff, T)
+    #np.savetxt("./output/rho0_eff.dat", rho0_eff, fmt="%12.6f")
 
 
     # Initial magnetic moment
 
-    #M = get_M(rho0, Mv_tot)
+    #M = get_M(rho0_eff, Mv_tot_eff)
     #print("Initial M = {:12.4E} {:12.4E} {:12.4E} mu_B".format(*M))
+
+
+
+    # Operators for constructing the \Gamma operator for spin-phonon coupling
+
+    X_eff = construct_X_eff(total_Sz_for_all_eigenstates, selected_states)
+    Rhbar_eff = construct_Rhbar(T, X_eff, eigen0_eff)
+
 
 
     # Get the magnetic field pulse
@@ -108,32 +148,29 @@ if __name__ == "__main__":
 
     # Final magnetic moment if the system is in equilibrium
 
-    #M = get_M_at_BET_plain((spins, h_ex, h_ani, Bs[-1], theta_B, phi_B, 0, 0, 0, T))
+    #M =  get_M_at_BET_Mv_tot((h0_eff, Mv_eff, Bs[-1], theta_B, phi_B, 0, 0, 0, T))
     #print("  Final M = {:12.4E} {:12.4E} {:12.4E} mu_B (if in equilibrium)".format(*M))
 
-
-    # Operators for constructing the \Gamma operator for spin-phonon coupling
-
-    X = construct_X(spins, eigen0)
-    Rhbar = construct_Rhbar(T, X, eigen0)
+    #M =  get_M_at_BET_Mv_tot((h0_eff, Mv_tot_eff, 14, theta_B, phi_B, 0, 0, 0, T))
+    #print("  M = {:12.4E} {:12.4E} {:12.4E} mu_B".format(*M))
 
 
     # Evolve the density matrix
 
-    rho = evolve_rho_qme(h0, Mv_tot, rho0, nt, ts, deltat, Bs, theta_B, phi_B, cs, X, Rhbar, lambda_)
-    #np.savetxt("rho.dat", rho, fmt="%12.6f")
+    rho_eff = evolve_rho_qme(h0_eff, Mv_tot_eff, rho0_eff, nt, ts, deltat, Bs, theta_B, phi_B, cs, X_eff, Rhbar_eff, lambda_)
+    np.savetxt("./output/rho_eff.dat", rho_eff, fmt="%12.6f")
 
 
 
     # Final magnetic moment as the system is driven
 
-    M = get_M(rho, Mv_tot)
+    M = get_M(rho_eff, Mv_tot_eff)
     print("tmin = {:8.4f} ps, tmax = {:8.4f} ps, deltat = {:8.4f} ps, final M = {:12.4E} {:12.4E} {:12.4E} mu_B".format(tmin, tmax, deltat, *M))
 
 
 
-    #end   = time.time()
-    #print("Time: {:8.3f} s".format(end - start) )
+    end   = time.time()
+    print("Time: {:8.3f} s".format(end - start) )
 
 
 

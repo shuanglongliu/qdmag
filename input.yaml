@@ -111,7 +111,7 @@ dipole:
 ext_field: [0., 90., 0., 0., 0., 0.] # B, thetaB, phiB, E, thetaE, phiE
 
 BET_Bgrid:
-  - [0., 60., 0.5, 0., 0.] # Bmin, Bmax, Bstep, thetaB, phiB 
+  - [0., 60., 0.1, 0., 0.] # Bmin, Bmax, Bstep, thetaB, phiB 
   - [0., 0., 0.] # E, thetaE, phiE
   - [2.0] # [2.0, 10.0, 20.0, 40.0] # T1, T2, ..., Tn
 
