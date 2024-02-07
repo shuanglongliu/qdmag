@@ -1,0 +1,94 @@
+    T = 2.0 # Temperature in K
+    tmin = 0.0 # Initial time in ps
+    tmax = 10.0 # Finial time in ps
+    deltat = 0.01 # Time step in ps
+    theta_B = 0.0 # Polar angle of magnetic field in deg
+    phi_B = 0.0 # Azimuthal angle of magnetic field in deg
+    lambda_ = 50 # Spin phonon coupling constant in cm-1
+
+    rho0_eff = np.zeros(h0_eff.shape)
+    rho0_eff[0, 0] = 1.0
+
+Standard form:
+
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0010 ps, initial M =      -2.33521815E-04       0.00000000E+00       4.99999999E+00 mu_B
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0010 ps,   final M =      -1.01307022E-04       7.08074357E-05       2.68762579E+00 mu_B
+
+Liouville form: 
+
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps, initial M =      -2.33521815E-04       0.00000000E+00       4.99999999E+00 mu_B
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps,   final M =      -1.01307096E-04       7.08074201E-05       2.68762579E+00 mu_B
+
+
+
+    T = 2.0 # Temperature in K
+    tmin = 0.0 # Initial time in ps
+    tmax = 10.0 # Finial time in ps
+    deltat = 0.01 # Time step in ps
+    theta_B = 0.0 # Polar angle of magnetic field in deg
+    phi_B = 0.0 # Azimuthal angle of magnetic field in deg
+    lambda_ = 0 # Spin phonon coupling constant in cm-1
+
+    rho0_eff = np.zeros(h0_eff.shape)
+    rho0_eff[0, 0] = 1.0
+
+Standard form:
+
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps, initial M =      -2.33521815E-04       0.00000000E+00       4.99999999E+00 mu_B
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps,   final M =      -2.33521815E-04      -2.40638492E-10       4.99999999E+00 mu_B
+
+Liouville form: 
+
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps, initial M =      -2.33521815E-04       0.00000000E+00       4.99999999E+00 mu_B
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps,   final M =      -2.33521815E-04       0.00000000E+00       4.99999999E+00 mu_B
+
+
+
+    T = 2.0 # Temperature in K
+    tmin = 0.0 # Initial time in ps
+    tmax = 10.0 # Finial time in ps
+    deltat = 0.01 # Time step in ps
+    theta_B = 0.0 # Polar angle of magnetic field in deg
+    phi_B = 0.0 # Azimuthal angle of magnetic field in deg
+    lambda_ = 1.0 # Spin phonon coupling constant in cm-1
+
+    rho0_eff = np.zeros(h0_eff.shape)
+    rho0_eff[0, 0] = 1.0
+
+Standard form:
+
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps, initial M =      -2.33521815E-04       0.00000000E+00       4.99999999E+00 mu_B
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps,   final M =      -2.32904779E-04      -4.39030205E-10       4.99762141E+00 mu_B
+
+Liouville form: 
+
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps, initial M =      -2.33521815E-04       0.00000000E+00       4.99999999E+00 mu_B
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps,   final M =      -2.32904779E-04      -1.98994219E-10       4.99762141E+00 mu_B
+
+
+    T = 2.0 # Temperature in K
+    tmin = 0.0 # Initial time in ps
+    tmax = 10.0 # Finial time in ps
+    deltat = 0.01 # Time step in ps
+    theta_B = 0.0 # Polar angle of magnetic field in deg
+    phi_B = 0.0 # Azimuthal angle of magnetic field in deg
+    lambda_ = 10.0 # Spin phonon coupling constant in cm-1
+
+Standard form:
+
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps, initial M =      -4.57039060E-05       0.00000000E+00       3.00000000E+00 mu_B
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps,   final M =      -2.97334687E-05      -3.81747211E-08       2.77190794E+00 mu_B
+Time:    0.766 s
+
+Liouville form: 
+
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps, initial M =      -4.57039060E-05       0.00000000E+00       3.00000000E+00 mu_B
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps,   final M =      -2.97334703E-05      -3.81430432E-08       2.77190794E+00 mu_B
+Time:   22.574 s
+
+Liouville form using sparse matrix:
+
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps, initial M =      -4.57039060E-05       0.00000000E+00       3.00000000E+00 mu_B
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps,   final M =      -2.97334703E-05      -3.81430432E-08       2.77190794E+00 mu_B
+Time:  237.754 s
+

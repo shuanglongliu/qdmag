@@ -4,12 +4,14 @@ import copy
 import math
 import numpy as np
 import yaml
-from external.Operators import Operator
-from external.StevensOperators import StevensOpA
+import ray
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 from scipy.constants import N_A, mu_0
 from constants import meV2wavenumber, Tesla2wavenumber, Kelvin2meV, Kelvin2wavenumber
 from constants import x_mu_B, mu_B_per_Tesla_2_cm3_per_mol_phi
-import ray
+from external.Operators import Operator
+from external.StevensOperators import StevensOpA
 
 
 
@@ -325,6 +327,20 @@ def get_crossing_point(x1, y1, x2, y2):
     x = dx*dy1/(dy1 + dy2) + x1
     return x
 
+def convert_cmatrix_to_rmatrix(M, tag):
+    """
+    Return the real part of M if the imaginary part is negligibly small.
+    """
+
+    zero_imag = np.max( np.absolute( np.imag(M) ) ) < 1.e-12
+
+    if zero_imag:
+        print(tag, "is a real matrix. Using a matrix of real numbers to represent it.")
+    else:
+        print(tag, "is a complex matrix. Using a matrix of complex numbers to represent it.")
+
+    return np.real(M) if zero_imag else M
+
 ## =================================================================
 ## Functions for input and output.
 ## =================================================================
@@ -584,6 +600,45 @@ def get_h_Zeeman_Mv_tot(Mv_tot, Bv, coord):
         h_zee = h_zee - Bv[i]*Mv_tot[i]
 
     return h_zee
+
+def get_h_Zeeman_Mz_tot(Mz_tot, Bz):
+    """ 
+    Zeeman term H_Zee = - \vec{\mu} \cdot \vec{B} = - Mz_tot * Bz when the magnetic field is parallel to the z axis.
+
+    In the last line, B takes unit of energy (cm^-1 per \mu_B), and mu takes unit of \mu_b.
+    
+    Units: Tesla for B.
+
+    Mz_tot can be given in arbitrary basis. 
+    """
+
+    return -1 * Tesla2wavenumber*Bz * Mz_tot
+
+def get_h_Zeeman_minusMz_tot(minusMz_tot, Bz):
+    """ 
+    Zeeman term H_Zee = - \vec{\mu} \cdot \vec{B} = - Mz_tot * Bz when the magnetic field is parallel to the z axis.
+
+    In the last line, B takes unit of energy (cm^-1 per \mu_B), and mu takes unit of \mu_b.
+    
+    Units: Tesla for B.
+
+    Mz_tot can be given in arbitrary basis. 
+    """
+
+    return Tesla2wavenumber*Bz * minusMz_tot
+
+def get_h_Zeeman_minusMz_tot_Binwavenumber(minusMz_tot, Bz):
+    """ 
+    Zeeman term H_Zee = - \vec{\mu} \cdot \vec{B} = - Mz_tot * Bz when the magnetic field is parallel to the z axis.
+
+    In the last line, B takes unit of energy (cm^-1 per \mu_B), and mu takes unit of \mu_b.
+    
+    Units: cm^-1/mu_B for B.
+
+    Mz_tot can be given in arbitrary basis. 
+    """
+
+    return minusMz_tot * Bz
 
 ## =================================================================
 ## Functions for the Stark term.
@@ -1935,4 +1990,19 @@ def get_transition_strength_vs_B_for_one_pair(spins, h0, BET_Bgrid, i=0, j=1):
         f.write("# B (T)   para. transition strength   perp. transition strength\n")
         for iB in range(nB):
             f.write("{:8.4f} {:12.6E} {:12.6E}\n".format(Bs[iB], ts_para[iB], ts_perp[iB]))
+
+## =================================================================
+## Functions for plotting
+## =================================================================
+
+def spy_sparsity(M, tag, precision=1.0e-20, figsize=(20, 20), markersize=1):
+    """
+    Visualize the sparsity of the matrix M
+    """
+
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.spy(D, precision=precision, markersize=markersize)
+    plt.savefig("./output/sparsity_of_" + tag + ".pdf")
+
+    return
 

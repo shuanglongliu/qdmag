@@ -101,7 +101,7 @@ def construct_Rhbar(T, X, eigen):
 
     n = eigen.dim
 
-    Rhbar = np.zeros((n, n))
+    Rhbar = np.zeros((n, n), dtype=np.float64)
 
     for i in range(n):
         for j in range(n):

@@ -16,6 +16,23 @@ def get_pulse_for_Runge_Kutta(cs, tmin, tmax, deltat):
 
     return (nt, ts, Bs, deltat)
 
+def get_pulse_for_Runge_Kutta_double_grid(cs, tmin, tmax, deltat):
+    """
+    Magnetic pulse field
+    ts: step = deltat
+    Bs: step = deltat/2
+    """
+
+    nt = int( (tmax - tmin)/deltat )
+    deltat = (tmax - tmin) / nt
+    ts = np.linspace(tmin, tmax, nt+1, endpoint=True)
+
+    ts2 = np.linspace(tmin, tmax, 2*nt+1, endpoint=True)
+    Bs = cs(ts2)
+
+
+    return (nt, ts, Bs, deltat)
+
 def evolve_deltat(ha, hb, hc, psi, deltat):
     """
     Evolve psi by deltat using the Runge-Kutta method according to the time dependent Schrodinger equation

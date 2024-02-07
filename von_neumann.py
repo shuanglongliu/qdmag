@@ -25,12 +25,18 @@ def transform_O(O, eigen0):
 
 
 
-def transform_h0(h0, eigen0):
+def transform_h0_using_eigen0(h0, eigen0):
     """
-    Basis transformation for h0
+    Basis transformation for h0 on the basis of the eigenvectors of h0.
+    After transformation, h0[i, j] = e_i delta_{ij} where e_i are the eigenvalues of h0.
     """
 
-    h0_new = transform_O(h0, eigen0)
+    #h0_new = transform_O(h0, eigen0)
+    #print(np.all( np.absolute(h0_new.diagonal() - eigen0.eigenvalues) < 1.e-9 ) ) # True
+
+    h0_new = np.zeros(h0.shape, dtype=np.float64)
+    for i in range(h0.shape[0]):
+        h0_new[i, i] = eigen0.eigenvalues[i]
 
     return h0_new
 
