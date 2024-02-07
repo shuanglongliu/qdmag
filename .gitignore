@@ -162,6 +162,6 @@ cython_debug/
 # data files
 
 .dat
-.log
+#.log
 output/
 
