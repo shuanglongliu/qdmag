@@ -17,10 +17,10 @@ def set_up_the_effective_system(h0_full, Mv_tot_full, selected_states):
     # We use complex matrices here for general cases.
     # We need to code a real verion later.
 
-    h0_eff = np.zeros((n, n), dtype=complex)
-    Mx_tot = np.zeros((n, n), dtype=complex)
-    My_tot = np.zeros((n, n), dtype=complex)
-    Mz_tot = np.zeros((n, n), dtype=complex)
+    h0_eff = np.zeros((n, n), dtype=np.complex64)
+    Mx_tot = np.zeros((n, n), dtype=np.complex64)
+    My_tot = np.zeros((n, n), dtype=np.complex64)
+    Mz_tot = np.zeros((n, n), dtype=np.complex64)
 
     for i in range(n):
         for j in range(n):
@@ -46,9 +46,9 @@ def get_effective_Mv_tot(Mv_tot_full, selected_states):
 
     n = len(selected_states)
 
-    Mx_tot = np.zeros((n, n), dtype=complex)
-    My_tot = np.zeros((n, n), dtype=complex)
-    Mz_tot = np.zeros((n, n), dtype=complex)
+    Mx_tot = np.zeros((n, n), dtype=np.complex64)
+    My_tot = np.zeros((n, n), dtype=np.complex64)
+    Mz_tot = np.zeros((n, n), dtype=np.complex64)
 
     for i in range(n):
         for j in range(n):

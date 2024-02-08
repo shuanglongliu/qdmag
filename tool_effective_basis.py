@@ -61,7 +61,7 @@ if __name__ == "__main__":
     T = 2.0 # Temperature in K
     tmin = 0.0 # Initial time in ps
     tmax = 1.0 # Finial time in ps
-    deltat = 0.01 # Time step in ps
+    deltat = 0.001 # Time step in ps
     theta_B = 0.0 # Polar angle of magnetic field in deg
     phi_B = 0.0 # Azimuthal angle of magnetic field in deg
     lambda_ = 10.0 # Spin phonon coupling constant in cm-1

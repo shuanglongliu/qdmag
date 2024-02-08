@@ -107,6 +107,7 @@ def construct_Rhbar(T, X, eigen):
         for j in range(n):
             omega_ij = omegas[i] - omegas[j]
             if X[i, j] != 0.0:
+                print(i, j, omega_ij)
                 Rhbar[i, j] = X[i, j] * Phi(T, omega_ij)
 
     #print(np.max(np.absolute(Rhbar)))
