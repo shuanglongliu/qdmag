@@ -1,39 +1,46 @@
 import numpy as np
-from von_neumann import get_h_h0basis
 from constants import const1
+from von_neumann import get_h_h0basis
 
-def get_pulse_for_Runge_Kutta(cs, tmin, tmax, deltat):
+def get_habc(h0, Mv_tot, it, deltat, Bs2, theta_B, phi_B):
     """
-    Magnetic pulse field
-    """
+    Obtain ha = h(ts[it])
+           hb = h(ts[it] + deltat/2)
+           hc = h(ts[it] + deltat)
 
-    nt = int( (tmax - tmin)/deltat )
-    deltat = (tmax - tmin) / nt
-    ts = np.linspace(tmin, tmax+deltat, nt+1, endpoint=False)
+    h0 and Mv_tot are on the basis of the eigenvectors of h0.
 
-    Bs = cs(ts)
-
-
-    return (nt, ts, Bs, deltat)
-
-def get_pulse_for_Runge_Kutta_double_grid(cs, tmin, tmax, deltat):
-    """
-    Magnetic pulse field
-    ts: step = deltat
-    Bs: step = deltat/2
+    ts:  A list of time with a time step of deltat
+    Bs2: A list of B fields with a time step of deltat/2
+         B(t = ts[it]) = Bs2[2*it]
     """
 
-    nt = int( (tmax - tmin)/deltat )
-    deltat = (tmax - tmin) / nt
-    ts = np.linspace(tmin, tmax, nt+1, endpoint=True)
+    ha = get_h_h0basis(h0, Mv_tot, Bs2[2*it  ], theta_B, phi_B)
+    hb = get_h_h0basis(h0, Mv_tot, Bs2[2*it+1], theta_B, phi_B)
+    hc = get_h_h0basis(h0, Mv_tot, Bs2[2*it+2], theta_B, phi_B)
 
-    ts2 = np.linspace(tmin, tmax, 2*nt+1, endpoint=True)
-    Bs = cs(ts2)
+    return (ha, hb, hc)
+
+def get_habc_reuse_ha(h0, Mv_tot, it, deltat, Bs2, theta_B, phi_B, ha, hb, hc):
+    """
+    Obtain ha = h(ts[it])
+           hb = h(ts[it] + deltat/2)
+           hc = h(ts[it] + deltat)
+
+    h0 and Mv_tot are on the basis of the eigenvectors of h0.
+
+    ts:  A list of time with a time step of deltat
+    Bs2: A list of B fields with a time step of deltat/2
+         B(t = ts[it]) = Bs2[2*it]
+    """
+
+    hb = get_h_h0basis(h0, Mv_tot, Bs2[2*it+1], theta_B, phi_B)
+    hc = get_h_h0basis(h0, Mv_tot, Bs2[2*it+2], theta_B, phi_B)
+
+    return (ha, hb, hc)
 
 
-    return (nt, ts, Bs, deltat)
-
-def evolve_deltat(ha, hb, hc, psi, deltat):
+def evolve_psi_by_deltat(ha, hb, hc, psi, deltat):
     """
     Evolve psi by deltat using the Runge-Kutta method according to the time dependent Schrodinger equation
     i \partial \psi / \partial t = const1 * h(t) \psi or \partial \psi / \partial t = -i * const1 * h(t) \psi
@@ -58,7 +65,7 @@ def evolve_deltat(ha, hb, hc, psi, deltat):
 
     return psi_new
 
-def evolve_psi_by_nt_steps(h0, Mv_tot, eigenvectors, nt, ts, deltat, Bs, theta_B, phi_B, cs):
+def evolve_psi_by_nt_steps(h0, Mv_tot, eigenvectors, nt, deltat, Bs2, theta_B, phi_B):
     """
     Evolve psi by nt time steps using the Runge-Kutta method according to the time dependent Schrodinger equation..
 
@@ -69,21 +76,19 @@ def evolve_psi_by_nt_steps(h0, Mv_tot, eigenvectors, nt, ts, deltat, Bs, theta_B
       Mv_tot: Magnetization operators written on the basis of the eigenvectors of h0.
       eigenvectors: initial wavefunctions at t0, each column is one wavefunction.
       nt: number of time steps.
-      ts: list of time in unit of ps.
       delta: time step in unit of ps.
       Bs: list of magnetic field.
       theta_B: polar angle of the magnetic field.
       phi_B: azimuthal angle of the magnetic field.
-      cs: monotone cubic spline object for the pulse field.
     """
 
-    ha, hb, hc = get_habc(h0, Mv_tot, ts, 0, deltat, Bs, theta_B, phi_B, cs)
+    it = 0; ha, hb, hc = get_habc(h0, Mv_tot, it, deltat, Bs2, theta_B, phi_B)
 
-    eigenvectors = evolve_deltat(ha, hb, hc, eigenvectors, deltat)
+    eigenvectors = evolve_psi_by_deltat(ha, hb, hc, eigenvectors, deltat)
     #print(eigenvectors)
 
-    for i in range(1, nt):
-        ha, hb, hc = get_habc_reuse_ha(h0, Mv_tot, ts, i, deltat, Bs, theta_B, phi_B, cs, hc)
+    for it in range(1, nt):
+        ha, hb, hc = get_habc_reuse_ha(h0, Mv_tot, it, deltat, Bs2, theta_B, phi_B, hc, ha, hb)
         eigenvectors = evolve_deltat(ha, hb, hc, eigenvectors, deltat)
 
     return eigenvectors
@@ -94,38 +99,6 @@ def get_initial_eigenvectors(h0):
     """
 
     return np.eye(h0.shape[0])
-
-def get_habc(h0, Mv_tot, ts, it, deltat, Bs, theta_B, phi_B, cs):
-    """
-    Obtain ha = h(ts[it])
-           hb = h(ts[it] + deltat/2)
-           hc = h(ts[it] + deltat)
-    h0 and Mv_tot are on the basis of the eigenvectors of h0.
-    """
-
-    ha = get_h_h0basis(h0, Mv_tot, Bs[it], theta_B, phi_B)
-
-    B = cs(ts[it] + deltat/2)
-    hb = get_h_h0basis(h0, Mv_tot, B, theta_B, phi_B)
-
-    hc = get_h_h0basis(h0, Mv_tot, Bs[it+1], theta_B, phi_B)
-
-    return (ha, hb, hc)
-
-def get_habc_reuse_ha(h0, Mv_tot, ts, it, deltat, Bs, theta_B, phi_B, cs, ha):
-    """
-    Obtain ha = h(ts[it])
-           hb = h(ts[it] + deltat/2)
-           hc = h(ts[it] + deltat)
-    h0 and Mv_tot are on the basis of the eigenvectors of h0.
-    """
-
-    B = cs(ts[it] + deltat/2)
-    hb = get_h_h0basis(h0, Mv_tot, B, theta_B, phi_B)
-
-    hc = get_h_h0basis(h0, Mv_tot, Bs[it+1], theta_B, phi_B)
-
-    return (ha, hb, hc)
 
 def get_rho_from_eigenvectors(rho0, eigenvectors):
     """
@@ -143,6 +116,4 @@ def get_rho_from_eigenvectors(rho0, eigenvectors):
                 rho[i, j] = rho[i, j] + rho0[k, k] * eigenvectors[i, k] * eigenvectors_conj[j, k]
 
     return rho
-
-
 

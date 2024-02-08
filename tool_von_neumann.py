@@ -4,6 +4,7 @@ import time
 import ray
 from common import *
 from fitting import fit_magnetization
+from pulse import *
 from von_neumann import *
 
 
@@ -85,7 +86,7 @@ if __name__ == "__main__":
     # Get the magnetic field pulse
 
     cs = load_cs()
-    nt, ts, Bs, deltat = get_pulse(cs, tmin, tmax, deltat)
+    nt, ts, Bs, deltat = get_pulse_for_TEO(cs, tmin, tmax, deltat)
     #print("The last magnetic field is {:8.4f} T".format(Bs[-1]))
 
     # Final magnetic moment if the system is in equilibrium
@@ -95,7 +96,7 @@ if __name__ == "__main__":
 
     # Get time evolution operators
 
-    DeltaUs = get_DeltaUs_ray(h0, Mv_tot, theta_B, phi_B, tmin, tmax, deltat, nperiod)
+    DeltaUs = get_DeltaUs_ray(h0, Mv_tot, nt, ts, deltat, Bs, theta_B, phi_B, nperiod)
 
     # Evolve the density matrix due to the magnetic field pulse
 

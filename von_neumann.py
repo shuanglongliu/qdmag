@@ -57,37 +57,6 @@ def transform_Mv_tot(Mv_tot, eigen0):
 
 
 # =======================================================================
-# Functions for obtaining the time-dependent magnetic field
-# =======================================================================
-
-def load_cs():
-    """
-    Load the monotone cubic spline object for the pulse field
-    Units: ps for time and T for magnetic field
-    """
-
-    with open("cs_pulse.pickle", "rb") as f:
-        cs = pickle.load(f)
-
-    return cs
-
-
-def get_pulse(cs, tmin, tmax, deltat):
-    """
-    Magnetic pulse field
-    """
-
-    nt = int( (tmax - tmin)/deltat )
-    ts = np.linspace(tmin, tmax, nt, endpoint=False)
-
-    Bs = cs(ts)
-
-    deltat = (tmax - tmin) / nt
-
-    return (nt, ts, Bs, deltat)
-
-
-# =======================================================================
 # Functions for obtaining the time-dependent Hamiltonian H(B(t))
 # =======================================================================
 
@@ -194,7 +163,7 @@ def get_DeltaU_ray(args):
 
 
 
-def get_DeltaUs_ray(h0, Mv_tot, theta_B, phi_B, tmin, tmax, deltat, nperiod):
+def get_DeltaUs_ray(h0, Mv_tot, nt, ts, deltat, Bs, theta_B, phi_B, nperiod):
     """
     Get TIME EVOLUTION OPERATORS DeltaUs.
     DeltaU (not deltaU) is defined as deltaU(ts[nt]) \cdot deltaU(ts[nt-1]) \codt ... \cdot deltaU(ts[1]) \cdot deltaU(ts[0]).
@@ -202,19 +171,16 @@ def get_DeltaUs_ray(h0, Mv_tot, theta_B, phi_B, tmin, tmax, deltat, nperiod):
     Input: 
       h0: Spin Hamiltonian under zero field on the basis of of eigenvectors of h0. 
       Mv_tot: Magnetization operators on the basis of of eigenvectors of h0.
+      nt: number of time points
+      ts: time grid with a time step deltat
+      deltat: time step
+      Bs: magnetic fields on the time grid ts
       theta_B: polar angle of Bs. Unit: deg.
       phi_B: azimuthal angle of Bs. Unit: deg.
-      tmin: initial time
-      tmax: final time
-      deltat: time step
       nperiod: number of time periods, one time period can have many deltats.
 
     Output: DeltaUs = [DeltaU_n, ..., DeltaU_2, DeltaU_1]
     """
-
-    cs = load_cs()
-
-    nt, ts, Bs, deltat = get_pulse(cs, tmin, tmax, deltat)
 
     nDeltaU = nperiod
 

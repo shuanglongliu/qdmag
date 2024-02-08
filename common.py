@@ -2001,7 +2001,7 @@ def spy_sparsity(M, tag, precision=1.0e-20, figsize=(20, 20), markersize=1):
     """
 
     fig, ax = plt.subplots(figsize=figsize)
-    ax.spy(D, precision=precision, markersize=markersize)
+    ax.spy(M, precision=precision, markersize=markersize)
     plt.savefig("./output/sparsity_of_" + tag + ".pdf")
 
     return

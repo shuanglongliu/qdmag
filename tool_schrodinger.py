@@ -4,6 +4,7 @@ import time
 import ray
 from common import *
 from fitting import fit_magnetization
+from pulse import *
 from von_neumann import *
 from schrodinger import *
 
@@ -94,14 +95,13 @@ if __name__ == "__main__":
     # Get the magnetic field pulse
 
     cs = load_cs()
-    #nt, ts, Bs, deltat = get_pulse(cs, tmin, tmax, deltat)
-    nt, ts, Bs, deltat = get_pulse_for_schrodinger(cs, tmin, tmax, deltat)
-    #print("The last magnetic field is {:8.4f} T".format(Bs[-1]))
+    nt, ts, Bs2, deltat = get_pulse_for_Runge_Kutta_double_grid(cs, tmin, tmax, deltat)
+    #print("The last magnetic field is {:8.4f} T".format(Bs2[-1]))
 
 
     # Final magnetic moment if the system is in equilibrium
 
-    #M = get_M_at_BET_plain((spins, h_ex, h_ani, Bs[-1], theta_B, phi_B, 0, 0, 0, T))
+    #M = get_M_at_BET_plain((spins, h_ex, h_ani, Bs2[-1], theta_B, phi_B, 0, 0, 0, T))
     #print("  Final M = {:12.4E} {:12.4E} {:12.4E} mu_B (if in equilibrium)".format(*M))
 
 
@@ -119,7 +119,7 @@ if __name__ == "__main__":
 
     # Evolve eigenvectors
 
-    eigenvectors = evolve_psi_by_nt_steps(h0, Mv_tot, eigenvectors0, nt, ts, deltat, Bs, theta_B, phi_B, cs)
+    eigenvectors = evolve_psi_by_nt_steps(h0, Mv_tot, eigenvectors0, nt, deltat, Bs2, theta_B, phi_B)
 
 
     # Final magnetic moment as the system is driven

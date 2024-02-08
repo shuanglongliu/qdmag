@@ -1,4 +1,5 @@
 import numpy as np
+from common import spy_sparsity
 
 def set_up_the_effective_system(h0_full, Mv_tot_full, selected_states):
     """
@@ -17,10 +18,11 @@ def set_up_the_effective_system(h0_full, Mv_tot_full, selected_states):
     # We use complex matrices here for general cases.
     # We need to code a real verion later.
 
-    h0_eff = np.zeros((n, n), dtype=np.complex64)
-    Mx_tot = np.zeros((n, n), dtype=np.complex64)
-    My_tot = np.zeros((n, n), dtype=np.complex64)
-    Mz_tot = np.zeros((n, n), dtype=np.complex64)
+    # np.complex64 is not enough to capture the energy differences between the nearly degenerate states (which are indeed degenerate without perturbation).
+    h0_eff = np.zeros((n, n), dtype=np.complex128)
+    Mx_tot = np.zeros((n, n), dtype=np.complex128)
+    My_tot = np.zeros((n, n), dtype=np.complex128)
+    Mz_tot = np.zeros((n, n), dtype=np.complex128)
 
     for i in range(n):
         for j in range(n):
@@ -46,9 +48,9 @@ def get_effective_Mv_tot(Mv_tot_full, selected_states):
 
     n = len(selected_states)
 
-    Mx_tot = np.zeros((n, n), dtype=np.complex64)
-    My_tot = np.zeros((n, n), dtype=np.complex64)
-    Mz_tot = np.zeros((n, n), dtype=np.complex64)
+    Mx_tot = np.zeros((n, n), dtype=np.complex128)
+    My_tot = np.zeros((n, n), dtype=np.complex128)
+    Mz_tot = np.zeros((n, n), dtype=np.complex128)
 
     for i in range(n):
         for j in range(n):
@@ -76,7 +78,7 @@ def get_effective_operator(O_full, selected_states, is_real=False):
     if is_real:
         O_eff = np.zeros((n, n), dtype=np.float64)
     else:
-        O_eff = np.zeros((n, n), dtype=np.complex64)
+        O_eff = np.zeros((n, n), dtype=np.complex128)
 
     for i in range(n):
         for j in range(n):
@@ -103,7 +105,7 @@ def get_effective_operator_diag(O_full, selected_states, is_real=False):
     if is_real:
         O_eff_vec = np.zeros(n, dtype=np.float64)
     else:
-        O_eff_vec = np.zeros(n, dtype=np.complex64)
+        O_eff_vec = np.zeros(n, dtype=np.complex128)
 
     for i in range(n):
         ii = selected_states[i]
@@ -111,7 +113,7 @@ def get_effective_operator_diag(O_full, selected_states, is_real=False):
 
     return O_eff_vec
 
-def construct_X_eff(total_Sz_for_all_eigenstates, selected_states):
+def construct_X_eff(total_Sz_for_all_eigenstates, selected_states, save_to_file=False):
     """
     Construct the operator in the spin space, which couples to phonons.
     X_{ij} = 1 if | M_{iz} - M_{jz} | = 1. Otherwise, X_{ij} = 0. 
@@ -119,6 +121,7 @@ def construct_X_eff(total_Sz_for_all_eigenstates, selected_states):
 
     n = len(selected_states)
     X = np.zeros((n, n), dtype=np.float64)
+
     for i in range(n):
         for j in range(n):
             diff = abs(total_Sz_for_all_eigenstates[selected_states[i]] - total_Sz_for_all_eigenstates[selected_states[j]])
@@ -126,6 +129,14 @@ def construct_X_eff(total_Sz_for_all_eigenstates, selected_states):
             # the deviation in Sz from half integers is within 1e-8 mu_B.
             if abs(diff - 1.0) < 1e-6:
                 X[i, j] = 1.0
-            #print("{:5d}::{:8.3f},   {:5d}::{:8.3f},   {:5.1f}".format(i, total_Sz_for_all_eigenstates[selected_states[i]], j, total_Sz_for_all_eigenstates[selected_states[j]], X[i, j]))
+
+    if save_to_file:
+        with open("./output/X.dat", "w") as f:
+            for i in range(n):
+                for j in range(n):
+                    f.write("i   j   Sz_tot_i   Sz_tot_j   X_ij   = {:5d}   {:5d}   {:8.3f}   {:8.3f}   {:5.1f}\n".format( \
+                         i, j, total_Sz_for_all_eigenstates[selected_states[i]], total_Sz_for_all_eigenstates[selected_states[j]], X[i, j]))
+        spy_sparsity(X, "X", precision=1.0e-20, figsize=(10, 10), markersize=5)
+
     return X
 

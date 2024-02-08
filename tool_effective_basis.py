@@ -4,6 +4,7 @@ import time
 import ray
 from common import *
 from fitting import fit_magnetization
+from pulse import *
 from von_neumann import *
 from schrodinger import *
 from quantum_master import *
@@ -127,7 +128,9 @@ if __name__ == "__main__":
 
     # Operators for constructing the \Gamma operator for spin-phonon coupling
 
-    X_eff = construct_X_eff(total_Sz_for_all_eigenstates, selected_states)
+    #X_eff = construct_X_eff(total_Sz_for_all_eigenstates, selected_states, save_to_file=True); exit()
+    X_eff = construct_X_eff(total_Sz_for_all_eigenstates, selected_states, save_to_file=False)
+    #Rhbar_eff = construct_Rhbar(T, X_eff, eigen0_eff, save_to_file=True); exit()
     Rhbar_eff = construct_Rhbar(T, X_eff, eigen0_eff)
 
 
@@ -135,14 +138,13 @@ if __name__ == "__main__":
     # Get the magnetic field pulse
 
     cs = load_cs()
-    #nt, ts, Bs, deltat = get_pulse(cs, tmin, tmax, deltat)
-    nt, ts, Bs, deltat = get_pulse_for_Runge_Kutta(cs, tmin, tmax, deltat)
-    #print("The last magnetic field is {:8.4f} T".format(Bs[-1]))
+    nt, ts, Bs2, deltat = get_pulse_for_Runge_Kutta_double_grid(cs, tmin, tmax, deltat)
+    #print("The last magnetic field is {:8.4f} T".format(Bs2[-1]))
 
 
     # Final magnetic moment if the system is in equilibrium
 
-    #M =  get_M_at_BET_Mv_tot((h0_eff, Mv_eff, Bs[-1], theta_B, phi_B, 0, 0, 0, T))
+    #M =  get_M_at_BET_Mv_tot((h0_eff, Mv_eff, Bs2[-1], theta_B, phi_B, 0, 0, 0, T))
     #print("  Final M = {:12.4E} {:12.4E} {:12.4E} mu_B (if in equilibrium)".format(*M))
 
     #M =  get_M_at_BET_Mv_tot((h0_eff, Mv_tot_eff, 14, theta_B, phi_B, 0, 0, 0, T))
@@ -151,8 +153,9 @@ if __name__ == "__main__":
 
     # Evolve the density matrix
 
-    rho_eff = evolve_rho_qme(h0_eff, Mv_tot_eff, rho0_eff, nt, ts, deltat, Bs, theta_B, phi_B, cs, X_eff, Rhbar_eff, lambda_)
-    np.savetxt("./output/rho_eff.dat", rho_eff, fmt="%12.6f")
+    lambda1, lambda2 = get_constants(lambda_)
+    rho_eff = evolve_rho_qme(h0_eff, Mv_tot_eff, rho0_eff, nt, deltat, Bs2, theta_B, phi_B, X_eff, Rhbar_eff, lambda1, lambda2)
+    #np.savetxt("./output/rho_eff.dat", rho_eff, fmt="%12.6f")
 
 
 
