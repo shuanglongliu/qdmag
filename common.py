@@ -366,7 +366,7 @@ def read_input():
 
     return (Ss, nS, positions, exchange, anisotropy, gfactor, dipole, ext_field, BET_Bgrid, BET_Egrid, BET_BEgrid, BET_Tgrid, fit_problem)
 
-def save_eigenvalues(eigen, offset):
+def save_eigenvalues(eigen, offset=True, sort=True):
     
     if offset:
         eigenvalues = eigen.eigenvalues_offset
@@ -377,20 +377,29 @@ def save_eigenvalues(eigen, offset):
         subprocess.run(["mkdir", "./output"])
 
     with open("./output/eigenvalues.dat", "w") as f:
-        for i in range(len(eigenvalues)):
-            f.write("{:16.12f}\n".format(eigenvalues[eigen.indices[i]]))
+        if sort:
+            for i in range(eigen.dim):
+                f.write("{:16.12f}\n".format(eigenvalues[eigen.indices[i]]))
+        else:
+            for i in range(eigen.dim):
+                f.write("{:16.12f}\n".format(eigenvalues[i]))
 
     return
 
-def save_eigenvectors(spins, eigen):
+def save_eigenvectors(eigen, sort=True):
 
     if not os.path.exists("./output"):
         subprocess.run(["mkdir", "./output"])
 
     with open("./output/eigenvectors.dat", "w") as f:
-        for i in range(spins.dim):
-            state = eigen.eigenvectors[:, eigen.indices[i]]
-            f.write((spins.dim*" {:16.12f}" + "\n").format(*state))
+        if sort:
+            for i in range(eigen.dim):
+                state = eigen.eigenvectors[:, eigen.indices[i]]
+                f.write((eigen.dim*" {:16.12f}" + "\n").format(*state))
+        else:
+            for i in range(eigen.dim):
+                state = eigen.eigenvectors[:, i]
+                f.write((eigen.dim*" {:16.12f}" + "\n").format(*state))
     
     return
 

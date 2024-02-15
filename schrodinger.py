@@ -1,6 +1,6 @@
 import numpy as np
 from constants import const1
-from von_neumann import get_h_h0basis
+from von_neumann import get_h_h0basis, get_h_h0basis_Bz
 
 def get_habc(h0, Mv_tot, it, deltat, Bs2, theta_B, phi_B):
     """
@@ -21,6 +21,28 @@ def get_habc(h0, Mv_tot, it, deltat, Bs2, theta_B, phi_B):
 
     return (ha, hb, hc)
 
+def get_habc_Bz(h0, Mz_tot, it, deltat, Bs2):
+    """
+    Obtain ha = h(ts[it])
+           hb = h(ts[it] + deltat/2)
+           hc = h(ts[it] + deltat)
+
+    h0 and Mv_tot are on the basis of the eigenvectors of h0.
+
+    ts:  A list of time with a time step of deltat
+    Bs2: A list of B fields with a time step of deltat/2
+         B(t = ts[it]) = Bs2[2*it]
+
+    Assumptions:
+      The magnetic field is along the z direction.
+    """
+
+    ha = get_h_h0basis_Bz(h0, Mz_tot, Bs2[2*it  ])
+    hb = get_h_h0basis_Bz(h0, Mz_tot, Bs2[2*it+1])
+    hc = get_h_h0basis_Bz(h0, Mz_tot, Bs2[2*it+2])
+
+    return (ha, hb, hc)
+
 def get_habc_reuse_ha(h0, Mv_tot, it, deltat, Bs2, theta_B, phi_B, ha, hb, hc):
     """
     Obtain ha = h(ts[it])
@@ -38,6 +60,28 @@ def get_habc_reuse_ha(h0, Mv_tot, it, deltat, Bs2, theta_B, phi_B, ha, hb, hc):
     hc = get_h_h0basis(h0, Mv_tot, Bs2[2*it+2], theta_B, phi_B)
 
     return (ha, hb, hc)
+
+def get_habc_reuse_ha_Bz(h0, Mz_tot, it, deltat, Bs2, ha, hb, hc):
+    """
+    Obtain ha = h(ts[it])
+           hb = h(ts[it] + deltat/2)
+           hc = h(ts[it] + deltat)
+
+    h0 and Mv_tot are on the basis of the eigenvectors of h0.
+
+    ts:  A list of time with a time step of deltat
+    Bs2: A list of B fields with a time step of deltat/2
+         B(t = ts[it]) = Bs2[2*it]
+
+    Assumptions:
+      The magnetic field is along the z direction.
+    """
+
+    hb = get_h_h0basis_Bz(h0, Mz_tot, Bs2[2*it+1])
+    hc = get_h_h0basis_Bz(h0, Mz_tot, Bs2[2*it+2])
+
+    return (ha, hb, hc)
+
 
 
 def evolve_psi_by_deltat(ha, hb, hc, psi, deltat):

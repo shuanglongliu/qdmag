@@ -3,7 +3,6 @@ import sys
 import time
 import ray
 from common import *
-from fitting import fit_magnetization
 from von_neumann import *
 from schrodinger import *
 from quantum_master import *
@@ -117,7 +116,7 @@ if __name__ == "__main__":
     ## Mv_tot_eff will be used to calculate the Zeeman energy levels and the magnetic moment
 
     h0_eff = get_effective_operator(h0, selected_states, is_real=True)
-    Mv_tot_eff = get_effective_Mv_tot(Mv_tot, selected_states)
+    Mv_tot_eff = get_effective_Mv(Mv_tot, selected_states)
 
     ## Diagonal matrix elements only
 
@@ -197,7 +196,7 @@ if __name__ == "__main__":
     # Get the magnetic field pulse
 
     cs = load_cs()
-    nt, ts, Bs, deltat = get_pulse_for_Runge_Kutta_double_grid(cs, tmin, tmax, deltat)
+    nt, ts, Bs2, deltat = get_pulse_for_Runge_Kutta_double_grid(cs, tmin, tmax, deltat)
     #print("The last magnetic field is {:9.4e} T".format(Bs[-1]))
 
 
@@ -213,7 +212,7 @@ if __name__ == "__main__":
 
     # Evolve the density matrix
 
-    rho_eff = evolve_rho_sqme(D0_eff, Mz_tot_eff_diag, double_super_rho0_eff, nt, deltat, Bs)
+    rho_eff = evolve_rho_sqme(D0_eff, Mz_tot_eff_diag, double_super_rho0_eff, nt, deltat, Bs2)
 
 
 

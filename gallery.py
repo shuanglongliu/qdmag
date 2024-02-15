@@ -55,7 +55,7 @@ if __name__ == "__main__":
 
     # Check commutation relation
 
-    #check_commutation(h_ex, h_zee)
+    check_commutation(h_ex, h_zee)
 
     # Solve the eigenvalue problem
 

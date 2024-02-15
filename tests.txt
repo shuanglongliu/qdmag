@@ -1,0 +1,238 @@
+eigen.dim = 750
+
+von_neuman
+
+  Initial states: eigen(h_ex)
+
+    theta_B = 90 deg, phi_B = 0 deg:
+      tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.1000 ps, final M = 1.0282E-06-4.4844E-17j 1.0445E-14+1.0537E-18j -1.7760E-13-2.2937E-16j mu_B   Time: 4.096 s
+      tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0100 ps, final M = 1.1234E-06+3.7124E-16j 1.0219E-14-4.4418E-19j -1.3947E-13+7.4195E-16j mu_B
+      tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010 ps, final M = 1.1319E-06-5.9129E-17j 1.0268E-14+9.1561E-18j -1.3086E-13-7.8059E-16j mu_B
+      tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0001 ps, final M = 1.1327E-06-2.2082E-16j 2.0330E-14-3.7537E-18j -1.1046E-12+4.0258E-17j mu_B
+    
+    theta_B = 0 deg, phi_B = 0 deg:
+      tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.1000 ps, final M =  1.0526E-15-7.4847E-18j 3.7092E-15-3.5726E-18j 1.5053E-08-1.0550E-16j mu_B
+      tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0100 ps, final M = -3.4338E-15+1.2914E-16j 3.6832E-15-2.6610E-18j 1.7108E-08+4.7604E-16j mu_B
+      tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010 ps, final M = -3.2517E-15+2.1153E-17j 3.6498E-15-3.1450E-18j 1.7185E-08+3.0596E-16j mu_B   Time: 98 s
+      tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0001 ps, final M = -1.8548E-14+1.5576E-16j 3.5607E-15-2.2066E-18j 1.7193E-08+1.4581E-16j mu_B   Time:  628.315 s
+
+  Initial states: eigen(h_ex + h_zee(1e-9 T))
+
+    theta_B = 90 deg, phi_B = 0 deg:
+      tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0001 ps, final M = 1.1327E-06+1.5348E-18j -3.4907E-11+2.5056E-18j 3.5202E-09-5.7022E-16j mu_B   Time:  599.898 s
+
+    theta_B = 0 deg, phi_B = 0 deg:
+      tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0001 ps, final M = 4.9624E-15-1.2663E-20j 4.0803E-14+1.0628E-20j 2.0713E-08+2.1673E-17j mu_B    Time:  595.302 s
+
+
+schrodinger
+
+  Initial states: eigen(h_ex)
+
+    Initial M = -1.1027E-14+1.0786E-22j -1.7954E-17+3.5424E-19j -5.0134E-14-2.2869E-22j mu_B
+    Initial M = -1.1027E-14+1.0786E-22j -1.7954E-17+3.5424E-19j -5.0134E-14-2.2869E-22j mu_B (after calling get_rho)
+  
+    theta_B = 90 deg, phi_B = 0 deg:
+      tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0001 ps, final M = 1.1328E-06+5.1809E-18j 1.3358E-14+4.2484E-19j -1.2832E-13+1.4844E-17j mu_B   Time: 2769.408 s
+  
+    theta_B = 0 deg, phi_B = 0 deg:
+      tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0100  ps, final M = -3.0059E+47+6.2538E+29j -2.2273E+45-2.0155E+31j -4.3846E+47+4.0034E+30j mu_B   Time:  210.033 s
+      tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010  ps, final M = -1.0969E-14-1.8017E-18j 2.7039E-15+2.7381E-19j -1.1032E-06-8.0156E-18j mu_B   Time:  350.106 s
+      tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0001  ps, final M = -1.2215E-14-4.3389E-18j 2.6869E-15+3.2156E-19j 1.7182E-08-7.3529E-18j mu_B   Time: 1785.189 s
+      tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.00005 ps, final M = -8.9371E-15-2.3625E-18j 2.7169E-15+3.1213E-19j 1.7193E-08+9.2007E-18j mu_B   Time: 2909.813 s
+      tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.00001 ps, final M = -1.2879E-14+1.4058E-18j 2.7390E-15+3.3071E-19j 1.7193E-08-9.4475E-18j mu_B   Time: 25704.192 s
+
+
+quantum master
+
+  Initial states: eigen(h_ex)
+
+  Initial states: eigen(h_ex + h_zee(1e-9 T))
+
+    theta_B = 90 deg, phi_B = 0 deg:
+      tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0001 ps, final M = 1.1328E-06+1.7750E-19j -3.4963E-11-6.2016E-20j 3.5199E-09-3.7349E-17j mu_B   Time: 03:48:29 = 13709 s
+  
+    theta_B = 0 deg, phi_B = 0 deg:
+
+
+quantum master - effective basis
+
+  Initial states: eigen(h_ex)
+
+  Initial states: eigen(h_ex + h_zee(1e-9 T))
+
+    theta_B = 90 deg, phi_B = 0 deg:
+      tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0001 ps, final M = 8.9103E-07+1.7555E-19j -3.5012E-11-5.5955E-20j 3.5247E-09-3.7776E-17j mu_B   Time:    3.789 s
+      tmin =   0.0000 ps, tmax = 1000.0000 ps, deltat =   0.0010 ps, final M = 8.4459E-02+3.2236E-15j 4.4210E-04-1.4029E-14j 3.9115E-04+1.8051E-14j mu_B   Time:  310.400 s
+      tmin =   0.0000 ps, tmax = 1000.0000 ps, deltat =   0.0100 ps, final M = 8.4458E-02+8.4779E-15j 4.4302E-04-4.1191E-15j 3.9821E-04+1.9340E-14j mu_B   Time:   31.731 s
+
+
+  
+    theta_B = 0 deg, phi_B = 0 deg:
+
+
+np.max( np.absolute(Rhbar) ) = 
+    266762.08733815385 for I0 = 1 and B = 1e-9 T (perturbative B field at t0)
+    266762.08735141996 for I0 = 1 and B = 1e-8 T
+    266763.56134729984 for I0 = 1 and B = 1e-3 T
+
+    0.2667620873381538 for I0 = 1e-6 and B = 1e-9 T
+
+In the basis of the eigenvectors of h0, h0 is real and diagonal. When a perturbative magnetic field of 1e-9 T is added, the eigenstates of h0 + h_zee (B = 1e-9 T) are also eigenstates of Sz_tot. THen h_zee is also diagonal and real since there is no longer degeneracy.
+
+
+delta rho is sensitive to lambda_ when I0 = 1.0.
+    The change in rho_00 is on the order of 1e-5 when lambda_ = 0.5 using deltat = 0.0001
+    The change in rho_00 is on the order of 1e-2 when lambda_ = 1.0 using deltat = 0.0001
+
+
+
+
+
+
+
+    T = 2.0 # Temperature in K
+    tmin = 0.0 # Initial time in ps
+    tmax = 10.0 # Finial time in ps
+    deltat = 0.01 # Time step in ps
+    theta_B = 0.0 # Polar angle of magnetic field in deg
+    phi_B = 0.0 # Azimuthal angle of magnetic field in deg
+    lambda_ = 50 # Spin phonon coupling constant in cm-1
+
+    rho0_eff = np.zeros(h0_eff.shape)
+    rho0_eff[0, 0] = 1.0
+
+Standard form:
+
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0010 ps, initial M =      -2.33521815E-04       0.00000000E+00       4.99999999E+00 mu_B
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0010 ps,   final M =      -1.01307022E-04       7.08074357E-05       2.68762579E+00 mu_B
+
+Liouville form: 
+
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps, initial M =      -2.33521815E-04       0.00000000E+00       4.99999999E+00 mu_B
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps,   final M =      -1.01307096E-04       7.08074201E-05       2.68762579E+00 mu_B
+
+
+
+    T = 2.0 # Temperature in K
+    tmin = 0.0 # Initial time in ps
+    tmax = 10.0 # Finial time in ps
+    deltat = 0.01 # Time step in ps
+    theta_B = 0.0 # Polar angle of magnetic field in deg
+    phi_B = 0.0 # Azimuthal angle of magnetic field in deg
+    lambda_ = 0 # Spin phonon coupling constant in cm-1
+
+    rho0_eff = np.zeros(h0_eff.shape)
+    rho0_eff[0, 0] = 1.0
+
+Standard form:
+
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps, initial M =      -2.33521815E-04       0.00000000E+00       4.99999999E+00 mu_B
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps,   final M =      -2.33521815E-04      -2.40638492E-10       4.99999999E+00 mu_B
+
+Liouville form: 
+
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps, initial M =      -2.33521815E-04       0.00000000E+00       4.99999999E+00 mu_B
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps,   final M =      -2.33521815E-04       0.00000000E+00       4.99999999E+00 mu_B
+
+
+
+    T = 2.0 # Temperature in K
+    tmin = 0.0 # Initial time in ps
+    tmax = 10.0 # Finial time in ps
+    deltat = 0.01 # Time step in ps
+    theta_B = 0.0 # Polar angle of magnetic field in deg
+    phi_B = 0.0 # Azimuthal angle of magnetic field in deg
+    lambda_ = 1.0 # Spin phonon coupling constant in cm-1
+
+    rho0_eff = np.zeros(h0_eff.shape)
+    rho0_eff[0, 0] = 1.0
+
+Standard form:
+
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps, initial M =      -2.33521815E-04       0.00000000E+00       4.99999999E+00 mu_B
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps,   final M =      -2.32904779E-04      -4.39030205E-10       4.99762141E+00 mu_B
+
+Liouville form: 
+
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps, initial M =      -2.33521815E-04       0.00000000E+00       4.99999999E+00 mu_B
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps,   final M =      -2.32904779E-04      -1.98994219E-10       4.99762141E+00 mu_B
+
+
+    T = 2.0 # Temperature in K
+    tmin = 0.0 # Initial time in ps
+    tmax = 10.0 # Finial time in ps
+    deltat = 0.01 # Time step in ps
+    theta_B = 0.0 # Polar angle of magnetic field in deg
+    phi_B = 0.0 # Azimuthal angle of magnetic field in deg
+    lambda_ = 10.0 # Spin phonon coupling constant in cm-1
+
+Standard form:
+
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps, initial M =      -4.57039060E-05       0.00000000E+00       3.00000000E+00 mu_B
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps,   final M =      -2.97334687E-05      -3.81747211E-08       2.77190794E+00 mu_B
+Time:    0.766 s
+
+Liouville form: 
+
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps, initial M =      -4.57039060E-05       0.00000000E+00       3.00000000E+00 mu_B
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps,   final M =      -2.97334703E-05      -3.81430432E-08       2.77190794E+00 mu_B
+Time:   22.574 s
+
+Liouville form using sparse matrix:
+
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps, initial M =      -4.57039060E-05       0.00000000E+00       3.00000000E+00 mu_B
+tmin =   0.0000 ps, tmax =  10.0000 ps, deltat =   0.0100 ps,   final M =      -2.97334703E-05      -3.81430432E-08       2.77190794E+00 mu_B
+Time:  237.754 s
+
+
+
+
+# Rigorous proof of the effective basis method
+# Effective basis - lambda_ = 10.0
+    rho[0,0] = 1.0
+        Time:    0.233 s
+        tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010 ps, initial M =       0.00000000E+00       0.00000000E+00       5.00000000E+00 mu_B
+        tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010 ps,   final M =       0.00000000E+00       0.00000000E+00       4.97650260E+00 mu_B
+    rho[2,2] = 1.0
+        Time:    0.232 s
+        tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010 ps, initial M =       0.00000000E+00       0.00000000E+00       3.00000000E+00 mu_B
+        tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010 ps,   final M =       0.00000000E+00       0.00000000E+00       2.97702314E+00 mu_B
+
+# Effective basis - lambda_ = 0.5
+    rho[0,0] = 1.0
+        Time:    0.217 s
+        tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010 ps, initial M =       0.00000000E+00       0.00000000E+00       5.00000000E+00 mu_B
+        tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010 ps,   final M =       0.00000000E+00       0.00000000E+00       4.99994053E+00 mu_B
+    rho[2,2] = 1.0
+        Time:    0.214 s
+        tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010 ps, initial M =       0.00000000E+00       0.00000000E+00       3.00000000E+00 mu_B
+        tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010 ps,   final M =       0.00000000E+00       0.00000000E+00       2.99994053E+00 mu_B
+    rho[2,2] = 1.0
+        Time:    0.022 s
+        tmin =   0.0000 ps, tmax =   0.1000 ps, deltat =   0.0010 ps, initial M =       0.00000000E+00       0.00000000E+00       3.00000000E+00 mu_B
+        tmin =   0.0000 ps, tmax =   0.1000 ps, deltat =   0.0010 ps,   final M =       0.00000000E+00       0.00000000E+00       2.99999405E+00 mu_B
+
+# Quantum master - lambda_ = 0.5
+    Full X
+
+        rho[0,0] = 1.0
+            Time:  203.592 s
+            tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010 ps, initial M =      -3.39577049E-10       0.00000000E+00       5.00000000E+00 mu_B
+            tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010 ps,   final M =      -3.39569369E-10      -2.07795176E-14       4.99995373E+00 mu_B
+        rho[2,2] = 1.0
+            Time:  203.502 s
+            tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010 ps, initial M =      -5.93742710E-10       0.00000000E+00       3.00000000E+00 mu_B
+            tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010 ps,   final M =      -5.93728230E-10      -7.12418070E-14       2.99995548E+00 mu_B
+
+    Truncated X
+
+        rho[2,2] = 1.0
+            Time:  198.026 s
+            tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010 ps, initial M =      -5.93742710E-10       0.00000000E+00       3.00000000E+00 mu_B
+            tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010 ps,   final M =      -5.93709775E-10      -6.96789155E-14       2.99994053E+00 mu_B
+        rho[2,2] = 1.0
+            Time:   19.903 s
+            tmin =   0.0000 ps, tmax =   0.1000 ps, deltat =   0.0010 ps, initial M =      -5.93742710E-10       0.00000000E+00       3.00000000E+00 mu_B
+            tmin =   0.0000 ps, tmax =   0.1000 ps, deltat =   0.0010 ps,   final M =      -5.93739416E-10      -6.96757893E-15       2.99999405E+00 mu_B
+

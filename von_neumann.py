@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.linalg import expm
 from common import sph2cart_deg
-from common import get_h_Zeeman_Mv_tot
+from common import get_h_Zeeman_Mv_tot, get_h_Zeeman_Mz_tot
 from constants import Kelvin2wavenumber, Tesla2wavenumber
 from constants import const1
 import pickle
@@ -63,10 +63,25 @@ def transform_Mv_tot(Mv_tot, eigen0):
 def get_h_h0basis(h0, Mv_tot, B, theta_B, phi_B):
     """
     Both h0 and Mv_tot should be on the basis of eigenvectors of h0.
-    Return hs = [h(t1), h(t2), ..., h(tn)]
+    Return h under the magnetic field B.
     """
 
     h_zee = get_h_Zeeman_Mv_tot(Mv_tot, [B, theta_B, phi_B], 'spherical')
+    h = h0 + h_zee
+
+    return h
+
+
+def get_h_h0basis_Bz(h0, Mz_tot, B):
+    """
+    Both h0 and Mz_tot should be on the basis of eigenvectors of h0.
+    Return h under the magnetic field B.
+
+    Assumptions:
+      The magnetic field is along the z direction.
+    """
+
+    h_zee = get_h_Zeeman_Mz_tot(Mz_tot, B)
     h = h0 + h_zee
 
     return h
@@ -230,7 +245,7 @@ def get_rho0(eigen0, T):
     T: Temperature in Kelvin
     """
 
-    rho0 = np.zeros((eigen0.dim, eigen0.dim))
+    rho0 = np.zeros((eigen0.dim, eigen0.dim), dtype=np.complex128)
 
     e_ref = eigen0.eigenvalues[eigen0.indices[0]]
 
