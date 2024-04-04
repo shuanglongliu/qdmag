@@ -344,7 +344,7 @@ def construct_D_using_A_diag(A_diag, B, lambda_):
     D2 = np.hstack((D21, D22))
     D  = np.vstack((D1 , D2 ))
 
-    D = csr_array(D)
+    #D = csr_array(D)
 
     # The +1.0 and -1.0 operations are for creating the desired sparsity.
     dim = B.shape[0]

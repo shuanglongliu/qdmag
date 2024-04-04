@@ -191,6 +191,9 @@ if __name__ == "__main__":
     #np.savetxt("./output/D0_eff.dat", D0_eff, fmt="%12.4e"); exit()
     #spy_sparsity(D0_eff, "D0_eff", precision=1.0e-20, figsize=(20, 20), markersize=1); exit()
 
+    D1_eff = construct_D_from_D0_and_Bfield(D0_eff, -1*Mz_tot_eff_diag, 1)
+    check_commutation(D0_eff, D1_eff); exit()
+
 
 
     # Get the magnetic field pulse

@@ -194,6 +194,10 @@ Time:  237.754 s
         Time:    0.233 s
         tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010 ps, initial M =       0.00000000E+00       0.00000000E+00       5.00000000E+00 mu_B
         tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010 ps,   final M =       0.00000000E+00       0.00000000E+00       4.97650260E+00 mu_B
+    rho[0,0] = 1.0
+        Time:    0.030 s
+        tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0100 ps, initial M =       0.00000000E+00       0.00000000E+00       5.00000000E+00 mu_B
+        tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0100 ps,   final M =       0.00000000E+00       0.00000000E+00       4.97650260E+00 mu_B
     rho[2,2] = 1.0
         Time:    0.232 s
         tmin =   0.0000 ps, tmax =   1.0000 ps, deltat =   0.0010 ps, initial M =       0.00000000E+00       0.00000000E+00       3.00000000E+00 mu_B

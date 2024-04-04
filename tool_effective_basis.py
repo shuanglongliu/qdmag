@@ -47,20 +47,24 @@ if __name__ == "__main__":
     h = h_ex + h_zee 
 
 
+
     # Check commutation relation
 
     #check_commutation(h_ex, h_zee)
+
 
 
     # Control parameters for time evolution
 
     T = 2.0 # Temperature in K
     tmin = 0.0 # Initial time in ps
-    tmax = 0.1 # Finial time in ps
-    deltat = 0.001 # Time step in ps
+    tmax = 1.0 # Finial time in ps
+    deltat = 0.01 # Time step in ps
+    Deltat = 0.01 # Save rho every Deltat ps
     theta_B = 0.0 # Polar angle of magnetic field in deg
     phi_B = 0.0 # Azimuthal angle of magnetic field in deg
-    lambda_ = 0.5 # Spin phonon coupling constant in cm-1
+    lambda_ = 10.0 # Spin phonon coupling constant in cm-1
+
 
 
     # Eigenvalues and eigenvectors of the initial Hamiltonian
@@ -72,10 +76,12 @@ if __name__ == "__main__":
     #save_spins(spins, eigen0); exit()
 
 
+
     # Initial Hamiltonian in the basis of eigenvectors of h0
 
     h0 = transform_O(h, eigen0)
     #np.savetxt("h0.dat", h0, fmt="%6.2f")
+
 
 
     # Magnetic moment operator in the basis of eigenvectors of h0
@@ -87,9 +93,11 @@ if __name__ == "__main__":
     #check_commutation(h0, Mv_tot[2]) # Yes
 
 
+
     # Expectation of Sz_tot for all states
 
     total_Sz_for_all_eigenstates = get_total_Sz_for_all_eigenstates(spins, eigen0)
+
 
 
     # Get the effective Hamiltonian
@@ -99,9 +107,11 @@ if __name__ == "__main__":
     h0_eff, Mv_eff = set_up_the_effective_system(h0, Mv_tot, selected_states, save_to_file=False)
 
 
+
     # Energy levels vs B field
 
     #get_energy_levels_vs_B_Mv_tot(h0_eff, Mv_eff, BET_Bgrid[0])
+
 
 
     # Eigenvalues and eigenvectors of the effective Hamiltonian
@@ -115,7 +125,7 @@ if __name__ == "__main__":
 
     #rho0_eff = get_rho0(eigen0_eff, T)
     rho0_eff = np.zeros(h0_eff.shape, dtype = np.complex128)
-    rho0_eff[2, 2] = 1.0
+    rho0_eff[0, 0] = 1.0
     #np.savetxt("./output/rho0_eff.dat", rho0_eff, fmt="%12.6f")
 
 
@@ -147,9 +157,15 @@ if __name__ == "__main__":
 
     start = timer()
 
+    list_of_ts = []
+    list_of_rhos = []
     lambda1, lambda2 = get_constants(lambda_)
     if theta_B == 0.0 and phi_B == 0.0:
-        rho_eff = evolve_rho_qme_Bz(h0_eff, Mv_eff[2], rho0_eff, nt, deltat, Bs2, X_eff, Rhbar_eff, lambda1, lambda2)
+        if save_rho:
+            rho_eff = evolve_rho_qme_Bz(h0_eff, Mv_eff[2], rho0_eff, nt, deltat, Bs2, X_eff, Rhbar_eff, lambda1, lambda2)
+            #rho_eff, list_of_ts, list_of_rhos = evolve_rho_qme_Bz_save_rho(h0_eff, Mv_eff[2], rho0_eff, nt, ts, deltat, Bs2, X_eff, Rhbar_eff, lambda1, lambda2, list_of_rhos, Deltat)
+        else:
+            rho_eff = evolve_rho_qme_Bz(h0_eff, Mv_eff[2], rho0_eff, nt, deltat, Bs2, X_eff, Rhbar_eff, lambda1, lambda2)
     else:
         rho_eff = evolve_rho_qme(h0_eff, Mv_eff, rho0_eff, nt, deltat, Bs2, theta_B, phi_B, X_eff, Rhbar_eff, lambda1, lambda2)
     #np.savetxt("./output/rho_eff.dat", rho_eff, fmt="%12.6f")

@@ -241,3 +241,52 @@ def evolve_rho_qme_Bz(h0, Mz_tot, rho, nt, deltat, Bs2, X, Rhbar, lambda1, lambd
     return rho
 
 
+def evolve_rho_qme_Bz_save_rho(h0, Mz_tot, rho, nt, ts, deltat, Bs2, X, Rhbar, lambda1, lambda2, list_of_ts, list_of_rhos, Deltat):
+    """
+    Evolve the density matrix using the Runge-Kutta method according to the quantum master equation.
+
+    h0 and Mz_tot are written on the basis of the eigenvectors of h0.
+
+    Input:
+      h0: Hamiltonian at t0 = ts[0] written on the basis of the eigenvectors of h0.
+      Mz_tot: Magnetization operators written on the basis of the eigenvectors of h0.
+      rho: initial density matrix at t0.
+      nt: number of time steps.
+      ts: list of time in unit of ps.
+      delta: time step in unit of ps.
+      Bs2: a list of B fields with a time step of deltat/2
+           B(t = ts[it]) = Bs2[2*it]
+      theta_B: polar angle of the magnetic field.
+      phi_B: azimuthal angle of the magnetic field.
+      cs: monotone cubic spline object for the pulse field.
+      X, Rhbar: Auxiliary operators for constructing the \Gamma operator for spin-phonon coupling.
+      lambda1 = -1j * const1
+      lambda2 = lambda_^2 * pi * const1^2, lambda_: spin-phonon coupling constant in cm-1.
+      list_of_rhos: a list of (reduced) density matrices.
+      Deltat: save rho every Deltat ps.
+
+    Assumptions:
+      The magnetic field is along the z direction.
+    """
+
+    list_of_ts.append(ts[0])
+    #list_of_rhos[]
+
+    it = 0; ha, hb, hc = get_habc_Bz(h0, Mz_tot, it, deltat, Bs2)
+    rho = evolve_rho_by_deltat_qme(ha, hb, hc, rho, X, Rhbar, lambda1, lambda2, deltat)
+    #print("it = {:d}, max(rho) = {:12.4e}".format(it, np.max(np.absolute(rho))))
+
+    nt_save = int( Deltat // deltat )
+    nround = nt // nt_save
+    nleft = nt % nt_save
+
+    Deltat = nt_save * deltat
+
+    for it in range(1, nt):
+        ha, hb, hc = get_habc_reuse_ha_Bz(h0, Mz_tot, it, deltat, Bs2, hc, ha, hb)
+        rho = evolve_rho_by_deltat_qme(ha, hb, hc, rho, X, Rhbar, lambda1, lambda2, deltat)
+        #print("it = {:d}, max(rho) = {:12.4e}".format(it, np.max(np.absolute(rho))))
+
+    return rho
+
+
