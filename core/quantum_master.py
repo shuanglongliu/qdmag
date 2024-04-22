@@ -204,7 +204,6 @@ def evolve_rho_qme_Mv_light(h0, Mv_tot, rho, nt, deltat, Bs2, theta_B, phi_B, X,
            B(t = ts[it]) = Bs2[2*it]
       theta_B: polar angle of the magnetic field.
       phi_B: azimuthal angle of the magnetic field.
-      cs: monotone cubic spline object for the pulse field.
       X, Rhbar: Auxiliary operators for constructing the \Gamma operator for spin-phonon coupling.
       lambda1 = -1j * const1
       lambda2 = lambdaa^2 * pi * const1^2, lambdaa: spin-phonon coupling constant in cm-1.
@@ -239,7 +238,6 @@ def evolve_rho_qme_Mz_light(h0, Mz_tot, rho, nt, deltat, Bs2, X, Rhbar, lambda1,
            B(t = ts[it]) = Bs2[2*it]
       theta_B: polar angle of the magnetic field.
       phi_B: azimuthal angle of the magnetic field.
-      cs: monotone cubic spline object for the pulse field.
       X, Rhbar: Auxiliary operators for constructing the \Gamma operator for spin-phonon coupling.
       lambda1 = -1j * const1
       lambda2 = lambdaa^2 * pi * const1^2, lambdaa: spin-phonon coupling constant in cm-1.
@@ -276,7 +274,6 @@ def evolve_rho_qme_Mv(h0, Mv_tot, rho, nt, ts, deltat, Bs2, theta_B, phi_B, X, R
            B(t = ts[it]) = Bs2[2*it]
       theta_B: polar angle of the magnetic field.
       phi_B: azimuthal angle of the magnetic field.
-      cs: monotone cubic spline object for the pulse field.
       X, Rhbar: Auxiliary operators for constructing the \Gamma operator for spin-phonon coupling.
       lambda1 = -1j * const1
       lambda2 = lambdaa^2 * pi * const1^2, lambdaa: spin-phonon coupling constant in cm-1.
@@ -520,7 +517,6 @@ def evolve_rho_qme_Mz(h0, Mz_tot, rho, nt, ts, deltat, Bs2, X, Rhbar, lambda1, l
            B(t = ts[it]) = Bs2[2*it]
       theta_B: polar angle of the magnetic field.
       phi_B: azimuthal angle of the magnetic field.
-      cs: monotone cubic spline object for the pulse field.
       X, Rhbar: Auxiliary operators for constructing the \Gamma operator for spin-phonon coupling.
       lambda1 = -1j * const1
       lambda2 = lambdaa^2 * pi * const1^2, lambdaa: spin-phonon coupling constant in cm-1.

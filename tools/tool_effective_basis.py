@@ -98,8 +98,8 @@ if __name__ == "__main__":
 
     # Get the magnetic field pulse
 
-    #cs = load_cs()
-    #nt, ts, Bs2, deltat = get_pulse_for_Runge_Kutta_double_grid(cs, tmin, tmax, deltat)
+    #Bt = load_cs()
+    #nt, ts, Bs2, deltat = get_pulse_for_Runge_Kutta_double_grid(Bt, tmin, tmax, deltat)
 
     nt, ts, Bs2, deltat = get_pulse_for_Runge_Kutta_double_grid(get_B_sin, tmin, tmax, deltat)
 

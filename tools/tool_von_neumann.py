@@ -85,8 +85,8 @@ if __name__ == "__main__":
 
     # Get the magnetic field pulse
 
-    cs = load_cs()
-    nt, ts, Bs, deltat = get_pulse_for_TEO(cs, tmin, tmax, deltat)
+    Bt = load_cs()
+    nt, ts, Bs, deltat = get_pulse_for_TEO(Bt, tmin, tmax, deltat)
     #print("The last magnetic field is {:8.4f} T".format(Bs[-1]))
 
     # Final magnetic moment if the system is in equilibrium

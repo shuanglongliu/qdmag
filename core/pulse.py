@@ -31,7 +31,7 @@ def load_cs():
     return cs
 
 
-def get_pulse_for_TEO(cs, tmin, tmax, deltat):
+def get_pulse_for_TEO(Bt, tmin, tmax, deltat):
     """
     Magnetic pulse field for time evolution operator (TEO).
     """
@@ -39,14 +39,14 @@ def get_pulse_for_TEO(cs, tmin, tmax, deltat):
     nt = int( (tmax - tmin)/deltat )
     ts = np.linspace(tmin, tmax, nt, endpoint=False)
 
-    Bs = cs(ts)
+    Bs = Bt(ts)
 
     deltat = (tmax - tmin) / nt
 
     return (nt, ts, Bs, deltat)
 
 
-def get_pulse_for_Runge_Kutta(cs, tmin, tmax, deltat):
+def get_pulse_for_Runge_Kutta(Bt, tmin, tmax, deltat):
     """
     Magnetic pulse field
     B(t = ts[it]) = Bs[it]
@@ -56,12 +56,12 @@ def get_pulse_for_Runge_Kutta(cs, tmin, tmax, deltat):
     deltat = (tmax - tmin) / nt
     ts = np.linspace(tmin, tmax, nt+1, endpoint=True)
 
-    Bs = cs(ts)
+    Bs = Bt(ts)
 
 
     return (nt, ts, Bs, deltat)
 
-def get_pulse_for_Runge_Kutta_double_grid(cs, tmin, tmax, deltat):
+def get_pulse_for_Runge_Kutta_double_grid(Bt, tmin, tmax, deltat):
     """
     Magnetic pulse field
 
@@ -75,7 +75,7 @@ def get_pulse_for_Runge_Kutta_double_grid(cs, tmin, tmax, deltat):
     ts = np.linspace(tmin, tmax, nt+1, endpoint=True)
 
     ts2 = np.linspace(tmin, tmax, 2*nt+1, endpoint=True)
-    Bs2 = cs(ts2)
+    Bs2 = Bt(ts2)
 
 
     return (nt, ts, Bs2, deltat)

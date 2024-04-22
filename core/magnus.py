@@ -3,9 +3,9 @@ from scipy.integrate import quad
 from spin_dynamics.core.constants import Tesla2wavenumber
 from spin_dynamics.core.super_quantum_master import construct_D_using_Bfield
 
-def get_two_norm_of_D(t, D0, Mz_tot_diag, cs, dim, dims):
+def get_two_norm_of_D(t, D0, Mz_tot_diag, Bt, dim, dims):
 
-    B = cs(t)
+    B = Bt(t)
     B_wavenumber = Tesla2wavenumber * B
     minus_Mz_tot_diag = -1 * Mz_tot_diag
 
