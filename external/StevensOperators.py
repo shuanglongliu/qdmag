@@ -1,5 +1,5 @@
 import numpy as np
-from external.Operators import Operator, LSOperator
+from spin_dynamics.external.Operators import Operator, LSOperator
 
 
 # Modified by SLL @ UF, Mar 22, 2023
