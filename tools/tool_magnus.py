@@ -115,20 +115,21 @@ if __name__ == "__main__":
 
     # Get the magnetic field pulse
 
-    cs = load_cs()
+    #cs = load_cs()
 
 
 
     # Check the matrix norm
 
     ts = [0]
-    for i in range(0, 11):
+    for i in range(0, 10):
         for j in range(1, 10):
             ts = ts + [j*10**i]
 
     with open(root_dir + "output/norm_of_D.dat", "w") as f:
         for t in ts:
             print("t = {:18.3e}".format(t))
-            norm = get_two_norm_of_D(t, D0_eff, Mz_eff_diag, cs, dim, dims)
+            #norm = get_two_norm_of_D(t, D0_eff, Mz_eff_diag, cs, dim, dims)
+            norm = get_two_norm_of_D(t, D0_eff, Mz_eff_diag, get_B_sin, dim, dims)
             f.write("{:18.3e} {:24.12f}\n".format(t, norm) )
 

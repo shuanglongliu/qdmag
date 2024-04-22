@@ -3,18 +3,20 @@ import sys
 import time
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from common import *
-from von_neumann import *
-from schrodinger import *
-from quantum_master import *
-from effective_basis import * 
-from super_quantum_master import *
-
-
+from spin_dynamics.core.common import *
+from spin_dynamics.core.von_neumann import *
+from spin_dynamics.core.schrodinger import *
+from spin_dynamics.core.quantum_master import *
+from spin_dynamics.core.effective_basis import * 
+from spin_dynamics.core.super_quantum_master import *
 
 
 
 if __name__ == "__main__":
+
+    # Check setup
+
+    print(root_dir)
 
     # Spin system
 
@@ -88,6 +90,6 @@ if __name__ == "__main__":
     # Get indices of rho_upper_triangle for plotting
 
     #get_indices_of_rho_upper(spins.dim) # Full system
-    get_indices_of_rho_upper(32) # Effective system
+    #get_indices_of_rho_upper(32) # Effective system
 
 
