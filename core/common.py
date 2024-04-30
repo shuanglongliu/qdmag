@@ -660,7 +660,34 @@ def get_energy_levels_vs_B_Mv_tot(h0, Mv_tot, Bgrid):
             B = Bmin + i*Bstep
             f.write((" {:12.6f}" + eigen.dim*" {:15.9f}" + "\n").format(B, *eigenvalues[i]))
 
+def get_energy_levels_vs_B_Mz_tot_diag(h0, Mz_tot, Bgrid):
+    """
+    Assumption: h0 and Mz_tot are written on the perturbed basis. 
+                Thus, both h0 and Mz_tot are diagonal.
+    """
 
+    Bmin, Bmax, Bstep, theta_B, phi_B = Bgrid
+    nB = int((Bmax-Bmin)/Bstep) + 1
+
+    eigen = eigen_spin_hamiltonian(h0)
+    energy0 = eigen.eigenvalues[eigen.indices[0]]
+
+    h0_diag = np.real( h0.diagonal() )
+
+    minus_Mz_tot = -1 * Mz_tot
+    minus_Mz_tot_diag = np.real( minus_Mz_tot.diagonal() )
+
+    eigenvalues = np.zeros((nB, eigen.dim))
+    for i in range(nB):
+        B = Bmin + i*Bstep
+        h_zee_diag = Tesla2wavenumber * B * minus_Mz_tot_diag
+        eigenvalues[i] = h0_diag + h_zee_diag
+    eigenvalues = eigenvalues - energy0
+
+    with open(root_dir + "output/Zeeman.dat", "w") as f:
+        for i in range(nB):
+            B = Bmin + i*Bstep
+            f.write((" {:12.6f}" + eigen.dim*" {:15.9f}" + "\n").format(B, *eigenvalues[i]))
 
 ## ================================================================
 ## Functions for thermodynamic properties.

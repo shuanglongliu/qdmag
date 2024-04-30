@@ -132,8 +132,8 @@ BET_Tgrid:
 
 dynamics:
     - T: 2.0          # Temperature in K
-      lambdaa: 0.1    # Spin phonon coupling constant in cm-1
-      I0: 1.e-4       # Prefactor for phonon density of states
+      lambdaa: 0.1    # Spin phonon coupling constant in cm-1, 0.1
+      I0: 1.e-4       # Prefactor for phonon density of states. 1e-4
 
     - tmin: 0.0       # Initial time in ps 
       tmax: 1.0       # Finial time in ps

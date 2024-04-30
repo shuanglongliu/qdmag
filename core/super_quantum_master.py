@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.linalg import expm
 from spin_dynamics.core.constants import const1, Tesla2wavenumber
 from spin_dynamics.core.common import kronecker_delta
 from spin_dynamics.core.common import convert_cmatrix_to_rmatrix
@@ -479,6 +480,8 @@ def evolve_rho_dsqme(D0, Mz_tot_diag, double_super_rho, nt, deltat, Bs2, dim, di
       nt: number of time steps.
       delta: time step in unit of ps.
       Bs2: list of magnetic field on the double grid.
+      dim: dimension of the Hilbert space.
+      dims: dimension of superoperators
 
     Assumptions: 
       The magnetic field is along the z direction.
@@ -505,5 +508,30 @@ def evolve_rho_dsqme(D0, Mz_tot_diag, double_super_rho, nt, deltat, Bs2, dim, di
 
     return double_super_rho
 
+def evolve_rho_dsqme_onestair(D0, Mz_tot_diag, rho, B, deltat, dim, dims):
+    """
+    Evolve rho by deltat of constant B using the analytical solution of the quantum master equation
+        d rho / d t = D rho
+        rho = np.vstack(rhore, rhoim)
+        rho_new = exp(int_t1^t2 D dt) rho = exp(D deltat) rho
 
+    Input: 
+        D0: double superoperator at zero magnetic field.
+        Mz_tot_diag: diagnal matrix elements of the z component of the magnetization operators
+        rho: vectorized initial density matrix on the perturbed basis.
+        B: magnetic field in Tesla
+        deltat: time step in ps.
+        dim: dimension of the Hilbert space.
+        dims: dimension of superoperators
+    """
+
+    B_wavenumber = Tesla2wavenumber * B
+    minus_Mz_tot_diag = -1 * Mz_tot_diag
+
+    # The double Liouville superoperator, which is a constant matrix, during deltat. Unit: cm-1.
+    D = construct_D_using_Bfield(D0, minus_Mz_tot_diag, B_wavenumber, dim, dims)
+
+    rho = expm(D * deltat) @ rho
+
+    return rho
 
