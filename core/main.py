@@ -98,9 +98,31 @@ if __name__ == "__main__":
 
     selected_states = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
 
-    h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff, Rhbar_eff = set_up_the_effective_system(h_ex_p, S2_tot_p, Sz_tot_p, Mv_tot_p, selected_states, T, I0)
+    h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff = set_up_the_effective_system(h_ex_p, S2_tot_p, Sz_tot_p, Mv_tot_p, selected_states, T, I0)
 
     #spy_the_effective_system(h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff, Rhbar_eff); exit()
+
+    dim = h0_eff.shape[0]
+    dims = dim * dim
+    dimds = 2*dims
+
+    indices_nonzero_X_eff, indices_nonzero_X2_eff = get_indices_nonzero_X(X_eff)
+
+    indices_nonzero_B = get_indices_nonzero_B(indices_nonzero_X_eff, indices_nonzero_X2_eff, dim)
+
+    minus_Mz_tot_diag = -1 * np.diagonal( Mv_eff[2] )
+
+    h0_diag = np.diagonal(h0_eff)
+
+    A_diag = construct_A_diag_from_H_diag(h0_diag, dim, dims)
+
+    D0 = construct_D_from_A_diag(A_diag, dims)
+
+    D = get_D_at_Bfield(1, h0_diag, minus_Mz_tot_diag, X_eff, lambdaa, I0, T, dim, dims, D0, indices_nonzero_X, indices_nonzero_B)
+
+    print(D[0])
+
+
 
 
 
@@ -108,7 +130,7 @@ if __name__ == "__main__":
 
     #get_energy_levels_vs_B(spins, h_ex, h_ani, Bgrid)
 
-    get_energy_levels_vs_B_Mz_tot_diag(h0_eff, Mv_eff[2], BET_Bgrid[0])
+    #get_energy_levels_vs_B_Mz_tot_diag(h0_eff, Mv_eff[2], BET_Bgrid[0])
 
 
 

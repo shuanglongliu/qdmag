@@ -143,11 +143,9 @@ def set_up_the_effective_system(h0_full, S2_full, Sz_full, Mv_full, selected_sta
 
     X_eff = construct_X_eff(Sz_full, selected_states)
 
-    Rhbar_eff = construct_Rhbar(T, X_eff, np.real(np.diag(h0_eff)), I0)
+    return (h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff)
 
-    return (h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff, Rhbar_eff)
-
-def spy_the_effective_system(h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff, Rhbar_eff):
+def spy_the_effective_system(h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff):
     """
     When the perturbative magnetic field is 1e-4 T, the matrix elements of Mx,y,z_eff smaller than 1e-8 are numerically insigficant.
     They are actually numerical errors for Mz_eff which should be exactly diagonal.
@@ -200,11 +198,6 @@ def spy_the_effective_system(h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff, Rhbar_eff):
                 f.write("i   j   Sz_i   Sz_j   X_ij   = {:5d}   {:5d}   {:8.3f}   {:8.3f}   {:5.1f}\n".format( \
                      i, j, np.real(Sz_eff[i, i]), np.real(Sz_eff[j, j]), X_eff[i, j]))
 
-    with open(root_dir + "output/Rhbar_eff.dat", "w") as f:
-        for i in range(n):
-            for j in range(n):
-                f.write("{:5d} {:5d} {:12.4e}\n".format(i, j, Rhbar_eff[i, j]))
- 
     spy_sparsity(h0_eff_abs, "h0_eff_abs", precision=1.0e-8, figsize=(10, 10), markersize=5) 
     spy_sparsity(S2_eff_abs, "S2_eff_abs", precision=1.0e-8, figsize=(10, 10), markersize=5)
     spy_sparsity(Sz_eff_abs, "Sz_eff_abs", precision=1.0e-8, figsize=(10, 10), markersize=5)
@@ -212,9 +205,6 @@ def spy_the_effective_system(h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff, Rhbar_eff):
     spy_sparsity(My_eff_abs, "My_eff_abs", precision=1.0e-8, figsize=(10, 10), markersize=5)
     spy_sparsity(Mz_eff_abs, "Mz_eff_abs", precision=1.0e-8, figsize=(10, 10), markersize=5)
     spy_sparsity(X_eff,      "X_eff",      precision=1.0e-8, figsize=(10, 10), markersize=5)
-
-    max_Rhbar_eff = np.max(np.absolute(Rhbar_eff))
-    spy_sparsity(Rhbar_eff, "Rhbar_eff", precision = 0.01*max_Rhbar_eff, figsize=(10, 10), markersize=5)
 
     return
 

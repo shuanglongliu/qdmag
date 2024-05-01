@@ -64,9 +64,30 @@ if __name__ == "__main__":
 
     selected_states = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
 
-    h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff, Rhbar_eff = set_up_the_effective_system(h_ex_p, S2_tot_p, Sz_tot_p, Mv_tot_p, selected_states, T, I0)
+    h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff, nonzero_indices_X_eff = set_up_the_effective_system(h_ex_p, S2_tot_p, Sz_tot_p, Mv_tot_p, selected_states, T, I0)
 
-    #spy_the_effective_system(h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff, Rhbar_eff); exit()
+    #spy_the_effective_system(h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff); exit()
+
+
+
+    #Rhbar_eff = construct_Rhbar(T, X_eff, nonzero_indices_X_eff, np.real(np.diag(h0_eff)), I0)
+    #, Rhbar_eff
+    #with open(root_dir + "output/Rhbar_eff.dat", "w") as f:
+        #for i in range(n):
+            #for j in range(n):
+                #f.write("{:5d} {:5d} {:12.4e}\n".format(i, j, Rhbar_eff[i, j]))
+ 
+    #max_Rhbar_eff = np.max(np.absolute(Rhbar_eff))
+    #spy_sparsity(Rhbar_eff, "Rhbar_eff", precision = 0.01*max_Rhbar_eff, figsize=(10, 10), markersize=5)
+
+
+    # Construct the superoperator B_eff from X_eff, and Rhbar_eff
+
+    B_eff = construct_B(X_eff, Rhbar_eff, dim, dims)
+
+    # Construct the superoperator D0 that corresponds to h0_eff/A0_eff using the diagonal elements of A0_eff
+
+    D0_eff = construct_D_using_A_diag(A0_eff_diag, B_eff, lambdaa, dims)
 
 
 

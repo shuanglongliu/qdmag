@@ -101,7 +101,16 @@ def construct_X(Sz_tot):
 
     return X
 
-def construct_Rhbar(T, X, energies, I0):
+def get_indices_nonzero_X(X):
+
+    indices_nonzero_X = np.nonzero(X)
+
+    X2 = X @ X
+    indices_nonzero_X2 = np.nonzero(X2)
+
+    return (indices_nonzero_X, indices_nonzero_X2)
+
+def construct_Rhbar(T, X, indices_nonzero_X, energies, I0):
     """
     Construct the auxiliary operator R multiplied by hbar.
 
@@ -118,18 +127,46 @@ def construct_Rhbar(T, X, energies, I0):
       2. The order of the perturbed basis functions does not change, although the order of their energies do change.
     """
 
-    n = X.shape[0]
+    Rhbar = np.zeros(X.shape, dtype=np.float64)
 
     omegas = energy2omega(energies)
 
-    Rhbar = np.zeros((n, n), dtype=np.float64)
+    n = indices_nonzero_X[0].shape[0] # Number of nonzero matrix elements of X
+    for k in range(n):
+        i = indices_nonzero_X[0][k]
+        j = indices_nonzero_X[1][k]
+        omega_ij = omegas[i] - omegas[j]
+        #print(i, j, omega_ij)
+        Rhbar[i, j] = X[i, j] * Phi(T, omega_ij, I0)
 
-    for i in range(n):
-        for j in range(n):
-            omega_ij = omegas[i] - omegas[j]
-            if X[i, j] != 0.0:
-                #print(i, j, omega_ij)
-                Rhbar[i, j] = X[i, j] * Phi(T, omega_ij, I0)
+    return Rhbar
+
+def update_Rhbar(Rhbar, T, X, indices_nonzero_X, energies, I0):
+    """
+    Update the auxiliary operator R multiplied by hbar.
+
+    energies: energies of perturbed basis under any finite magnetic field (along z direction)
+
+    Rhbar_{ij} = X_{ij} * Phi_{ij}
+    Phi_{ij} = ( I(omega_ij) - I(-omega_ij) ) / ( exp(beta * hbar * omega_ij ) - 1 )
+    omega_ij = ( E_i - E_j ) / hbar.
+    I(omega) = I0 omega^2 theta(omega): spectral density for phonons
+    theta(omega) is the step function.
+
+    Assumption:
+      1. The perturbed basis are the eigenvectors under zero and finite magnetic fields.
+      2. The order of the perturbed basis functions does not change, although the order of their energies do change.
+    """
+
+    omegas = energy2omega(energies)
+
+    n = indices_nonzero_X[0].shape[0] # Number of nonzero matrix elements of X
+    for k in range(n):
+        i = indices_nonzero_X[0][k]
+        j = indices_nonzero_X[1][k]
+        omega_ij = omegas[i] - omegas[j]
+        #print(i, j, omega_ij)
+        Rhbar[i, j] = X[i, j] * Phi(T, omega_ij, I0)
 
     return Rhbar
 

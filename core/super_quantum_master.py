@@ -181,7 +181,7 @@ def construct_A_diag_from_H_diag(H_diag, dim, dims):
 
     return A_diag
 
-def construct_B(X, Rhbar):
+def construct_B(X, Rhbar, dim, dims):
     """
     [X, Rhbar rho]_{I} = B_{IJ} rho_{J}
       I = i * N + j, N = dim(H)
@@ -195,18 +195,56 @@ def construct_B(X, Rhbar):
     Assumption: X and Rhbar are matrices of real numbers.
     """
 
-    N = X.shape[0]
-    dim = N**2
+    XRhbar = np.matmul(X, Rhbar)
+
+    B = np.zeros((dims, dims), dtype=np.float64)
+
+    for I in range(dims):
+        i, j = dec_composite_index(I, dim)
+        for J in range(dims):
+            k, l = dec_composite_index(J, dim)
+            B[I, J] = XRhbar[i, k] * kronecker_delta(l, j) - Rhbar[i, k] * X[l, j]
+
+    return B
+
+def get_indices_nonzero_B(indices_nonzero_X, indices_nonzero_X2, dim):
+
+    set_of_indices_nonzero_X = set( [(indices_nonzero_X[0][i], indices_nonzero_X[1][i]) for i in range(indices_nonzero_X[0].shape[0])] )
+    set_of_indices_nonzero_X2 = set( [(indices_nonzero_X2[0][i], indices_nonzero_X2[1][i]) for i in range(indices_nonzero_X2[0].shape[0])] )
+
+    indices_nonzero_B = []
+    for i in range(dim):
+        for j in range(dim):
+            for k in range(dim):
+                for l in range(dim):
+                    if ( (i, k) in set_of_indices_nonzero_X2 and l == j) or  ( (i, k) in set_of_indices_nonzero_X and (l, j) in set_of_indices_nonzero_X ):
+                        indices_nonzero_B.append( (i, j, k, l) )
+
+    return indices_nonzero_B
+
+def construct_B_fast(X, Rhbar, dim, dims, indices_nonzero_B):
 
     XRhbar = np.matmul(X, Rhbar)
 
-    B = np.zeros((dim, dim), dtype=np.float64)
+    B = np.zeros((dims, dims), dtype=np.float64)
 
-    for I in range(dim):
-        i, j = dec_composite_index(I, N)
-        for J in range(dim):
-            k, l = dec_composite_index(J, N)
-            B[I, J] = XRhbar[i, k] * kronecker_delta(l, j) - Rhbar[i, k] * X[l, j]
+    for m in indices_nonzero_B:
+        i, j, k, l = m
+        I = i * dim + j
+        J = k * dim + l
+        B[I, J] = XRhbar[i, k] * kronecker_delta(l, j) - Rhbar[i, k] * X[l, j]
+
+    return B
+
+def update_B(B, X, Rhbar, dim, indices_nonzero_B):
+
+    XRhbar = np.matmul(X, Rhbar)
+
+    for m in indices_nonzero_B:
+        i, j, k, l = m
+        I = i * dim + j
+        J = k * dim + l
+        B[I, J] = XRhbar[i, k] * kronecker_delta(l, j) - Rhbar[i, k] * X[l, j]
 
     return B
 
@@ -229,7 +267,7 @@ def construct_BST(B):
 
     return BST
 
-def construct_D(A, B, lambdaa, is_real=True):
+def construct_D_from_A_and_B(A, B, lambdaa, is_real=True):
     """
     The quantum master equation reads (in the units given at the beginning of this file)
         d (rhore, rhoim)^T / d t = np.array([[D11, D12], [D21, D22]]) (rhore, rhoim)^T
@@ -242,7 +280,7 @@ def construct_D(A, B, lambdaa, is_real=True):
     is_real: Is H (and thus A) real? B is always real.
     """
 
-    BST = construct_BST(B, dtype=np.float64)
+    BST = construct_BST(B)
 
     if is_real:
         D11 = - lambdaa**2 * np.pi * const1**2 * (B + BST)
@@ -264,7 +302,7 @@ def construct_D(A, B, lambdaa, is_real=True):
 
     return D
 
-def construct_D_using_A_diag(A_diag, B, lambdaa, dims):
+def construct_D_from_A_diag_and_B(A_diag, B, lambdaa, dims):
     """
     The quantum master equation reads (in the units given at the beginning of this file)
         d (rhore, rhoim)^T / d t = np.array([[D11, D12], [D21, D22]]) (rhore, rhoim)^T
@@ -302,7 +340,42 @@ def construct_D_using_A_diag(A_diag, B, lambdaa, dims):
 
     return D
 
-def construct_D_using_Azee_diag(D0, Azee_diag, dims):
+def construct_D_from_A_diag(A_diag, dims):
+    """
+    The quantum master equation reads (in the units given at the beginning of this file)
+        d (rhore, rhoim)^T / d t = np.array([[D11, D12], [D21, D22]]) (rhore, rhoim)^T
+    
+        D11 =  const1 * Aim - lambdaa**2 pi const1**2 (Bre + BSTre)
+        D12 =  const1 * Are + lambdaa**2 pi const1**2 (Bim + BSTim)
+        D21 = -const1 * Are - lambdaa**2 pi const1**2 (Bim - BSTim)
+        D22 =  const1 * Aim - lambdaa**2 pi const1**2 (Bre - BSTre)
+
+    A_diag = A.diagonal()
+
+    Assume that A is diagonal and thus real. 
+
+    dims: dimension of a super operator. dims = dim**2, where dim is the dimenion of the Hilbert space.
+    """
+
+    D11 = np.zeros((dims, dims), dtype=np.float64)
+    D12 = np.zeros((dims, dims), dtype=np.float64)
+    D21 = np.zeros((dims, dims), dtype=np.float64)
+    D22 = np.zeros((dims, dims), dtype=np.float64)
+
+    c1A_diag = const1 * A_diag
+    for i in range(dims):
+        D12[i, i] =   c1A_diag[i]
+        D21[i, i] = - c1A_diag[i]
+
+    D1 = np.hstack((D11, D12))
+    D2 = np.hstack((D21, D22))
+    D  = np.vstack((D1 , D2 ))
+
+    #D = csr_array(D)
+
+    return D
+
+def add_Azee_diag_to_D0(D0, Azee_diag, dims):
     """
     D0:   The superoperator for the initial Hamiltonian (on the perturbed basis)
           D0 = [[D011, D012], [D021, D022]]
@@ -330,18 +403,48 @@ def construct_D_using_Azee_diag(D0, Azee_diag, dims):
 
     return D
 
-def construct_D_using_Bfield(D0, minus_Mz_tot_diag, B_wavenumber, dim, dims):
+def update_B_within_D(D, B, dims, dimds, lambdaa):
+
+    D_new = D.copy()
+
+    BST = construct_BST(B)
+
+    D_new[0:dims, 0:dims]         = - lambdaa**2 * np.pi * const1**2 * (B + BST)
+    D_new[dims:dimds, dims:dimds] = - lambdaa**2 * np.pi * const1**2 * (B - BST)
+
+    return D_new
+
+def get_D_at_Bfield(B_wavenumber, h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nonzero_X, indices_nonzero_B):
     """
-    B_wavenumber: B in wavenumber.
+    D0: D matrix due to h0 = h_ex at t = 0 ps.
+    h0_diag: diagonal matrix elements of h0
+    minus_Mz_tot_diag: -1 * np.diagonal(Mz_tot)
+    B_wavenumber: B field in wavenumber.
+    X: The matrix that encodes possible spin transitions
+    indices_nonzero_X: indices of nonzero matrix elements of X
     """
 
-    Hzee_diag = minus_Mz_tot_diag * B_wavenumber
-    Azee_diag = construct_A_diag_from_H_diag(Hzee_diag, dim, dims)
-    D = construct_D_using_Azee_diag(D0, Azee_diag, dims)
+    D = D0.copy()
+
+    hzee_diag = minus_Mz_tot_diag * B_wavenumber
+    Azee_diag = construct_A_diag_from_H_diag(hzee_diag, dim, dims)
+
+    c1Azee_diag = const1 * Azee_diag
+    for i in range(dims):
+        D[     i, dims+i] += c1Azee_diag[i]
+        D[dims+i,      i] -= c1Azee_diag[i]
+
+    energies = np.real(h0_diag + hzee_diag)
+    Rhbar = construct_Rhbar(T, X, indices_nonzero_X, energies, I0)
+    B = construct_B_fast(X, Rhbar, dim, dims, indices_nonzero_B)
+    BST = construct_BST(B)
+
+    D[0:dims, 0:dims]         = - lambdaa**2 * np.pi * const1**2 * (B + BST)
+    D[dims:dimds, dims:dimds] = - lambdaa**2 * np.pi * const1**2 * (B - BST)
 
     return D
 
-def get_Dabc(D0, minus_Mz_tot_diag, it, deltat, Bs2_wavenumber, dim, dims):
+def get_Dabc(Bs2_wavenumber, it, h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nonzero_X, indices_nonzero_B):
     """
     Obtain Da = D(ts[it])
            Db = D(ts[it] + deltat/2)
@@ -353,13 +456,13 @@ def get_Dabc(D0, minus_Mz_tot_diag, it, deltat, Bs2_wavenumber, dim, dims):
     dims: dimension of a super operator. dims = dim**2.
     """
 
-    Da = construct_D_using_Bfield(D0, minus_Mz_tot_diag, Bs2_wavenumber[2*it  ], dim, dims)
-    Db = construct_D_using_Bfield(D0, minus_Mz_tot_diag, Bs2_wavenumber[2*it+1], dim, dims)
-    Dc = construct_D_using_Bfield(D0, minus_Mz_tot_diag, Bs2_wavenumber[2*it+2], dim, dims)
+    Da = get_D_at_Bfield(Bs2_wavenumber[2*it  ], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nonzero_X, indices_nonzero_B)
+    Db = get_D_at_Bfield(Bs2_wavenumber[2*it+1], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nonzero_X, indices_nonzero_B)
+    Dc = get_D_at_Bfield(Bs2_wavenumber[2*it+2], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nonzero_X, indices_nonzero_B)
 
     return (Da, Db, Dc)
 
-def get_Dabc_reuse_Da(D0, minus_Mz_tot_diag, it, deltat, Bs2_wavenumber, Da, Db, Dc, dim, dims):
+def get_Dabc_reuse_Da(Bs2_wavenumber, it, h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nonzero_X, indices_nonzero_B, Da, Db, Dc):
     """
     Obtain Da = D(ts[it])
            Db = D(ts[it] + deltat/2)
@@ -371,8 +474,8 @@ def get_Dabc_reuse_Da(D0, minus_Mz_tot_diag, it, deltat, Bs2_wavenumber, Da, Db,
     dims: dimension of a super operator. dims = dim**2.
     """
 
-    Db = construct_D_using_Bfield(D0, minus_Mz_tot_diag, Bs2_wavenumber[2*it+1], dim, dims)
-    Dc = construct_D_using_Bfield(D0, minus_Mz_tot_diag, Bs2_wavenumber[2*it+2], dim, dims)
+    Db = get_D_at_Bfield(Bs2_wavenumber[2*it+1], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nonzero_X, indices_nonzero_B)
+    Dc = get_D_at_Bfield(Bs2_wavenumber[2*it+2], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nonzero_X, indices_nonzero_B)
 
     return (Da, Db, Dc)
 
@@ -396,7 +499,7 @@ def convert_dsrho_to_rho(double_super_rho, dim, dims, dimds):
     rho = super_rho.reshape((dim, dim))
     return rho
 
-def set_up_double_super_qme(h0_eff, Mz_eff, X_eff, Rhbar_eff, lambdaa):
+def set_up_double_super_qme(h0_eff, Mz_eff, X_eff):
 
     # Dimensions
 
@@ -422,13 +525,9 @@ def set_up_double_super_qme(h0_eff, Mz_eff, X_eff, Rhbar_eff, lambdaa):
 
     A0_eff_diag = construct_A_diag_from_H_diag(h0_eff_diag, dim, dims)
 
-    # Construct the superoperator B_eff from X_eff, and Rhbar_eff
-
-    B_eff = construct_B(X_eff, Rhbar_eff)
-
     # Construct the superoperator D0 that corresponds to h0_eff/A0_eff using the diagonal elements of A0_eff
 
-    D0_eff = construct_D_using_A_diag(A0_eff_diag, B_eff, lambdaa, dims)
+    D0_eff = construct_D_using_A_diag_only(A0_eff_diag, dims)
 
     return (D0_eff, Mz_eff_diag, dim, dims, dimds)
 
@@ -529,7 +628,7 @@ def evolve_rho_dsqme_onestair(D0, Mz_tot_diag, rho, B, deltat, dim, dims):
     minus_Mz_tot_diag = -1 * Mz_tot_diag
 
     # The double Liouville superoperator, which is a constant matrix, during deltat. Unit: cm-1.
-    D = construct_D_using_Bfield(D0, minus_Mz_tot_diag, B_wavenumber, dim, dims)
+    D = get_D_at_Bfield(D0, minus_Mz_tot_diag, B_wavenumber, dim, dims)
 
     rho = expm(D * deltat) @ rho
 
