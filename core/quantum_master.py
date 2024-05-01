@@ -101,15 +101,6 @@ def construct_X(Sz_tot):
 
     return X
 
-def get_indices_nonzero_X(X):
-
-    indices_nonzero_X = np.nonzero(X)
-
-    X2 = X @ X
-    indices_nonzero_X2 = np.nonzero(X2)
-
-    return (indices_nonzero_X, indices_nonzero_X2)
-
 def construct_Rhbar(T, X, indices_nonzero_X, energies, I0):
     """
     Construct the auxiliary operator R multiplied by hbar.

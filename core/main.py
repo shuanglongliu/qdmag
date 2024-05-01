@@ -102,23 +102,11 @@ if __name__ == "__main__":
 
     #spy_the_effective_system(h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff, Rhbar_eff); exit()
 
-    dim = h0_eff.shape[0]
-    dims = dim * dim
-    dimds = 2*dims
 
-    indices_nonzero_X_eff, indices_nonzero_X2_eff = get_indices_nonzero_X(X_eff)
 
-    indices_nonzero_B = get_indices_nonzero_B(indices_nonzero_X_eff, indices_nonzero_X2_eff, dim)
+    D0_eff, h0_eff_diag, minus_Mz_eff_diag, dim, dims, dimds, indices_nonzero_X_eff, indices_nonzero_B = set_up_double_super_qme(h0_eff, Mv_eff[2], X_eff)
 
-    minus_Mz_tot_diag = -1 * np.diagonal( Mv_eff[2] )
-
-    h0_diag = np.diagonal(h0_eff)
-
-    A_diag = construct_A_diag_from_H_diag(h0_diag, dim, dims)
-
-    D0 = construct_D_from_A_diag(A_diag, dims)
-
-    D = get_D_at_Bfield(1, h0_diag, minus_Mz_tot_diag, X_eff, lambdaa, I0, T, dim, dims, D0, indices_nonzero_X, indices_nonzero_B)
+    D = get_D_at_Bfield(D0_eff, 1, minus_Mz_eff_diag, X_eff, h0_eff_diag, lambdaa, I0, T, dim, dims, dimds, indices_nonzero_X_eff, indices_nonzero_B)
 
     print(D[0])
 

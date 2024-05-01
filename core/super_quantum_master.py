@@ -4,6 +4,7 @@ from spin_dynamics.core.constants import const1, Tesla2wavenumber
 from spin_dynamics.core.common import kronecker_delta
 from spin_dynamics.core.common import convert_cmatrix_to_rmatrix
 from spin_dynamics.core.common import spy_sparsity
+from spin_dynamics.core.quantum_master import construct_Rhbar
 from spin_dynamics import __file__ as root_dir
 
 """
@@ -414,13 +415,16 @@ def update_B_within_D(D, B, dims, dimds, lambdaa):
 
     return D_new
 
-def get_D_at_Bfield(B_wavenumber, h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nonzero_X, indices_nonzero_B):
+def get_D_at_Bfield(D0, B_wavenumber, minus_Mz_tot_diag, X, h0_diag, lambdaa, I0, T, dim, dims, dimds, indices_nonzero_X, indices_nonzero_B):
     """
     D0: D matrix due to h0 = h_ex at t = 0 ps.
-    h0_diag: diagonal matrix elements of h0
-    minus_Mz_tot_diag: -1 * np.diagonal(Mz_tot)
+
     B_wavenumber: B field in wavenumber.
+    minus_Mz_tot_diag: -1 * np.diagonal(Mz_tot)
+
     X: The matrix that encodes possible spin transitions
+    h0_diag: diagonal matrix elements of h0, needed for calculating Rhbar
+
     indices_nonzero_X: indices of nonzero matrix elements of X
     """
 
@@ -519,7 +523,7 @@ def set_up_double_super_qme(h0_eff, Mz_eff, X_eff):
     # Diagonal matrix elements
 
     h0_eff_diag = np.diagonal(h0_eff)
-    Mz_eff_diag = np.diagonal(Mz_eff)
+    minus_Mz_eff_diag = -1 * np.diagonal(Mz_eff)
 
     # Construct the superoperator A0 from h0. 
 
@@ -527,9 +531,18 @@ def set_up_double_super_qme(h0_eff, Mz_eff, X_eff):
 
     # Construct the superoperator D0 that corresponds to h0_eff/A0_eff using the diagonal elements of A0_eff
 
-    D0_eff = construct_D_using_A_diag_only(A0_eff_diag, dims)
+    D0_eff = construct_D_from_A_diag(A0_eff_diag, dims)
 
-    return (D0_eff, Mz_eff_diag, dim, dims, dimds)
+    # Nonzero matrix elements of X and B
+
+    indices_nonzero_X_eff = np.nonzero(X_eff)
+
+    X_eff2 = X_eff @ X_eff
+    indices_nonzero_X_eff2 = np.nonzero(X_eff2)
+
+    indices_nonzero_B = get_indices_nonzero_B(indices_nonzero_X_eff, indices_nonzero_X_eff2, dim)
+
+    return (D0_eff, h0_eff_diag, minus_Mz_eff_diag, dim, dims, dimds, indices_nonzero_X_eff, indices_nonzero_B)
 
 def spy_double_super_system(D, tag, dimds):
 
