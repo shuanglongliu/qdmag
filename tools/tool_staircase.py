@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
     selected_states = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
 
-    h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff, indices_nonzero_X_eff = set_up_the_effective_system(h_ex_p, S2_tot_p, Sz_tot_p, Mv_tot_p, selected_states, T, I0)
+    h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff = set_up_the_effective_system(h_ex_p, S2_tot_p, Sz_tot_p, Mv_tot_p, selected_states)
 
     #spy_the_effective_system(h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff, Rhbar_eff); exit()
 
@@ -87,18 +87,23 @@ if __name__ == "__main__":
 
     # Set up the double super quantum master equation
 
-    D0_eff, Mz_eff_diag, dim, dims, dimds = set_up_double_super_qme(h0_eff, Mv_eff[2], X_eff, Rhbar_eff, lambdaa)
+    D_eff, D0_eff, h0_eff_diag, Mz_eff_diag, Rhbar_eff, C_eff, CST_eff, dim, dims, dimds = set_up_double_super_qme(h0_eff, Mv_eff[2], X_eff, I0, T)
 
-    #spy_double_super_system(D0_eff, "D0_eff", dimds); exit()
+    indices_nonzero_X_eff, indices_nonzero_C_eff = get_indices_nonzero_X_and_C(X_eff, dim)
+
+    norm = np.linalg.norm(D0_eff, 2)
+    print("Norm of the initial D matrix = {:12.6f}\n".format(norm))
+
+    #spy_M(D0_eff, "D0_eff", threshold=1e-3); exit()
 
 
 
     # Initial density matrix
 
-    rho0_eff = get_rho0(eigen0_eff, T)
+    #rho0_eff = get_rho0(eigen0_eff, T)
 
-    #rho0_eff = np.zeros((dim, dim))
-    #rho0_eff[0, 0] = 1.0
+    rho0_eff = np.zeros((dim, dim))
+    rho0_eff[0, 0] = 1.0
 
     double_super_rho0_eff = convert_rho_to_dsrho(rho0_eff)
 
@@ -124,14 +129,37 @@ if __name__ == "__main__":
 
     start = time.time()
 
+    print("Trace of initial density matrix = {:20.16f}\n".format( np.real( np.trace(rho0_eff) ) ))
+
     #double_super_rho_eff = evolve_rho_dsqme(D0_eff, Mz_eff_diag, double_super_rho0_eff, nt, deltat, Bs2, dim, dims)
-    B = 14.0; deltat=1e10; double_super_rho_eff = evolve_rho_dsqme_onestair(D0_eff, Mz_eff_diag, double_super_rho0_eff, B, deltat, dim, dims)
+
+    B = 1
+    D_eff = update_D_under_magnetic_field(D_eff, D0_eff, Mz_eff_diag, B, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
+
+    norm = np.linalg.norm(D_eff, 2)
+    print("Norm of the D matrix at {:8.3f} Tesla = {:12.6f}\n".format(B, norm))
+
+    #spy_M(D_eff, "D_eff", threshold=1e-3); exit()
+
+    deltat=1.0
+    double_super_rho_eff = expm(D_eff * deltat) @ double_super_rho0_eff
+
+    #B = 2
+    #D_eff = update_D_under_magnetic_field(D_eff, D0_eff, Mz_eff_diag, B, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
+    #deltat=1.0
+    #double_super_rho_eff = expm(D_eff * deltat) @ double_super_rho_eff
+
+    #double_super_rho_eff = evolve_rho_dsqme_onestair(D0_eff, Mz_eff_diag, double_super_rho0_eff, B, deltat, dim, dims)
 
     rho_eff = convert_dsrho_to_rho(double_super_rho_eff, dim, dims, dimds)
+
+    print("Trace of final density matrix = {:20.16f}\n".format( np.real( np.trace(rho_eff) ) ))
 
     end   = time.time()
 
     print("Time used for evolution: {:8.3f} s\n".format(end - start) )
+
+    #spy_M(rho_eff, "rho_eff", threshold=1e-9)
 
 
 

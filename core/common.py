@@ -1166,3 +1166,23 @@ def get_indices_of_rho_upper(dim):
         for i in range(indices_upper[0].shape[0]):
             f.write("{:6d} {:6d} {:6d}\n".format(indices_upper[0].shape[0] + i + 1, indices_upper[0][i], indices_upper[1][i]))
 
+
+
+# =======================================================================
+# Functions for checking a matrix
+# =======================================================================
+
+def spy_M(M, tag, width=10, markersize=2, threshold=1e-9):
+
+    M.shape[0]
+
+    with open(root_dir + "output/" + tag + ".dat", "w") as f:
+        for i in range(M.shape[0]):
+            for j in range(M.shape[1]):
+                if np.abs(M[i, j]) > threshold:
+                    f.write("{:6d} {:6d} {:12.6f} {:12.6f} {:12.6f}\n".format(i+1, j+1, np.real(M[i, j]), np.imag(M[i, j]), np.abs(M[i, j])))
+
+    spy_sparsity(M, tag, precision=1.0e-20, figsize=(width, width), markersize=markersize)
+
+    return
+

@@ -104,11 +104,13 @@ if __name__ == "__main__":
 
 
 
-    D0_eff, h0_eff_diag, minus_Mz_eff_diag, dim, dims, dimds, indices_nonzero_X_eff, indices_nonzero_B = set_up_double_super_qme(h0_eff, Mv_eff[2], X_eff)
+    D_eff, D0_eff, h0_eff_diag, minus_Mz_eff_diag, Rhbar_eff, C_eff, CST_eff, dim, dims, dimds = set_up_double_super_qme(h0_eff, Mv_eff[2], X_eff, I0, T)
 
-    D = get_D_at_Bfield(D0_eff, 1, minus_Mz_eff_diag, X_eff, h0_eff_diag, lambdaa, I0, T, dim, dims, dimds, indices_nonzero_X_eff, indices_nonzero_B)
+    indices_nonzero_X_eff, indices_nonzero_C_eff = get_indices_nonzero_X_and_C(X_eff, dim)
 
-    print(D[0])
+    D_eff = update_D_under_magnetic_field(D_eff, D0_eff, minus_Mz_eff_diag, 1., C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
+
+    print(D_eff[0])
 
 
 

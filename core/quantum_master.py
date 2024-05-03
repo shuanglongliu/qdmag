@@ -101,7 +101,7 @@ def construct_X(Sz_tot):
 
     return X
 
-def construct_Rhbar(T, X, indices_nonzero_X, energies, I0):
+def construct_Rhbar(T, X, energies, I0):
     """
     Construct the auxiliary operator R multiplied by hbar.
 
@@ -112,30 +112,25 @@ def construct_Rhbar(T, X, indices_nonzero_X, energies, I0):
     omega_ij = ( E_i - E_j ) / hbar.
     I(omega) = I0 omega^2 theta(omega): spectral density for phonons
     theta(omega) is the step function.
-
-    Assumption:
-      1. The perturbed basis are the eigenvectors under zero and finite magnetic fields.
-      2. The order of the perturbed basis functions does not change, although the order of their energies do change.
     """
 
     Rhbar = np.zeros(X.shape, dtype=np.float64)
 
     omegas = energy2omega(energies)
 
-    n = indices_nonzero_X[0].shape[0] # Number of nonzero matrix elements of X
-    for k in range(n):
-        i = indices_nonzero_X[0][k]
-        j = indices_nonzero_X[1][k]
-        omega_ij = omegas[i] - omegas[j]
-        #print(i, j, omega_ij)
-        Rhbar[i, j] = X[i, j] * Phi(T, omega_ij, I0)
+    for i in range(X.shape[0]):
+        for j in range(X.shape[0]):
+            omega_ij = omegas[i] - omegas[j]
+            Rhbar[i, j] = X[i, j] * Phi(T, omega_ij, I0)
 
     return Rhbar
 
 def update_Rhbar(Rhbar, T, X, indices_nonzero_X, energies, I0):
     """
     Update the auxiliary operator R multiplied by hbar.
+    Save time by avoiding memory allocation for Rhbar.
 
+    indices_nonzero_X: indices of nonzero matrix elements of X
     energies: energies of perturbed basis under any finite magnetic field (along z direction)
 
     Rhbar_{ij} = X_{ij} * Phi_{ij}
@@ -156,7 +151,6 @@ def update_Rhbar(Rhbar, T, X, indices_nonzero_X, energies, I0):
         i = indices_nonzero_X[0][k]
         j = indices_nonzero_X[1][k]
         omega_ij = omegas[i] - omegas[j]
-        #print(i, j, omega_ij)
         Rhbar[i, j] = X[i, j] * Phi(T, omega_ij, I0)
 
     return Rhbar

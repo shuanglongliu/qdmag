@@ -98,7 +98,7 @@ def construct_X_eff(Sz_full, selected_states):
 
     return X_eff
 
-def set_up_the_effective_system(h0_full, S2_full, Sz_full, Mv_full, selected_states, T, I0):
+def set_up_the_effective_system(h0_full, S2_full, Sz_full, Mv_full, selected_states):
     """
     Obtain h0_eff and Mv_eff on the basis of selected states. 
     All the operators are on the perturbed basis, i.e. the eigenstates of h_ex + h_zee(B = 1e-4 T).

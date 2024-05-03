@@ -1,0 +1,1 @@
+Near resonance, constant B field, analytical solution, rho_ii can be negative, rho_ij can blow up, trace(rho) deviate from 1.
