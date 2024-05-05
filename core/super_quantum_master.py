@@ -459,7 +459,7 @@ def update_D_under_magnetic_field(D, D0, Mz_tot_diag, B, C, CST, X, Rhbar, h0_di
     c1Azee_diag = const1 * Azee_diag
     for i in range(dims):
         D[     i, dims+i] = D0[     i, dims+i] + c1Azee_diag[i]
-        D[dims+i,      i] = D0[     i, dims+i] - c1Azee_diag[i]
+        D[dims+i,      i] = D0[dims+i,      i] - c1Azee_diag[i]
 
     # Update the spin-phonon coupling of the D matrix. Both A and C are real.
 

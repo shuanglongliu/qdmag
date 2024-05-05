@@ -100,10 +100,10 @@ if __name__ == "__main__":
 
     # Initial density matrix
 
-    #rho0_eff = get_rho0(eigen0_eff, T)
+    rho0_eff = get_rho0(eigen0_eff, T)
 
-    rho0_eff = np.zeros((dim, dim))
-    rho0_eff[0, 0] = 1.0
+    #rho0_eff = np.zeros((dim, dim))
+    #rho0_eff[0, 0] = 1.0
 
     double_super_rho0_eff = convert_rho_to_dsrho(rho0_eff)
 
@@ -133,7 +133,7 @@ if __name__ == "__main__":
 
     #double_super_rho_eff = evolve_rho_dsqme(D0_eff, Mz_eff_diag, double_super_rho0_eff, nt, deltat, Bs2, dim, dims)
 
-    B = 1
+    B = 3.49
     D_eff = update_D_under_magnetic_field(D_eff, D0_eff, Mz_eff_diag, B, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
 
     norm = np.linalg.norm(D_eff, 2)
@@ -141,38 +141,32 @@ if __name__ == "__main__":
 
     #spy_M(D_eff, "D_eff", threshold=1e-3); exit()
 
-    deltat=1.0
-    double_super_rho_eff = expm(D_eff * deltat) @ double_super_rho0_eff
+    for deltat in [1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7]:
 
-    #B = 2
-    #D_eff = update_D_under_magnetic_field(D_eff, D0_eff, Mz_eff_diag, B, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
-    #deltat=1.0
-    #double_super_rho_eff = expm(D_eff * deltat) @ double_super_rho_eff
-
-    #double_super_rho_eff = evolve_rho_dsqme_onestair(D0_eff, Mz_eff_diag, double_super_rho0_eff, B, deltat, dim, dims)
-
-    rho_eff = convert_dsrho_to_rho(double_super_rho_eff, dim, dims, dimds)
-
-    print("Trace of final density matrix = {:20.16f}\n".format( np.real( np.trace(rho_eff) ) ))
-
-    end   = time.time()
-
-    print("Time used for evolution: {:8.3f} s\n".format(end - start) )
-
-    #spy_M(rho_eff, "rho_eff", threshold=1e-9)
-
-
-
-    # Initial magnetic moment
-
-    M = get_Mv_from_rho(rho0_eff, Mv_eff)
-    print("tmin = {:8.4f} ps, tmax = {:8.4f} ps, deltat = {:8.4f} ps, initial M = {:20.8E} {:20.8E} {:20.8E} mu_B".format(tmin, tmax, deltat, *np.real(M)))
-
-
-
-    # Final magnetic moment as the system is driven
-
-    M = get_Mv_from_rho(rho_eff, Mv_eff)
-    print("tmin = {:8.4f} ps, tmax = {:8.4f} ps, deltat = {:8.4f} ps,   final M = {:20.8E} {:20.8E} {:20.8E} mu_B".format(tmin, tmax, deltat, *np.real(M)))
+        double_super_rho_eff = expm(D_eff * deltat) @ double_super_rho0_eff
+    
+        rho_eff = convert_dsrho_to_rho(double_super_rho_eff, dim, dims, dimds)
+    
+        #spy_M(rho_eff, "rho_eff", threshold=1e-9)
+    
+        print("Trace of final density matrix = {:20.16f}\n".format( np.real( np.trace(rho_eff) ) ))
+    
+        end   = time.time()
+    
+        print("Time used for evolution: {:8.3f} s\n".format(end - start) )
+    
+    
+    
+        # Initial magnetic moment
+    
+        #M = get_Mv_from_rho(rho0_eff, Mv_eff)
+        #print("tmin = {:8.4f} ps, tmax = {:8.4f} ps, deltat = {:8.4f} ps, initial M = {:20.8E} {:20.8E} {:20.8E} mu_B".format(tmin, tmax, deltat, *np.real(M)))
+    
+    
+    
+        # Final magnetic moment as the system is driven
+    
+        M = get_Mv_from_rho(rho_eff, Mv_eff)
+        print("tmin = {:8.4f} ps, tmax = {:8.4f} ps, deltat = {:8.4f} ps,   final M = {:20.8E} {:20.8E} {:20.8E} mu_B".format(tmin, tmax, deltat, *np.real(M)))
 
 
