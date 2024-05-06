@@ -133,7 +133,7 @@ if __name__ == "__main__":
 
     #double_super_rho_eff = evolve_rho_dsqme(D0_eff, Mz_eff_diag, double_super_rho0_eff, nt, deltat, Bs2, dim, dims)
 
-    B = 10.0
+    B = 3.49
     D_eff = update_D_under_magnetic_field(D_eff, D0_eff, Mz_eff_diag, B, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
 
     #norm = np.linalg.norm(D_eff, 2)
@@ -141,12 +141,12 @@ if __name__ == "__main__":
 
     #spy_M(D_eff, "D_eff", threshold=1e-3); exit()
 
-    deltat = 5e2
+    deltat = 1e2
     double_super_rho_eff = expm(D_eff * deltat) @ double_super_rho0_eff
     
-    B = 10.0; deltat = 5e2
-    D_eff = update_D_under_magnetic_field(D_eff, D0_eff, Mz_eff_diag, B, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
-    double_super_rho_eff = expm(D_eff * deltat) @ double_super_rho_eff
+    #B = 14; deltat = 1e12
+    #D_eff = update_D_under_magnetic_field(D_eff, D0_eff, Mz_eff_diag, B, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
+    #double_super_rho_eff = expm(D_eff * deltat) @ double_super_rho_eff
 
     rho_eff = convert_dsrho_to_rho(double_super_rho_eff, dim, dims, dimds)
     

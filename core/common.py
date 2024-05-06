@@ -1179,7 +1179,7 @@ def spy_M(M, tag, width=10, markersize=2, threshold=1e-9):
     with open(root_dir + "output/" + tag + ".dat", "w") as f:
         for i in range(M.shape[0]):
             for j in range(M.shape[1]):
-                if np.abs(M[i, j]) > threshold:
+                if np.abs(M[i, j]) >= threshold:
                     f.write("{:6d} {:6d} {:12.6f} {:12.6f} {:12.6f}\n".format(i+1, j+1, np.real(M[i, j]), np.imag(M[i, j]), np.abs(M[i, j])))
 
     spy_sparsity(M, tag, precision=1.0e-20, figsize=(width, width), markersize=markersize)
