@@ -5,6 +5,7 @@ from spin_dynamics.core.constants import const1, Tesla2wavenumber
 from spin_dynamics.core.common import kronecker_delta
 from spin_dynamics.core.common import convert_cmatrix_to_rmatrix
 from spin_dynamics.core.common import spy_sparsity
+from spin_dynamics.core.common import get_Mv_from_rho
 from spin_dynamics.core.quantum_master import construct_Rhbar, update_Rhbar
 from spin_dynamics import __file__ as root_dir
 
@@ -594,7 +595,7 @@ def evolve_rho_dsqme(D0, Mz_tot_diag, double_super_rho, nt, deltat, Bs2, dim, di
 
     return double_super_rho
 
-def evolve_rho_dsqme_onestair(D0, Mz_tot_diag, rho, Bfield, deltat, dim, dims):
+def evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds):
     """
     Evolve rho by deltat of constant Bfield using the analytical solution of the quantum master equation
         d rho / d t = D rho
@@ -602,22 +603,68 @@ def evolve_rho_dsqme_onestair(D0, Mz_tot_diag, rho, Bfield, deltat, dim, dims):
         rho_new = exp(int_t1^t2 D dt) rho = exp(D deltat) rho
 
     Input: 
+        double_super_rho: double super density matrix
+        deltat: time period for evolution
+        D: double superoperator
         D0: double superoperator at zero magnetic field.
-        Mz_tot_diag: diagnal matrix elements of the z component of the magnetization operators
+        Mz_diag: diagnal matrix elements of the z component of the magnetization operators
+        B: magnetic field in Tesla
+        C: super operator for spin-phonon coupling
+        CST: super transpose of C
+        X: spin operator that encodes possible spin transitions
+        Rhbar: auxiliary operator for spin phonon coupling
+        h0_diag: diagonal matrix elements of the initial Hamiltonian on the perturbed basis
+        indices_nonzero_X: indices of the nonzero matrix elements of X
+        indices_nonzero_C: indices of the nonzero matrix elements of C
+        lambdaa: spin-phonon coupling constant in wavenumbers
+        I0: prefactor for the phonon density of states
+        T: temperature in Kelvin
         rho: vectorized initial density matrix on the perturbed basis.
-        Bfield: magnetic field in Tesla
         deltat: time step in ps.
         dim: dimension of the Hilbert space.
         dims: dimension of superoperators
     """
 
-    B_wavenumber = Tesla2wavenumber * Bfield
-    minus_Mz_tot_diag = -1 * Mz_tot_diag
+    D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
 
-    # The double Liouville superoperator, which is a constant matrix, during deltat. Unit: cm-1.
-    D = get_D_at_Bfield(D0, minus_Mz_tot_diag, B_wavenumber, dim, dims)
+    double_super_rho = expm(D * deltat) @ double_super_rho
 
-    rho = expm(D * deltat) @ rho
+    return double_super_rho
 
-    return rho
+def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt, double_super_rho, D, D0, Mz_diag, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds, Mv):
+
+    half_deltat = deltat/2
+
+    nt = int( np.round((t1 - t0)/deltat) )
+
+    t1 = t0 + nt*deltat
+    B1 = Bt(t1)
+    #print("t1 = {:18.3f} , B1 = {:15.3e}\n".format(t1, B1)); exit()
+
+    for it in range(nt):
+        t = t0 + it*deltat + half_deltat
+        B = Bt(t)
+
+        #print("it / nt = {:6d} / {:6d} , t / t1 = {:18.3f} / {:18.3f} , B / B1 = {:15.3e} / {:15.3e}\n".format(it, nt, t, t1, B, B1))
+
+        D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
+        print("it / nt = {:6d} / {:6d} , t / t1 = {:18.3f} / {:18.3f} , B / B1 = {:15.3e} / {:15.3e}, max(|D|) = {:12.6f}, max(|exp(D * deltat)|) = {:12.6f}\n".format(it, nt, t, t1, B, B1, np.max(np.abs(D)), np.max(np.abs(expm(D*deltat)))))
+
+        #double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
+
+        #M = get_magnetic_moment_stairs(double_super_rho, Mv, dim, dims, dimds)
+        #print("it / nt = {:6d} / {:6d} , t / t1 = {:18.3f} / {:18.3f} , B / B1 = {:15.3e} / {:15.3e} , M = {:20.8E} {:20.8E} {:20.8E} mu_B\n".format(it, nt, t, t1, B, B1, *np.real(M)))
+
+    return ( t1, double_super_rho )
+
+def get_magnetic_moment_stairs(double_super_rho, Mv, dim, dims, dimds):
+
+    rho = convert_dsrho_to_rho(double_super_rho, dim, dims, dimds)
+
+    #spy_M(rho, "rho", threshold=0)
+    #print("Trace of final density matrix = {:20.16f}\n".format( np.real( np.trace(rho) ) ))
+    
+    M = get_Mv_from_rho(rho, Mv)
+
+    return M
 

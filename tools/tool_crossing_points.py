@@ -36,6 +36,25 @@ def get_crossing_magnetic_fields(indices_nonzero_X_eff, h0_eff_diag, Mz_eff_diag
 
 
 
+def get_crossing_times(B0, t0):
+    f = lambda x: get_B_sin(x) - B0
+    crossing_time = fsolve(f, [t0])
+    print("{:20.3f}".format(crossing_time[0]))
+
+
+def get_max_evolution_operator(t, deltat):
+    B = get_B_sin(t)
+    D = update_D_under_magnetic_field(D_eff, D0_eff, Mz_eff_diag, B, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
+    max_evolution_operator = np.max(np.abs(expm(D*deltat)))
+    print("t , deltat , B , max_evolution_operator = {:20.3f} , {:20.3f} , {:20.3f} , {:20.3f}".format(t, deltat[0], B, max_evolution_operator))
+    return max_evolution_operator
+
+def get_max_time_step(t, deltat0, max_evolution_operator0=10000.):
+
+    f = lambda x: get_max_evolution_operator(t, x) - max_evolution_operator0
+    max_deltat = fsolve(f, [deltat0])
+    print("{:20.3f}".format(max_deltat[0]))
+
 if __name__ == "__main__":
 
     # Spin system
@@ -98,15 +117,6 @@ if __name__ == "__main__":
 
 
 
-    # Eigenvalues and eigenvectors of the effective Hamiltonian
-
-    eigen0_eff = eigen_spin_hamiltonian(h0_eff)
-
-    #save_eigenvalues(eigen0_eff, offset=True)
-    #save_eigenvectors(eigen0_eff)
-
-
-
     # Set up the double super quantum master equation
 
     D_eff, D0_eff, h0_eff_diag, Mz_eff_diag, Rhbar_eff, C_eff, CST_eff, dim, dims, dimds = set_up_double_super_qme(h0_eff, Mv_eff[2], X_eff, I0, T)
@@ -115,106 +125,24 @@ if __name__ == "__main__":
 
     #print(indices_nonzero_X_eff); exit()
 
-    #norm = np.linalg.norm(D0_eff, 2)
-    #print("Norm of the initial D matrix = {:12.6f}\n".format(norm))
+    #crossing_magnetic_fields = get_crossing_magnetic_fields(indices_nonzero_X_eff, h0_eff_diag, Mz_eff_diag)
+    #print(crossing_magnetic_fields); exit() # [1.7135593106969351, 1.7778177848482146, 3.491377095545602]
 
-    #spy_M(D0_eff, "D0_eff", threshold=1e-3); exit()
-
-
-
-    # Initial density matrix
-
-    #energies = h0_eff_diag - Mz_eff_diag * 5
-    #rho0_eff = get_rhoe(energies, T)
-
-    rho0_eff = get_rho0(eigen0_eff, T)
-
-    #rho0_eff = np.zeros((dim, dim))
-    #rho0_eff[0, 0] = 1.0
-
-    #print( np.diagonal( rho0_eff ) ); exit()
-
-    double_super_rho0_eff = convert_rho_to_dsrho(rho0_eff)
+    #get_crossing_times(1.7135593106969351, 0.1e9)   # 139878972.288
+    #get_crossing_times(1.7778177848482146, 0.1e9)   # 145125705.173
+    #get_crossing_times(3.491377095545602 , 0.1e9)   # 285106489.578
 
 
 
-    # Check commutation relation
+    # Get the maximal reasonable time step
 
-    #D1_eff = construct_D_using_Bfield(D0_eff, -1*Mz_eff_diag, 1, dim, dims)
-    #check_commutation(D0_eff, D1_eff); exit()
+    #get_max_evolution_operator(0, 1e0)
 
+    #get_max_time_step(0, 1e1) # 10.021
+    #get_max_time_step(1e6, 1e1) # 10.036
+    #get_max_time_step(1e7, 1e1) # 12.038
+    #get_max_time_step(1e8, 1e1) # 12.038
+    get_max_time_step(5e8, 1e3) # 12.038
 
-
-    # Get the magnetic field pulse
-
-    #Bt = load_cs()
-    #nt, ts, Bs2, deltat = get_pulse_for_Runge_Kutta_double_grid(Bt, tmin, tmax, deltat)
-
-    Bt = get_B_sin
-
-
-
-    # Evolve the density matrix
-
-    start = time.time()
-
-    print("Trace of initial density matrix = {:20.16f}\n".format( np.real( np.trace(rho0_eff) ) ))
-
-    #double_super_rho_eff = evolve_rho_dsqme(D0_eff, Mz_eff_diag, double_super_rho0_eff, nt, deltat, Bs2, dim, dims)
-
-    #B = 5.0; deltat = 1e3
-    #double_super_rho_eff = evolve_rho_dsqme_onestair(double_super_rho0_eff, deltat, D_eff, D0_eff, Mz_eff_diag, B, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
-
-    #t0 = 0; t1 = 0.28e9; deltat = 1e6 # Over flow, de
-    #t0 = 0; deltat = 1e0; t1 = t0 + deltat
-    #t0 = 0; deltat = 1e1; t1 = t0 + deltat
-    #t0 = 0; deltat = 1e2; t1 = t0 + deltat
-    #t0 = 5e9; deltat = 1e1; t1 = t0 + deltat
-    #t0 = 5e9; deltat = 1e2; t1 = t0 + deltat
-    #t0 = 139878972; deltat = 1e1; t1 = t0 + deltat
-    #t0 = 139878972; deltat = 1e2; t1 = t0 + deltat
-    #t0 = 145125705; deltat = 1e1; t1 = t0 + deltat
-    #t0 = 145125705; deltat = 1e2; t1 = t0 + deltat
-    #t0 = 285106489; deltat = 1e1; t1 = t0 + deltat
-    #t0 = 285106489; deltat = 1e2; t1 = t0 + deltat
-
-    #t0 = 1e3; deltat = 1e2; t1 = t0 + deltat
-    #t0 = 1e6; deltat = 1e2; t1 = t0 + deltat
-    #t0 = 1e7; deltat = 1e2; t1 = t0 + deltat
-    #t0 = 5e7; deltat = 1e2; t1 = t0 + deltat
-    #t0 = 1e8; deltat = 1e2; t1 = t0 + deltat
-    #t0 = 1e8; deltat = 1e3; t1 = t0 + deltat
-    #t0 = 2e8; deltat = 1e3; t1 = t0 + deltat
-    t0 = 2e8; deltat = 1e6; t1 = t0 + deltat
-    t1, double_super_rho_eff = evolve_rho_dsqme_stairs(t0, t1, deltat, Bt, double_super_rho0_eff, D_eff, D0_eff, Mz_eff_diag, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds, Mv_eff)
-
-    #norm = np.linalg.norm(D_eff, 2)
-    #print("Norm of the D matrix at {:8.3f} Tesla = {:12.6f}\n".format(B, norm))
-
-    #spy_M(D_eff, "D_eff", threshold=1e-3); exit()
-
-    rho_eff = convert_dsrho_to_rho(double_super_rho_eff, dim, dims, dimds)
-    
-    spy_M(rho_eff, "rho_eff", threshold=0); exit()
-    
-    print("Trace of final density matrix = {:20.16f}\n".format( np.real( np.trace(rho_eff) ) ))
-    
-    end   = time.time()
-    
-    print("Time used for evolution: {:8.3f} s\n".format(end - start) )
-    
-    
-    
-    # Initial magnetic moment
-    
-    M = get_Mv_from_rho(rho0_eff, Mv_eff)
-    print("tmin = {:8.4f} ps, tmax = {:8.4f} ps, deltat = {:8.4f} ps, initial M = {:20.8E} {:20.8E} {:20.8E} mu_B".format(tmin, tmax, deltat, *np.real(M)))
-    
-    
-    
-    # Final magnetic moment as the system is driven
-    
-    M = get_Mv_from_rho(rho_eff, Mv_eff)
-    print("tmin = {:8.4f} ps, tmax = {:8.4f} ps, deltat = {:8.4f} ps,   final M = {:20.8E} {:20.8E} {:20.8E} mu_B".format(tmin, tmax, deltat, *np.real(M)))
 
 

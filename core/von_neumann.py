@@ -160,7 +160,7 @@ def get_DeltaUs_ray(h0, Mv_tot, nt, ts, deltat, Bs, theta_B, phi_B, nperiod):
 
 def get_rho0(eigen0, T):
     """
-    Get initial density matrix rho0 on the basis of eigenvectors of h0
+    Get initial density matrix rho0 on the perturbed basis
     rho0_kk = p_k which is the probability of occupying the state |k>
     T: Temperature in Kelvin
     """
@@ -178,6 +178,30 @@ def get_rho0(eigen0, T):
     rho0 = rho0 / np.trace(rho0)
 
     return rho0
+
+
+def get_rhoe(energies, T):
+    """
+    Get the density matrix on the perturbed basis for the thermal equilibrium
+    rho0_kk = p_k which is the probability of occupying the state |k>
+    T: Temperature in Kelvin
+    """
+
+    dim = energies.shape[0]
+
+    rhoe = np.zeros((dim, dim), dtype=np.complex128)
+
+    e_ref = np.min(energies)
+
+    beta = 1/(Kelvin2wavenumber * T)
+
+    for i in range(dim):
+        eigenvalue = energies[i] - e_ref
+        rhoe[i, i] = np.exp(-beta*eigenvalue)
+
+    rhoe = rhoe / np.trace(rhoe)
+
+    return rhoe
 
 
 def evolve_Deltat(rho, DeltaU):
