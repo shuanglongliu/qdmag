@@ -1,11 +1,12 @@
 import copy
 import numpy as np
+import h5py
 from scipy.linalg import expm
 from spin_dynamics.core.constants import const1, Tesla2wavenumber
 from spin_dynamics.core.common import kronecker_delta
 from spin_dynamics.core.common import convert_cmatrix_to_rmatrix
 from spin_dynamics.core.common import spy_sparsity
-from spin_dynamics.core.common import get_Mv_from_rho
+from spin_dynamics.core.common import get_Mv_from_rho, get_Mz_from_rho
 from spin_dynamics.core.quantum_master import construct_Rhbar, update_Rhbar
 from spin_dynamics import __file__ as root_dir
 
@@ -631,40 +632,91 @@ def evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CS
 
     return double_super_rho
 
-def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt, double_super_rho, D, D0, Mz_diag, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds, Mv):
+def evolve_rho_dsqme_stairs_light(t0, t1, deltat, Bt, double_super_rho, D, D0, Mz_diag, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds, Mv):
 
     half_deltat = deltat/2
-
     nt = int( np.round((t1 - t0)/deltat) )
-
     t1 = t0 + nt*deltat
+
+    B0 = Bt(t0)
     B1 = Bt(t1)
-    #print("t1 = {:18.3f} , B1 = {:15.3e}\n".format(t1, B1)); exit()
+
+    print("deltat = {:18.3f}, t0/t1 = {:18.3f}/{:18.3f}, B0/B1 = {:15.3e}/{:15.3e}\n".format(deltat, t0, t1, B0, B1))
 
     for it in range(nt):
         t = t0 + it*deltat + half_deltat
         B = Bt(t)
 
-        #print("it / nt = {:6d} / {:6d} , t / t1 = {:18.3f} / {:18.3f} , B / B1 = {:15.3e} / {:15.3e}\n".format(it, nt, t, t1, B, B1))
+        #print("deltat = {:18.3f}, it / nt = {:6d} / {:6d} , t / t1 = {:18.3f} / {:18.3f} , B / B1 = {:15.3e} / {:15.3e}\n".format(deltat, it, nt, t, t1, B, B1))
 
         D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
         print("it / nt = {:6d} / {:6d} , t / t1 = {:18.3f} / {:18.3f} , B / B1 = {:15.3e} / {:15.3e}, max(|D|) = {:12.6f}, max(|exp(D * deltat)|) = {:12.6f}\n".format(it, nt, t, t1, B, B1, np.max(np.abs(D)), np.max(np.abs(expm(D*deltat)))))
 
         #double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
 
-        #M = get_magnetic_moment_stairs(double_super_rho, Mv, dim, dims, dimds)
+        #M = get_magnetic_moment_dsrho(double_super_rho, Mv, dim, dims, dimds)
         #print("it / nt = {:6d} / {:6d} , t / t1 = {:18.3f} / {:18.3f} , B / B1 = {:15.3e} / {:15.3e} , M = {:20.8E} {:20.8E} {:20.8E} mu_B\n".format(it, nt, t, t1, B, B1, *np.real(M)))
 
     return ( t1, double_super_rho )
 
-def get_magnetic_moment_stairs(double_super_rho, Mv, dim, dims, dimds):
+def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt, double_super_rho, D, D0, Mz_diag, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds, Mv, save_mag, deltat_mag, save_rho, deltat_rho):
+
+    half_deltat = deltat/2
+    nt = int( np.round((t1 - t0)/deltat) )
+    t1 = t0 + nt*deltat
+
+    B0 = Bt(t0)
+    B1 = Bt(t1)
+
+    print("deltat = {:18.3f}".format(deltat))
+    print("nt = {:18d}".format(nt))
+    print("t0/t1 = {:18.3f}/{:18.3f}".format(t0, t1))
+    print("B0/B1 = {:18.3f}/{:18.3f}\n".format(B0, B1))
+
+    nt_mag = round( deltat_mag / deltat )
+    nt_rho = round( deltat_rho / deltat )
+
+    #M = get_magnetic_moment_dsrho(double_super_rho, Mv, dim, dims, dimds)
+    #print("it = {:6d}, t = {:18.3f}, B = {:15.3e}, max(|D|) = {:12.6f}, max(|exp(D * deltat)|) = {:12.6f}, M = {:20.8E} {:20.8E} {:20.8E} mu_B\n".format(-1, t0, Bt(t0), np.max(np.abs(D)), np.max(np.abs(expm(D*deltat))), *np.real(M)))
+
+    with h5py.File(root_dir + 'output/double_super_rho.hdf5', 'w') as f1,  open(root_dir + 'output/M-t.dat', 'w') as f2:
+        for it in range(nt):
+            t = t0 + it*deltat + half_deltat
+            B = Bt(t)
+    
+            print("it / nt = {:6d} / {:6d} , t / t1 = {:18.3f} / {:18.3f} , B / B1 = {:15.6e} / {:15.6e}".format(it, nt, t, t1, B, B1))
+    
+            D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
+    
+            double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
+    
+            if it%nt_rho == 0:
+                tag = "{:.3f}".format(t + half_deltat)
+                dset = f1.create_dataset(tag, data=double_super_rho)
+
+            if it%nt_mag == 0:
+                Mz = get_Mz_from_dsrho(double_super_rho, Mv[2], dim, dims, dimds)
+                f2.write("{:20.3f} {:20.6E} {:20.8E}\n".format(t + half_deltat, B, Mz))
+    
+            #M = get_magnetic_moment_dsrho(double_super_rho, Mv, dim, dims, dimds)
+            #print("it = {:6d}, t = {:18.3f}, B = {:15.3e}, max(|D|) = {:12.6f}, max(|exp(D * deltat)|) = {:12.6f}, M = {:20.8E} {:20.8E} {:20.8E} mu_B\n".format(it, t+half_deltat, B, np.max(np.abs(D)), np.max(np.abs(expm(D*deltat))), *np.real(M)))
+
+    return ( t1, double_super_rho )
+
+def get_magnetic_moment_dsrho(double_super_rho, Mv, dim, dims, dimds):
 
     rho = convert_dsrho_to_rho(double_super_rho, dim, dims, dimds)
 
     #spy_M(rho, "rho", threshold=0)
-    #print("Trace of final density matrix = {:20.16f}\n".format( np.real( np.trace(rho) ) ))
+    #print("Trace of the density matrix = {:20.16f}".format( np.real( np.trace(rho) ) ))
     
     M = get_Mv_from_rho(rho, Mv)
 
     return M
+
+def get_Mz_from_dsrho(double_super_rho, Mz, dim, dims, dimds):
+
+    rho = convert_dsrho_to_rho(double_super_rho, dim, dims, dimds)
+
+    return get_Mz_from_rho(rho, Mz)
 

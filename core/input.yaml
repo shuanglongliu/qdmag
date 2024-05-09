@@ -135,14 +135,14 @@ dynamics:
       lambdaa: 10.0    # Spin phonon coupling constant in cm-1, 0.1
       I0: 1.e-4       # Prefactor for phonon density of states. 1e-4
 
-    - tmin: 0.0       # Initial time in ps 
-      tmax: 1.0       # Finial time in ps
-      deltat: 0.01    # Time step in ps
+    - tmin: 0.5e+9       # Initial time in ps 
+      tmax: 1.0e+9       # Finial time in ps
+      deltat: 1.e+6    # Time step in ps
 
     - save_mag: true   # Calculate and save magnetization during the dynamics ?
-      deltat_mag: 0.02  # Calculate and save magnetization every delta_mag ps
+      deltat_mag: 1.e+6  # Calculate and save magnetization every delta_mag ps
       save_rho: true   # Save the density matrix ?
-      deltat_rho: 0.1  # Save the density matrix every delta_rho ps
+      deltat_rho: 1.e+6  # Save the density matrix every delta_rho ps
 
     - theta_B: 0.0    # Polar angle of the magnetic field
       phi_B: 0.0      # Azimuthal angle of the magnetic field

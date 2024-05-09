@@ -1150,6 +1150,11 @@ def get_Mv_from_rho(rho, Mv_tot):
     return Mv
 
 
+def get_Mz_from_rho(rho, Mz_tot):
+
+    return np.real( np.trace( np.matmul(rho, Mz_tot) ) )
+
+
 def get_rho_upper(rho, indices_upper):
     rho_upper = rho[indices_upper]
     rho_upper_real = np.real(rho_upper)

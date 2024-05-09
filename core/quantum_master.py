@@ -77,12 +77,19 @@ def Phi(T, omega, I0):
     numerator = spectral_density(omega, I0=I0) - spectral_density(-omega, I0=I0)
 
     if abs( energy ) < eta:
+        #print("Energy gap too small.")
         if energy >= 0:
             energy = eta
         else:
             energy = -1 * eta
-        denominator = np.exp(beta * energy) - 1
     denominator = np.exp(beta * energy) - 1
+
+    #if np.abs(denominator) < 1e-3:
+        #print("denominator very small")
+        #if denominator >= 0:
+            #denominator = 1e-3
+        #elif denominator < 0:
+            #denominator = -1e-3
 
     result = numerator / denominator
 
@@ -126,7 +133,8 @@ def construct_Rhbar(T, X, energies, I0):
     for i in range(X.shape[0]):
         for j in range(X.shape[0]):
             omega_ij = omegas[i] - omegas[j]
-            Rhbar[i, j] = X[i, j] * Phi(T, omega_ij, I0)
+            if X[i, j] != 0:
+                Rhbar[i, j] = X[i, j] * Phi(T, omega_ij, I0)
 
     return Rhbar
 
