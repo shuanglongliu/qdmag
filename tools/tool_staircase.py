@@ -35,6 +35,18 @@ def get_crossing_magnetic_fields(indices_nonzero_X_eff, h0_eff_diag, Mz_eff_diag
     return unique_crossing_magnetic_fields
 
 
+def get_a_random_rho(dim):
+    x = np.zeros(dim)
+    x[24] = 5.
+    x = x + np.random.rand(dim)
+    x = x / np.sum(x)
+    
+    y = 2*(np.random.rand(dim, dim) - 0.5)
+    y = ( np.transpose(y) + y )/2
+    for i in range(dim):
+        y[i, i] = x[i]
+
+    return y
 
 if __name__ == "__main__":
 
@@ -122,7 +134,15 @@ if __name__ == "__main__":
     # Initial density matrix
 
     energies = h0_eff_diag - Mz_eff_diag * Tesla2wavenumber * get_B_sin(tmin)
-    rho0_eff = get_rhoe(energies, T)
+    #rho0_eff = get_rhoe(energies, T)
+
+    #rho0_eff = get_a_random_rho(dim)
+
+    rho0_eff = np.eye(dim) / dim
+
+    
+
+
 
     #rho0_eff = get_rho0(eigen0_eff, T)
 

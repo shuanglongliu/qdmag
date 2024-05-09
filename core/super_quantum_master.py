@@ -680,6 +680,15 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt, double_super_rho, D, D0, Mz_diag
     #print("it = {:6d}, t = {:18.3f}, B = {:15.3e}, max(|D|) = {:12.6f}, max(|exp(D * deltat)|) = {:12.6f}, M = {:20.8E} {:20.8E} {:20.8E} mu_B\n".format(-1, t0, Bt(t0), np.max(np.abs(D)), np.max(np.abs(expm(D*deltat))), *np.real(M)))
 
     with h5py.File(root_dir + 'output/double_super_rho.hdf5', 'w') as f1,  open(root_dir + 'output/M-t.dat', 'w') as f2:
+
+        if save_rho:
+            tag = "{:.3f}".format(t0)
+            dset = f1.create_dataset(tag, data=double_super_rho)
+
+        if save_mag:
+            Mz = get_Mz_from_dsrho(double_super_rho, Mv[2], dim, dims, dimds)
+            f2.write("{:20.3f} {:20.6E} {:20.8E}\n".format(t0, Bt(t0), Mz))
+    
         for it in range(nt):
             t = t0 + it*deltat + half_deltat
             B = Bt(t)
@@ -690,11 +699,11 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt, double_super_rho, D, D0, Mz_diag
     
             double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
     
-            if it%nt_rho == 0:
+            if save_rho and it%nt_rho == 0:
                 tag = "{:.3f}".format(t + half_deltat)
                 dset = f1.create_dataset(tag, data=double_super_rho)
 
-            if it%nt_mag == 0:
+            if save_mag and it%nt_mag == 0:
                 Mz = get_Mz_from_dsrho(double_super_rho, Mv[2], dim, dims, dimds)
                 f2.write("{:20.3f} {:20.6E} {:20.8E}\n".format(t + half_deltat, B, Mz))
     
