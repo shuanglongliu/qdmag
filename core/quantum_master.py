@@ -68,30 +68,16 @@ def spectral_density(omega, I0=1e-4):
 
 def Phi(T, omega, I0):
 
-    # Numerical parameter to avoid divergence
-    eta = 5.e-2
-
     beta = 1/(Kelvin2wavenumber * T)
     energy = omega2energy(omega)
 
-    numerator = spectral_density(omega, I0=I0) - spectral_density(-omega, I0=I0)
-
-    if abs( energy ) < eta:
-        #print("Energy gap too small.")
-        if energy >= 0:
-            energy = eta
-        else:
-            energy = -1 * eta
-    denominator = np.exp(beta * energy) - 1
-
-    #if np.abs(denominator) < 1e-3:
-        #print("denominator very small")
-        #if denominator >= 0:
-            #denominator = 1e-3
-        #elif denominator < 0:
-            #denominator = -1e-3
-
-    result = numerator / denominator
+    if abs( beta*energy ) < 1e-3:
+        # Use Taylor expansion to avoid divergence
+        result = abs( -I0*omega*omega/2 + I0*const1*omega/beta )
+    else:
+        numerator = spectral_density(omega, I0=I0) - spectral_density(-omega, I0=I0)
+        denominator = np.exp(beta * energy) - 1
+        result = numerator / denominator
 
     return result
 
