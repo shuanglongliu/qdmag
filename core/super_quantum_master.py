@@ -10,7 +10,7 @@ from spin_dynamics.core.common import get_Mv_from_rho, get_Mz_from_rho
 from spin_dynamics.core.quantum_master import construct_Rhbar, update_Rhbar
 from spin_dynamics import __file__ as root_dir
 
-"""
+r"""
 Codes for solving the quantum master equation described in the Eq. 2.7 of
 J. Phys. Soc. Jpn. 2001.70:2151-2157 by Hiroki Nakano and Seiji Miyashita.
 The quantum master equation is cast into the Liouville form with the real 
@@ -384,7 +384,11 @@ def construct_D_from_A_diag(A_diag, dims):
     return D
 
 
-def set_up_double_super_qme(h0_eff, Mz_eff, X_eff, I0, T):
+def set_up_double_super_qme(h0_eff, h1_eff, Mz_eff, X_eff, I0, T):
+    """
+    h0: Hamiltonian at t = 0
+    h1: Hamiltonian at t = tmin
+    """
 
     # Dimensions
 
@@ -399,30 +403,34 @@ def set_up_double_super_qme(h0_eff, Mz_eff, X_eff, I0, T):
     # Build real matrices to speed up the construction of the D matrix, which will be done at each time step.
 
     h0_eff = convert_cmatrix_to_rmatrix(h0_eff, "h0_eff")
+    h1_eff = convert_cmatrix_to_rmatrix(h1_eff, "h1_eff")
     Mz_eff = convert_cmatrix_to_rmatrix(Mz_eff, "Mz_eff")
 
     # Diagonal matrix elements
 
     h0_eff_diag = np.diagonal(h0_eff)
+    h1_eff_diag = np.diagonal(h1_eff)
     Mz_eff_diag = np.diagonal(Mz_eff)
 
     # Construct the superoperator A0 from h0. 
 
     A0_eff_diag = construct_A_diag_from_H_diag(h0_eff_diag, dim, dims)
+    A1_eff_diag = construct_A_diag_from_H_diag(h1_eff_diag, dim, dims)
 
     # Construct the superoperator D0 that corresponds to h0_eff/A0_eff using the diagonal elements of A0_eff
 
     D0_eff = construct_D_from_A_diag(A0_eff_diag, dims)
-
-    D_eff = copy.deepcopy(D0_eff)
+    D_eff  = construct_D_from_A_diag(A1_eff_diag, dims)
 
     # Construct Rhbar, C, and CST using the initial energy spectrum
+    # The matrix elements of Rhbar_eff, C, and CST_eff do not matter here, since they will be reconstructed completely later.
+    # We set them up at the beginning to reuse the memory and save time.
 
     Rhbar_eff = construct_Rhbar(T, X_eff, h0_eff_diag, I0)
     C_eff = construct_C(X_eff, Rhbar_eff, dim, dims)
     CST_eff = construct_CST(C_eff, dim, dims)
 
-    return (D_eff, D0_eff, h0_eff_diag, Mz_eff_diag, Rhbar_eff, C_eff, CST_eff, dim, dims, dimds)
+    return (D0_eff, D_eff, h0_eff_diag, Mz_eff_diag, Rhbar_eff, C_eff, CST_eff, dim, dims, dimds)
 
 def update_D_under_magnetic_field(D, D0, Mz_tot_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds):
     """
@@ -633,6 +641,10 @@ def evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CS
     return double_super_rho
 
 def evolve_rho_dsqme_stairs_light(t0, t1, deltat, Bt, double_super_rho, D, D0, Mz_diag, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds, Mv):
+    """
+    D: D at tmin
+    D0: D at t=0 when B = 0 T.
+    """
 
     half_deltat = deltat/2
     nt = int( np.round((t1 - t0)/deltat) )
@@ -660,6 +672,10 @@ def evolve_rho_dsqme_stairs_light(t0, t1, deltat, Bt, double_super_rho, D, D0, M
     return ( t1, double_super_rho )
 
 def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt, double_super_rho, D, D0, Mz_diag, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds, Mv, save_mag, deltat_mag, save_rho, deltat_rho):
+    """
+    C and CST will be reconstructed completely from X and Rhbar.
+    Rhbar will also be reconstructed completely from X and the eigenvalues.
+    """
 
     half_deltat = deltat/2
     nt = int( np.round((t1 - t0)/deltat) )
@@ -676,8 +692,8 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt, double_super_rho, D, D0, Mz_diag
     nt_mag = round( deltat_mag / deltat )
     nt_rho = round( deltat_rho / deltat )
 
-    #M = get_magnetic_moment_dsrho(double_super_rho, Mv, dim, dims, dimds)
-    #print("it = {:6d}, t = {:18.3f}, B = {:15.3e}, max(|D|) = {:12.6f}, max(|exp(D * deltat)|) = {:12.6f}, M = {:20.8E} {:20.8E} {:20.8E} mu_B\n".format(-1, t0, Bt(t0), np.max(np.abs(D)), np.max(np.abs(expm(D*deltat))), *np.real(M)))
+    M = get_magnetic_moment_dsrho(double_super_rho, Mv, dim, dims, dimds)
+    print("it = {:6d}, t = {:18.3f}, B = {:15.3e}, max(|D|) = {:12.6f}, max(|exp(D * deltat)|) = {:12.6f}, M = {:20.8E} {:20.8E} {:20.8E} mu_B\n".format(-1, t0, Bt(t0), np.max(np.abs(D)), np.max(np.abs(expm(D*deltat))), *np.real(M)))
 
     with h5py.File(root_dir + 'output/double_super_rho.hdf5', 'w') as f1,  open(root_dir + 'output/M-t.dat', 'w') as f2:
 
@@ -707,8 +723,8 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt, double_super_rho, D, D0, Mz_diag
                 Mz = get_Mz_from_dsrho(double_super_rho, Mv[2], dim, dims, dimds)
                 f2.write("{:20.3f} {:20.6E} {:20.8E}\n".format(t + half_deltat, B, Mz))
     
-            #M = get_magnetic_moment_dsrho(double_super_rho, Mv, dim, dims, dimds)
-            #print("it = {:6d}, t = {:18.3f}, B = {:15.3e}, max(|D|) = {:12.6f}, max(|exp(D * deltat)|) = {:12.6f}, M = {:20.8E} {:20.8E} {:20.8E} mu_B\n".format(it, t+half_deltat, B, np.max(np.abs(D)), np.max(np.abs(expm(D*deltat))), *np.real(M)))
+            M = get_magnetic_moment_dsrho(double_super_rho, Mv, dim, dims, dimds)
+            print("it = {:6d}, t = {:18.3f}, B = {:15.3e}, max(|D|) = {:12.6f}, max(|exp(D * deltat)|) = {:12.6f}, M = {:20.8E} {:20.8E} {:20.8E} mu_B\n".format(it, t+half_deltat, B, np.max(np.abs(D)), np.max(np.abs(expm(D*deltat))), *np.real(M)))
 
     return ( t1, double_super_rho )
 

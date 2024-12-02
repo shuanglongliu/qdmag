@@ -80,6 +80,9 @@ if __name__ == "__main__":
     # Hamiltonian
 
     h_ex = get_h_exchange(spins, exchange, -2)
+    B_tmin = get_B_sin(tmin)
+    h_zee = get_h_Zeeman(spins, [0,0,B_tmin], 'cartesian')
+    h_tmin = h_ex + h_zee
 
 
 
@@ -88,6 +91,7 @@ if __name__ == "__main__":
     eigen_p = get_perturbed_basis(h_ex, spins, [0,0,1e-4])
 
     h_ex_p = transform_O(h_ex, eigen_p)
+    h_tmin_p = transform_O(h_tmin, eigen_p)
     S2_tot_p = transform_O(spins.S2_tot, eigen_p)
     Sz_tot_p = transform_O(spins.Sv_tot[2], eigen_p)
     Mv_tot_p = transform_Mv_tot(spins.Mv_tot, eigen_p)
@@ -99,6 +103,7 @@ if __name__ == "__main__":
     selected_states = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
 
     h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff = set_up_the_effective_system(h_ex_p, S2_tot_p, Sz_tot_p, Mv_tot_p, selected_states)
+    h_tmin_eff, _, _, _, _ = set_up_the_effective_system(h_tmin_p, S2_tot_p, Sz_tot_p, Mv_tot_p, selected_states)
 
     #spy_the_effective_system(h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff, Rhbar_eff); exit()
 
@@ -112,7 +117,7 @@ if __name__ == "__main__":
 
     # Eigenvalues and eigenvectors of the effective Hamiltonian
 
-    eigen0_eff = eigen_spin_hamiltonian(h0_eff)
+    #eigen0_eff = eigen_spin_hamiltonian(h0_eff)
 
     #save_eigenvalues(eigen0_eff, offset=True)
     #save_eigenvectors(eigen0_eff)
@@ -121,7 +126,7 @@ if __name__ == "__main__":
 
     # Set up the double super quantum master equation
 
-    D_eff, D0_eff, h0_eff_diag, Mz_eff_diag, Rhbar_eff, C_eff, CST_eff, dim, dims, dimds = set_up_double_super_qme(h0_eff, Mv_eff[2], X_eff, I0, T)
+    D0_eff, D_eff, h0_eff_diag, Mz_eff_diag, Rhbar_eff, C_eff, CST_eff, dim, dims, dimds = set_up_double_super_qme(h0_eff, h_tmin_eff, Mv_eff[2], X_eff, I0, T)
 
     indices_nonzero_X_eff, indices_nonzero_C_eff = get_indices_nonzero_X_and_C(X_eff, dim)
 
@@ -134,11 +139,11 @@ if __name__ == "__main__":
     # Initial density matrix
 
     energies = h0_eff_diag - Mz_eff_diag * Tesla2wavenumber * get_B_sin(tmin)
-    #rho0_eff = get_rhoe(energies, T)
+    rho0_eff = get_rhoe(energies, T)
 
     #rho0_eff = get_a_random_rho(dim)
 
-    rho0_eff = np.eye(dim) / dim
+    #rho0_eff = np.eye(dim) / dim
 
     
 

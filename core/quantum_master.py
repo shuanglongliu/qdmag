@@ -1,3 +1,5 @@
+import os
+import subprocess
 import numpy as np
 from spin_dynamics.core.constants import const1, Kelvin2wavenumber
 from spin_dynamics.core.common import get_commutation
@@ -7,7 +9,7 @@ from spin_dynamics.core.common import get_rho_upper
 from spin_dynamics.core.pulse import get_partial_double_grid, get_partial_double_grid_left
 from spin_dynamics import __file__ as root_dir
 
-"""
+r"""
 Codes for solving the quantum master equation described in the Eq. 2.7 of
 J. Phys. Soc. Jpn. 2001.70:2151-2157 by Hiroki Nakano and Seiji Miyashita.
 
@@ -157,6 +159,9 @@ def update_Rhbar(Rhbar, T, X, indices_nonzero_X, energies, I0):
 def spy_XRhbar(X, Rhbar, Sz_tot):
     n = X.shape[0]
 
+    if not os.path.exists(root_dir + "./output"):
+        subprocess.run(["mkdir", root_dir + "./output"])
+
     with open(root_dir + "output/X.dat", "w") as f:
         for i in range(n):
             for j in range(n):
@@ -189,7 +194,7 @@ def get_Gammarho(rho, X, Rhbar, lambda2):
 
 
 def evolve_rho_by_deltat_qme(ha, hb, hc, rho, X, Rhbar, lambda1, lambda2, deltat):
-    """
+    r"""
     Evolve rho by deltat using the Runge-Kutta method according to the quantum master equation
     d rho / d t = -i * const1 * [H, rho] - { [X, Rhbar rho] + [X, Rhbar rho]^\dagger } * lambdaa^2 * pi * const1^2
 
@@ -215,7 +220,7 @@ def evolve_rho_by_deltat_qme(ha, hb, hc, rho, X, Rhbar, lambda1, lambda2, deltat
     return rho_new
 
 def evolve_rho_qme_Mv_light(h0, Mv_tot, rho, nt, deltat, Bs2, theta_B, phi_B, X, Rhbar, lambda1, lambda2):
-    """
+    r"""
     Evolve the density matrix using the Runge-Kutta method according to the quantum master equation.
 
     h0 and Mv_tot are written on the basis of the eigenvectors of h0.
@@ -249,7 +254,7 @@ def evolve_rho_qme_Mv_light(h0, Mv_tot, rho, nt, deltat, Bs2, theta_B, phi_B, X,
 
 
 def evolve_rho_qme_Mz_light(h0, Mz_tot, rho, nt, deltat, Bs2, X, Rhbar, lambda1, lambda2):
-    """
+    r"""
     Evolve the density matrix using the Runge-Kutta method according to the quantum master equation.
 
     h0 and Mz_tot are written on the basis of the eigenvectors of h0.
@@ -285,7 +290,7 @@ def evolve_rho_qme_Mz_light(h0, Mz_tot, rho, nt, deltat, Bs2, X, Rhbar, lambda1,
     return rho
 
 def evolve_rho_qme_Mv(h0, Mv_tot, rho, nt, ts, deltat, Bs2, theta_B, phi_B, X, Rhbar, lambda1, lambda2, save_mag, deltat_mag, save_rho, deltat_rho):
-    """
+    r"""
     Evolve the density matrix using the Runge-Kutta method according to the quantum master equation.
 
     h0 and Mv_tot are written on the perturbed basis.
@@ -528,7 +533,7 @@ def evolve_rho_qme_Mv(h0, Mv_tot, rho, nt, ts, deltat, Bs2, theta_B, phi_B, X, R
 
 
 def evolve_rho_qme_Mz(h0, Mz_tot, rho, nt, ts, deltat, Bs2, X, Rhbar, lambda1, lambda2, save_mag, deltat_mag, save_rho, deltat_rho):
-    """
+    r"""
     Evolve the density matrix using the Runge-Kutta method according to the quantum master equation.
 
     h0 and Mz_tot are written on the perturbed basis.

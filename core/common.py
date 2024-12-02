@@ -187,7 +187,7 @@ class many_spins:
         return (Px, Py, Pz)
     
     def get_dipole(self):
-        """
+        r"""
         \vec{P} = \alpha sum_{ij} \vec{e}_{ij} \cross (\vec{S_i} \cross \vec{S_j}) + \
                   \vec{\pi} sum_{ij} \vec{\pi} (\vec{S_i} \cdot \vec{S_j})
         """
@@ -560,7 +560,7 @@ def get_h_anisotropy(spins, anisotropy):
 ## =================================================================
 
 def get_h_Zeeman(spins, Bv, coord):
-    """ 
+    r""" 
     Zeeman term H_Zee = - \vec{\mu} \cdot \vec{B} = \mu_B/\hbar \vec{B}[i] g_s[i,j] \vec{S}[j]
                       = \vec{B}[i] g_s[i,j] \vec{S}[j]
 
@@ -583,7 +583,7 @@ def get_h_Zeeman(spins, Bv, coord):
     return h_zee
 
 def get_h_Zeeman_Mv_tot(Mv_tot, Bv, coord):
-    """ 
+    r""" 
     Zeeman term H_Zee = - \vec{\mu} \cdot \vec{B} 
 
     In the last line, B takes unit of energy (cm^-1 per \mu_B), and mu takes unit of \mu_b.
@@ -742,7 +742,7 @@ def get_magnetic_moment_Mv_tot(Mv_tot, eigen, T, Z):
     
 def get_chim_tensor_kernel(spins, h_ex, h_ani, B0v_sph, E0v_sph, T, dBv_sph, verbose):
 
-    """
+    r"""
     chim_n = \partial M / \partial B along the e_n direction.
     B0v: B vector in spherical coordinate. Angles in deg.
     """
@@ -777,7 +777,7 @@ def get_chim_tensor_kernel(spins, h_ex, h_ani, B0v_sph, E0v_sph, T, dBv_sph, ver
       
 def get_chim_tensor(spins, h_ex, h_ani, E0v_sph, B0v_sph, T, dB):
 
-    """
+    r"""
     chim at certain B field, E field, and temperature T
     chim_tensor_{ij} = \partial M_i / \partial B_j
     """
@@ -1178,8 +1178,6 @@ def get_indices_of_rho_upper(dim):
 # =======================================================================
 
 def spy_M(M, tag, width=10, markersize=2, threshold=1e-9):
-
-    M.shape[0]
 
     with open(root_dir + "output/" + tag + ".dat", "w") as f:
         for i in range(M.shape[0]):

@@ -5,6 +5,11 @@
 import numpy as np
 import pickle
 from spin_dynamics import __file__ as root_dir
+from scipy.optimize import fsolve
+
+def get_B_sin_offset(t, *argv):
+    B0 = argv[0]
+    return get_B_sin(t) - B0
 
 def get_B_sin(t):
     """
@@ -118,4 +123,19 @@ def get_partial_double_grid_left(nt, ts, Bs2, nt_left):
     Bs2_part = Bs2[iB_min: iB_max + 1]
 
     return (ts_part, Bs2_part)
+
+if __name__ == "__main__":
+
+    #B_offset = get_B_sin_offset(0, 0.1); print(B_offset)
+
+    #solution = fsolve(get_B_sin_offset, 1e8, args=[3.50])
+    #print(solution)
+
+    #B = get_B_sin(2.84993929e+08); print(B) # 3.49000000560594
+    #B = get_B_sin(2.85811311e+08); print(B) # 3.49999999467692
+
+    #B = get_B_sin(2.85e+08); print(B) # 3.490074279544974
+    #B = get_B_sin(2.86e+08); print(B) # 3.502308436017445
+
+    B = get_B_sin(0.5e+09); print(B) # 6.116883809339946
 
