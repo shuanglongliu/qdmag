@@ -1,21 +1,25 @@
-#!/bin/bash
+#!/bin/bash -l
 
-#SBATCH -A m2qm-efrc
+#SBATCH --account=m2qm-efrc
 #SBATCH --qos=m2qm-efrc-b
-#SBATCH -p hpg-default
-#SBATCH -J Spin
-#SBATCH -t 1-00:00:00
-#SBATCH -N 1
-#SBATCH -n 1
-#SBATCH -c 2
-#SBATCH --mem=4Gb
-#SBATCH --error=tmp.error.%j
-#SBATCH --output=tmp.output.%j
-#SBATCH --mail-type=ALL
+#SBATCH --job-name=dynamics
+#SBATCH --mail-type=All
 #SBATCH --mail-user=shlufl@ufl.edu
-##SBATCH --dependency=afterok:17691116
+#SBATCH --partition=hpg-default
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=32
+#SBATCH --ntasks-per-node=1
+#SBATCH --ntasks-per-socket=8
+#SBATCH --mem=64gb
+#SBATCH --distribution=cyclic:cyclic
+#SBATCH -t 4-00:00:00
+#SBATCH --error=error
+#SBATCH --output=output
 
 source ~/.bash_aliases; keep_log
 
-python main.py > quantum_master_lambda0_thetaB90_0.0001.log
+export PYTHONPATH=/blue/m2qm-efrc/shuan.liu.neu/projects
+
+python tool_staircase.py
 

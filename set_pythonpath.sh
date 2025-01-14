@@ -1,2 +1,2 @@
-export PYTHONPATH=/home/shuan.liu.neu/git
-#export PYTHONPATH=/home/shuan.liu.neu/git/spin_dynamics
+# export PYTHONPATH=/home/shuan.liu.neu/git
+export PYTHONPATH=/blue/m2qm-efrc/shuan.liu.neu/projects
