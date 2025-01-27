@@ -69,9 +69,8 @@ if __name__ == "__main__":
 
     # Get the effective system
 
-    # selected_states = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
-
-    selected_states = [ 0, 10, 12, 21, 24, 31 ]
+    # dim = 16
+    selected_states = [200,150,88,30,10,0,1,2,3,4,5,17,41,99,173,215]
 
     h0_eff, h_tmin_eff, S2_eff, Sz_eff, Mv_eff, X_eff = set_up_the_effective_system(h_ex_p, h_tmin_p, S2_tot_p, Sz_tot_p, Mv_tot_p, selected_states)
 
@@ -99,8 +98,8 @@ if __name__ == "__main__":
     # examine_D_max_and_expDdeltat_max(Bs, deltats, "near_3.49T", D_eff, D0_eff, Mz_eff_diag, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
 
     
-    Bs = np.linspace(0, 14, 1401, endpoint=True)
+    Bs = np.linspace(0, 50, 1001, endpoint=True)
     deltats = [1e-3, 1e-2, 1e-1, 1., 10., 20., 30., 40., 50., 60., 70., 80., 90., 100., 1e3, 1e4, 1e5, 1e6 ]
-    examine_D_max_and_expDdeltat_max(Bs, deltats, "0-14T", D_eff, D0_eff, Mz_eff_diag, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
+    examine_D_max_and_expDdeltat_max(Bs, deltats, "0-50T", D_eff, D0_eff, Mz_eff_diag, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
 
     

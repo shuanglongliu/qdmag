@@ -7,7 +7,6 @@ from spin_dynamics.dynamics.common import spy_sparsity
 from spin_dynamics.dynamics.common import get_habc_Mv, get_habc_Mz, get_habc_reuse_ha_Mv, get_habc_reuse_ha_Mz
 from spin_dynamics.dynamics.common import get_rho_upper
 from spin_dynamics.dynamics.pulse import get_partial_double_grid, get_partial_double_grid_left
-from spin_dynamics import __file__ as root_dir
 
 r"""
 Codes for solving the quantum master equation described in the Eq. 2.7 of
@@ -78,6 +77,8 @@ def Phi(T, omega, I0):
         result = abs( -I0*omega*omega/2 + I0*const1*omega/beta )
     else:
         numerator = spectral_density(omega, I0=I0) - spectral_density(-omega, I0=I0)
+        # Print beta, energy, and their product to check the divergence
+        # print("beta, energy, beta*energy = {:12.4e} {:12.4e} {:12.4e}".format(beta, energy, beta*energy))
         denominator = np.exp(beta * energy) - 1
         result = numerator / denominator
 
@@ -161,16 +162,16 @@ def update_Rhbar(Rhbar, T, X, indices_nonzero_X, energies, I0):
 def spy_XRhbar(X, Rhbar, Sz_tot):
     n = X.shape[0]
 
-    if not os.path.exists(root_dir + "./output"):
-        subprocess.run(["mkdir", root_dir + "./output"])
+    if not os.path.exists("./output"):
+        subprocess.run(["mkdir", "./output"])
 
-    with open(root_dir + "output/X.dat", "w") as f:
+    with open("./output/X.dat", "w") as f:
         for i in range(n):
             for j in range(n):
                 f.write("i   j   Sz_tot_i   Sz_tot_j   X_ij   = {:5d}   {:5d}   {:8.3f}   {:8.3f}   {:5.1f}\n".format( \
                      i, j, np.real(Sz_tot[i, i]), np.real(Sz_tot[j, j]), X[i, j]))
 
-    with open(root_dir + "output/Rhbar.dat", "w") as f:
+    with open("./output/Rhbar.dat", "w") as f:
         for i in range(n):
             for j in range(n):
                 f.write("{:5d} {:5d} {:12.4e}\n".format(i, j, Rhbar[i, j]))
@@ -340,12 +341,12 @@ def evolve_rho_qme_Mv(h0, Mv_tot, rho, nt, ts, deltat, Bs2, theta_B, phi_B, X, R
 
     if save_mag:
         ostring1 = "{:18.3f} {:18.10e} {:12.6f} {:12.6f} {:12.6f}\n"
-        f1 = open(root_dir + "output/Mv_vs_t.dat", "w")
+        f1 = open("./output/Mv_vs_t.dat", "w")
 
     if save_rho:
         indices_upper = np.triu_indices(rho.shape[0])
         ostring2 = "{:18.3f} {:18.10e}" + indices_upper[0].shape[0] * " {:18.10e}" + "\n"
-        f2 = open(root_dir + "output/rho_vs_t.dat", "w")
+        f2 = open("./output/rho_vs_t.dat", "w")
 
     if nt_rho > nt_mag:
         nt_part = nt_mag
@@ -586,12 +587,12 @@ def evolve_rho_qme_Mz(h0, Mz_tot, rho, nt, ts, deltat, Bs2, X, Rhbar, lambda1, l
 
     if save_mag:
         ostring1 = "{:18.3f} {:18.10e} {:12.6f} {:12.6f}\n"
-        f1 = open(root_dir + "output/Mz_vs_t.dat", "w")
+        f1 = open("./output/Mz_vs_t.dat", "w")
 
     if save_rho:
         indices_upper = np.triu_indices(rho.shape[0])
         ostring2 = "{:18.3f} {:18.10e}" + indices_upper[0].shape[0] * " {:18.10e}" + "\n"
-        f2 = open(root_dir + "output/rho_vs_t.dat", "w")
+        f2 = open("./output/rho_vs_t.dat", "w")
 
     if nt_rho > nt_mag:
         nt_part = nt_mag

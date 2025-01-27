@@ -1,3 +1,4 @@
+import os
 import copy
 import numpy as np
 import h5py
@@ -9,7 +10,7 @@ from spin_dynamics.dynamics.common import convert_cmatrix_to_rmatrix
 from spin_dynamics.dynamics.common import spy_sparsity
 from spin_dynamics.dynamics.common import get_Mv_from_rho, get_Mz_from_rho
 from spin_dynamics.dynamics.quantum_master import construct_Rhbar, update_Rhbar
-from spin_dynamics import __file__ as root_dir
+from spin_dynamics.dynamics.pulse import get_Bt
 
 r"""
 Codes for solving the quantum master equation described in the Eq. 2.7 of
@@ -106,6 +107,42 @@ def get_Mz_from_dsrho(double_super_rho, Mz, dim, dims, dimds):
     rho = convert_dsrho_to_rho(double_super_rho, dim, dims, dimds)
 
     return get_Mz_from_rho(rho, Mz)
+
+# ============================================================================ #
+# Functions for calculating magnetic susceptibility.
+# ============================================================================ #
+
+def get_chimz_from_rho(H, Bt, t, Mz_tot, rho, X, Rhbar, lambdaa):
+    r"""
+    Assume that the system is isotropic and the magnetic field is along the z direction.
+
+    chimz = dMz/dBz
+          = Tr( drho/dBz Mz )
+          = Tr( drho/dt dt/dBz Mz )
+          = Tr( drho/dt (dBz/dt)^-1 Mz )
+          = Tr( (-i * const1 * [H, rho] - { [X, Rhbar rho] + [X, Rhbar rho]^\dagger } * lambdaa^2 * pi* const1^2) (dBz/dt)^-1 Mz )
+    """
+    drhodt = -1j * const1 * (np.matmul(H, rho) - np.matmul(rho, H))
+    commutator = np.matmul(X, np.matmul(Rhbar, rho)) - np.matmul(np.matmul(Rhbar, rho), X)
+    drhodt = drhodt - (commutator + np.conjugate(np.transpose(commutator))) * lambdaa**2 * np.pi * const1**2
+    dt = 1e+3 # ps
+    dBzdt = (Bt(t+dt) - Bt(t-dt))/(2*dt) # Tesla/ps
+    return np.real( np.trace( np.matmul(drhodt, Mz_tot) ) / dBzdt )
+
+def get_chimz_from_dsrho(h0_diag, Bt, t, Mz, Mz_diag, dsrho, X, Rhbar, lambdaa, dim, dims, dimds):
+    """
+    Wrapper for get_chimz_from_rho
+    Assumption: h0 and Mz_tot are written on the perturbed basis.
+    """
+    # Total Hamiltonian
+    H = np.diag(h0_diag - Tesla2wavenumber * Bt(t) * Mz_diag)
+    
+    # Get the density matrix rho from the double super density matrix dsrho
+    rho = convert_dsrho_to_rho(dsrho, dim, dims, dimds)
+
+    # Call get_chimz_from_rho
+    return get_chimz_from_rho(H, Bt, t, Mz, rho, X, Rhbar, lambdaa)
+
 
 # ============================================================================ #
 # Functions for constructing the Liouville superoperator.
@@ -550,7 +587,7 @@ def examine_D_max_and_expDdeltat_max(Bs, deltats, tag, D, D0, Mz_diag, C, CST, X
 
     # Save D_max in the file D_max.dat, the first column is the magnetic field, and the first row is the time step.
     # Ths first row should be a comment line starting with #.
-    with open(root_dir + "./output/D_max_" + tag + ".dat", "w") as f:
+    with open("./output/D_max_" + tag + ".dat", "w") as f:
         f.write("# ")
         for j in range(n):
             f.write("{:15.3f}".format(deltats[j]))
@@ -563,7 +600,7 @@ def examine_D_max_and_expDdeltat_max(Bs, deltats, tag, D, D0, Mz_diag, C, CST, X
 
     # Save expDdeltat_max in the file expDdeltat_max.dat, the first column is the magnetic field, and the first row is the time step.
     # Ths first row should be a comment line starting with #. 
-    with open(root_dir + "./output/expDdeltat_max_" + tag + ".dat", "w") as f:
+    with open("./output/expDdeltat_max_" + tag + ".dat", "w") as f:
         f.write("# ")
         for j in range(n):
             f.write("{:15.3f}".format(deltats[j]))
@@ -575,6 +612,55 @@ def examine_D_max_and_expDdeltat_max(Bs, deltats, tag, D, D0, Mz_diag, C, CST, X
             f.write("\n")
 
     return
+
+
+
+# ============================================================================ #
+# Functions for calculating the long-time evolution operator.
+# ============================================================================ #
+
+def get_U_dsqe_longtime(t0, t1, deltat, Bt, D, D0, Mz_diag, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds):
+    r"""
+    Get the long-time evolution operator \Pi_i U = exp(D_i * deltat), where \Pi is the product operator.
+    The operators exp(D_i * deltat) are time-ordered such that later times are to the left of earlier times.
+    """
+
+    half_deltat = deltat/2
+    nt = int( np.round((t1 - t0)/deltat) )
+    t1 = t0 + nt*deltat
+
+    # Initialize the long-time evolution operator
+    U = np.identity(dimds, dtype=np.float64)
+
+    # Loop over the time steps and multiply the short-time evolution operators to get the long-time evolution operator
+    for it in range(nt):
+        t = t0 + it*deltat + half_deltat
+        B = Bt(t)
+        # Print t and B for debugging
+        # print("it = {:6d}, t = {:18.3f}, B = {:15.3e}".format(it, t, B))
+        D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
+        U = np.matmul(expm(D*deltat), U)
+
+    # file name for saving the long-time evolution operator
+    ta = int( t0 / 1e6 // 1 ) # micro second 
+    fname      = './output/double_super_U_{:d}-{:d}us.hdf5'.format(ta, ta+1)
+    fname_lock = './output/double_super_U_{:d}-{:d}us.hdf5.lock'.format(ta, ta+1)
+
+    # Lock the file to prevent other processes from writing to it
+    with FileLock(fname_lock):
+        # The tag is uique and accurate if t < 5e12 ps.
+        tag = "{:.3f}-{:.3f}".format(t0, t1)
+        # Save the long-time double super evolution operator
+        with h5py.File(fname, "a") as f1:
+            # Write data safely. 
+            if tag in f1:
+                # print("The dataset {} already exists in the file {}. Deleting the dataset ...".format(tag, fname))
+                del f1[tag]
+            # print("Creating the dataset {} in the file {} ...".format(tag, fname))
+            dset = f1.create_dataset("{:.3f}-{:.3f}".format(t0, t1), data=U)
+
+    return (t0, t1, U)
+
 
 
 # ============================================================================ #
@@ -605,6 +691,7 @@ def set_up_double_super_qme(h0_eff, h1_eff, Mz_eff, X_eff, I0, T, lambdaa):
     h0_eff = convert_cmatrix_to_rmatrix(h0_eff, "h0_eff")
     h1_eff = convert_cmatrix_to_rmatrix(h1_eff, "h1_eff")
     Mz_eff = convert_cmatrix_to_rmatrix(Mz_eff, "Mz_eff")
+    print()
 
     # Diagonal matrix elements
 
@@ -772,7 +859,38 @@ def evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CS
 
     return double_super_rho
 
-def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt, double_super_rho, D, D0, Mz_diag, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds, Mv, save_mag, deltat_mag, save_rho, deltat_rho):
+def get_outdirs(T, I0, lambdaa, Bt_params):
+    """
+    Get the output directory for the double super density matrix and the magnetic moment.
+    T: temperature in Kelvin.
+    I0: prefactor for the phonon density of states.
+    lambdaa: spin-phonon coupling constant in wavenumbers.
+    Bt_params: parameters for the magnetic fields. See pulse.py for details.
+    """
+    if Bt_params['Bt_type'] == 'linear':
+        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1f}/double_super_rho'.format(T, I0, lambdaa, Bt_params['sweep_rate'])
+        outdir_mag = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1f}/magnetometry'.format(T, I0, lambdaa, Bt_params['sweep_rate'])
+    elif Bt_params['Bt_type'] == 'pwlinear':
+        times = Bt_params['times']
+        fields = Bt_params['fields']
+        outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/'.format(T, I0, lambdaa)
+        outdir += 'Bt_pwlinear_t{:.1e}ps-B{:.1f}T'.format(times[0], fields[0])
+        for i in range(1, len(times)):
+            outdir += '_t{:.1e}ps-B{:.1f}T'.format(times[i], fields[i])
+        outdir = outdir.replace('+', '')
+        outdir_rho = outdir + '/double_super_rho'
+        outdir_mag = outdir + '/magnetometry'
+    elif Bt_params['Bt_type'] == 'sin':
+        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_sin_amplitude_{:.1f}_omega_{:.2f}/double_super_rho'.format(T, I0, lambdaa, Bt_params['amplitude'], Bt_params['omega'])
+        outdir_mag = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_sin_amplitude_{:.1f}_omega_{:.2f}/magnetometry'.format(T, I0, lambdaa, Bt_params['amplitude'], Bt_params['omega'])
+    elif Bt_params['Bt_type'] == 'cs':
+        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_cs/double_super_rho'.format(T, I0, lambdaa)
+        outdir_mag = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_cs/magnetometry'.format(T, I0, lambdaa)
+    else:
+        raise ValueError("Invalid Bt_type: {}".format(Bt_params['Bt_type']))
+    return (outdir_rho, outdir_mag)
+
+def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, double_super_rho, D, D0, Mz_full, Mz_diag, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds, save_mag, nt_mag, save_rho, nt_rho):
     """
     Evolve the double super density matrix using the staircase method according to the quantum master equation.
     Multiple staircases are used. All stairs have the same width deltat.
@@ -780,10 +898,11 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt, double_super_rho, D, D0, Mz_diag
     t0: initial time
     t1: final time
     deltat: time step in ps
-    Bt: magnetic field as a function of time
+    turning_points: turning points of the magnetic field as a function of time. turning_points = [times, fields]
     double_super_rho: initial double super density matrix at t0
     D: The double super operator D at tmin
     D0: The exchange-only double super operator at tmin
+    Mz_full: The z component of the magnetization operators
     Mz_diag: diagnal matrix elements of the z component of the magnetization operators
     C: The superoperator for spin-phonon coupling
     CST: super transpose of C
@@ -800,331 +919,149 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt, double_super_rho, D, D0, Mz_diag
     dim: dimension of the Hilbert space
     dims: dimension of superoperators
     dimds: dimension of double superoperators
-    Mv: magnetic moment operator
     save_mag: logical, save the magnetic moment at chosen time steps?
-    deltat_mag: time step for saving the magnetic moment
+    nt_mag: save the magnetic moment per nt_mag*delta ps
     save_rho: logical, save the double super density matrix at chosen time steps?
-    deltat_rho: time step for saving the double super density matrix
+    nt_rho: save the double super density matrix per nt_rho*delta ps. nt_rho will be adjusted to be a multiple of nt_mag.
     """
 
     half_deltat = deltat/2
-    nt = int( np.round((t1 - t0)/deltat) )
-    t1 = t0 + nt*deltat
 
-    B0 = Bt(t0)
-    B1 = Bt(t1)
+    # Specify the magnetic field as a function of time
+    Bt = get_Bt(Bt_params)
 
-    print("deltat = {:18.3f}".format(deltat))
-    print("nt = {:18d}".format(nt))
-    print("t0/t1 = {:18.3f}/{:18.3f}".format(t0, t1))
-    print("B0/B1 = {:18.3f}/{:18.3f}\n".format(B0, B1))
+    if save_rho and save_mag:
+        # nt_rho should be a multiple of nt_mag
+        nround_mag = int( max(nt_rho // nt_mag, 1) )
+        nt_rho = nround_mag * nt_mag
+        
+        # nt should be a multiple of nt_rho
+        nround_rho = int( max((t1 - t0)//deltat // nt_rho, 1) )
+        nt = nround_rho * nt_rho
+        
+        # Adjust the final time
+        t1 = t0 + nt*deltat
 
-    nt_mag = round( deltat_mag / deltat )
-    nt_rho = round( deltat_rho / deltat )
+        # Output directories
+        outdir_rho, outdir_mag = get_outdirs(T, I0, lambdaa, Bt_params)
+        if not os.path.exists(outdir_rho):
+            os.makedirs(outdir_rho)
+        if not os.path.exists(outdir_mag):
+            os.makedirs(outdir_mag)
 
-    # For debugging
-    # M = get_magnetic_moment_dsrho(double_super_rho, Mv, dim, dims, dimds)
-    # print("it = {:6d}, t = {:18.3f}, B = {:15.3e}, max(|D|) = {:12.6f}, max(|exp(D * deltat)|) = {:12.6f}, M = {:20.8E} {:20.8E} {:20.8E} mu_B\n".format(-1, t0, Bt(t0), np.max(np.abs(D)), np.max(np.abs(expm(D*deltat))), *np.real(M)))
+        # Output files
+        fname1 = outdir_rho + '/{:.3f}-{:.3f}ps_dt{:.3f}ps.hdf5'.format(t0, t1, deltat)
+        fname2 = outdir_mag + '/{:.3f}-{:.3f}ps_dt{:.3f}ps.dat'.format(t0, t1, deltat)
 
-    fname1 = root_dir + 'output/double_super_rho_{:.3f}-{:.3f}.hdf5'.format(t0, t1)
-    fname2 = root_dir + 'output/M-t_{:.3f}-{:.3f}.dat'.format(t0, t1)
-
-    with h5py.File(fname1, 'w') as f1,  open(fname2, 'w') as f2:
-
-        if save_rho:
+        with h5py.File(fname1, 'w') as f1,  open(fname2, 'w') as f2:
             tag = "{:.3f}".format(t0)
             dset = f1.create_dataset(tag, data=double_super_rho)
 
-        if save_mag:
-            Mz = get_Mz_from_dsrho(double_super_rho, Mv[2], dim, dims, dimds)
-            f2.write("{:20.3f} {:20.6E} {:20.8E}\n".format(t0, Bt(t0), Mz))
+            Mz = get_Mz_from_dsrho(double_super_rho, Mz_full, dim, dims, dimds)
+            chimz = get_chimz_from_dsrho(h0_diag, Bt, 0, Mz_full, Mz_diag, double_super_rho, X, Rhbar, lambdaa, dim, dims, dimds)
+            f2.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(t0, Bt(t0), Mz, chimz))
     
+            # Loop over the rounds for saving the double super density matrix
+            for iround_rho in range(nround_rho):
+                # Loop over the rounds for saving the magnetic moment
+                for iround_mag in range(nround_mag):
+                    # Loop over the nt_mag time steps
+                    for it_mag in range(nt_mag):
+                        it = iround_rho * nt_rho + iround_mag * nt_mag + it_mag
+                        t = t0 + it*deltat + half_deltat
+                        B = Bt(t)
+                        print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
+                        D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
+                        double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
+                    # Save magnetic moment
+                    Mz = get_Mz_from_dsrho(double_super_rho, Mz_full, dim, dims, dimds)
+                    chimz = get_chimz_from_dsrho(h0_diag, Bt, t + half_deltat, Mz_full, Mz_diag, double_super_rho, X, Rhbar, lambdaa, dim, dims, dimds)
+                    f2.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(t+half_deltat, Bt(t+half_deltat), Mz, chimz))
+                # Save the double super density matrix
+                tag = "{:.3f}".format(t + half_deltat)
+                dset = f1.create_dataset(tag, data=double_super_rho)
+    elif save_rho and (not save_mag):
+        # nt should be a multiple of nt_rho
+        nround_rho = int( (t1 - t0)//deltat // nt_rho )
+        nt = nround_rho * nt_rho
+        
+        # Adjust the final time
+        t1 = t0 + nt*deltat
+
+        # Output directory
+        outdir_rho, outdir_mag = get_outdirs(T, I0, lambdaa, Bt_params)
+        if not os.path.exists(outdir_rho):
+            os.makedirs(outdir_rho)
+
+        # Output files
+        fname1 = outdir_rho + '/{:.3f}-{:.3f}ps_dt{:.3f}ps.hdf5'.format(t0, t1, deltat)
+
+        with h5py.File(fname1, 'w') as f1:
+            tag = "{:.3f}".format(t0)
+            dset = f1.create_dataset(tag, data=double_super_rho)
+
+            # Loop over the rounds for saving the double super density matrix
+            for iround_rho in range(nround_rho):
+                # Loop over the nt_rho time steps
+                for it_rho in range(nt_rho):
+                    it = iround_rho * nt_rho + it_rho
+                    t = t0 + it*deltat + half_deltat
+                    B = Bt(t)
+                    print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
+                    D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
+                    double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
+                # Save the double super density matrix
+                tag = "{:.3f}".format(t + half_deltat)
+                dset = f1.create_dataset(tag, data=double_super_rho)
+    elif (not save_rho) and save_mag:
+        # nt should be a multiple of nt_mag
+        nround_mag = int( (t1 - t0)//deltat // nt_mag )
+        nt = nround_mag * nt_mag
+        
+        # Adjust the final time
+        t1 = t0 + nt*deltat
+
+        # Output directory
+        outdir_rho, outdir_mag = get_outdirs(T, I0, lambdaa, Bt_params)
+        if not os.path.exists(outdir_mag):
+            os.makedirs(outdir_mag)
+
+        # Output files
+        fname2 = outdir_mag + '/{:.3f}-{:.3f}ps_dt{:.3f}ps.dat'.format(t0, t1, deltat)
+
+        with open(fname2, 'w') as f2:
+            Mz = get_Mz_from_dsrho(double_super_rho, Mz_full, dim, dims, dimds)
+            chimz = get_chimz_from_dsrho(h0_diag, Bt, 0, Mz_full, Mz_diag, double_super_rho, X, Rhbar, lambdaa, dim, dims, dimds)
+            f2.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(t0, Bt(t0), Mz, chimz))
+    
+            # Loop over the rounds for saving the magnetic moment
+            for iround_mag in range(nround_mag):
+                # Loop over the nt_mag time steps
+                for it_mag in range(nt_mag):
+                    it = iround_mag * nt_mag + it_mag
+                    t = t0 + it*deltat + half_deltat
+                    B = Bt(t)
+                    print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
+                    D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
+                    double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
+                # Save magnetic moment
+                Mz = get_Mz_from_dsrho(double_super_rho, Mz_full, dim, dims, dimds)
+                chimz = get_chimz_from_dsrho(h0_diag, Bt, t + half_deltat, Mz_full, Mz_diag, double_super_rho, X, Rhbar, lambdaa, dim, dims, dimds)
+                f2.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(t+half_deltat, Bt(t+half_deltat), Mz, chimz))
+    else:
+        # the time period should be a multiple of deltat
+        nt = int( (t1 - t0)//deltat )
+        
+        # Adjust the final time
+        t1 = t0 + nt*deltat
+
+        # Loop over the nt time steps
         for it in range(nt):
             t = t0 + it*deltat + half_deltat
             B = Bt(t)
-    
-            print("it = {:6d}, t = {:18.3f}, B = {:15.3e}".format(it, t, B))
-
-            D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-    
-            double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-    
-            if save_rho and it%nt_rho == 0:
-                # This tag is uique and accurate if t < 5e12 ps.
-                tag = "{:.3f}".format(t + half_deltat)
-                dset = f1.create_dataset(tag, data=double_super_rho)
-
-            if save_mag and it%nt_mag == 0:
-                Mz = get_Mz_from_dsrho(double_super_rho, Mv[2], dim, dims, dimds)
-                f2.write("{:20.3f} {:20.6E} {:20.8E}\n".format(t + half_deltat, B, Mz))
-
-            # For debugging
-            # M = get_magnetic_moment_dsrho(double_super_rho, Mv, dim, dims, dimds)
-            # print("it / nt = {:6d} / {:6d}, t = {:18.3f}, B = {:15.3e}, max(|D|) = {:12.6f}, max(|exp(D * deltat)|) = {:12.6f}, M = {:20.8E} {:20.8E} {:20.8E} mu_B".format(it, nt, t+half_deltat, B, np.max(np.abs(D)), np.max(np.abs(expm(D*deltat))), *np.real(M)))
-
-    return ( t1, double_super_rho )
-
-def evolve_rho_dsqme_stairs_rhomag(t0, t1, deltat, Bt, double_super_rho, D, D0, Mz_diag, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds, Mv, save_rhomag, deltat_rhomag):
-    """
-    Evolve the double super density matrix using the staircase method according to the quantum master equation.
-    Multiple staircases are used. All stairs have the same width deltat.
-
-    t0: initial time
-    t1: final time
-    deltat: time step in ps
-    Bt: magnetic field as a function of time
-    double_super_rho: initial double super density matrix at t0
-    D: The double super operator D at tmin
-    D0: The exchange-only double super operator at tmin
-    Mz_diag: diagnal matrix elements of the z component of the magnetization operators
-    C: The superoperator for spin-phonon coupling
-    CST: super transpose of C
-      C and CST will be reconstructed completely from X and Rhbar.
-    X: The matrix that encodes possible spin transitions
-    Rhbar: auxiliary operator for spin phonon coupling
-      Rhbar will be reconstructed completely from X and the eigenvalues.
-    h0_diag: diagonal matrix elements of the initial Hamiltonian on the perturbed basis
-    indices_nonzero_X: indices of the nonzero matrix elements of X
-    indices_nonzero_C: indices of the nonzero matrix elements of C
-    lambdaa: spin-phonon coupling constant in wavenumbers
-    I0: prefactor for the phonon density of states
-    T: temperature in Kelvin
-    dim: dimension of the Hilbert space
-    dims: dimension of superoperators
-    dimds: dimension of double superoperators
-    save_mag: logical, save the magnetic moment at chosen time steps?
-    deltat_mag: time step for saving the magnetic moment
-    save_rhomag: logical, save the double super density matrix and the magnetic moment at chosen time steps?
-    deltat_rhomag: time step for saving the double super density matrix and the magnetic moment
-    """
-
-    half_deltat = deltat/2
-    nt = int( np.round((t1 - t0)/deltat) )
-    t1 = t0 + nt*deltat
-
-    B0 = Bt(t0)
-    B1 = Bt(t1)
-
-    print("deltat = {:18.3f}".format(deltat))
-    print("nt = {:18d}".format(nt))
-    print("t0/t1 = {:18.3f}/{:18.3f}".format(t0, t1))
-    print("B0/B1 = {:18.3f}/{:18.3f}\n".format(B0, B1))
-
-    nt_rhomag = round( deltat_rhomag / deltat )
-
-    nround = nt // nt_rhomag
-    nremain = nt % nt_rhomag
-
-    fname1 = root_dir + 'output/double_super_rho_{:.3f}-{:.3f}.hdf5'.format(t0, t1)
-    fname2 = root_dir + 'output/M-t_{:.3f}-{:.3f}.dat'.format(t0, t1)
-
-    # Save the double super density matrix peirodically
-    if save_rhomag:
-        with h5py.File(fname1, 'w') as f1, open(fname2, 'w') as f2:
-            # Save the double super density matrix at t0
-            dset = f1.create_dataset("{:.3f}".format(t0), data=double_super_rho)
-
-            # Save the magnetic moment at t0
-            Mz = get_Mz_from_dsrho(double_super_rho, Mv[2], dim, dims, dimds)
-            f2.write("{:20.3f} {:20.6E} {:20.8E}\n".format(t0, Bt(t0), Mz))
-
-            # Loop over the rounds of nt_rhomag steps
-            for iround in range(nround):
-                for it in range(nt_rhomag):
-                    t = t0 + (iround*nt_rhomag + it)*deltat + half_deltat
-                    B = Bt(t)
-                    # Print t and B for debugging
-                    print("it = {:6d}, t = {:18.3f}, B = {:15.3e}".format(iround*nt_rhomag + it, t, B))
-                    D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-                    double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-                # Save the double super density matrix at t. The tag is uique and accurate if t < 5e12 ps.
-                dset = f1.create_dataset("{:.3f}".format(t + half_deltat), data=double_super_rho)
-
-                # Save the magnetic moment at t
-                Mz = get_Mz_from_dsrho(double_super_rho, Mv[2], dim, dims, dimds)
-                f2.write("{:20.3f} {:20.6E} {:20.8E}\n".format(t + half_deltat, B, Mz))
-
-        # Loop over the remaining steps
-        for it in range(nremain):
-            t = t0 + (nround*nt_rhomag + it)*deltat + half_deltat
-            B = Bt(t)
-            D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-            double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-    # Do not save the double super density matrix
-    else:
-        # Loop over the rounds of nt_rhomag steps
-        for iround in range(nround):
-            for it in range(nt_rhomag):
-                t = t0 + (iround*nt_rhomag + it)*deltat + half_deltat
-                B = Bt(t)
-                # Print t and B for debugging
-                print("it = {:6d}, t = {:18.3f}, B = {:15.3e}".format(iround*nt_rhomag + it, t, B))
-                D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-                double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-
-        # Loop over the remaining steps
-        for it in range(nremain):
-            t = t0 + (nround*nt_rhomag + it)*deltat + half_deltat
-            B = Bt(t)
+            print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
             D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
             double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
 
     return ( t1, double_super_rho )
-
-def evolve_rho_dsqme_stairs_light(t0, t1, deltat, Bt, double_super_rho, D, D0, Mz_diag, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds, save_rho, deltat_rho):
-    """
-    Evolve the double super density matrix using the staircase method according to the quantum master equation.
-    Multiple staircases are used. All stairs have the same width deltat.
-
-    t0: initial time
-    t1: final time
-    deltat: time step in ps
-    Bt: magnetic field as a function of time
-    double_super_rho: initial double super density matrix at t0
-    D: The double super operator D at tmin
-    D0: The exchange-only double super operator at tmin
-    Mz_diag: diagnal matrix elements of the z component of the magnetization operators
-    C: The superoperator for spin-phonon coupling
-    CST: super transpose of C
-      C and CST will be reconstructed completely from X and Rhbar.
-    X: The matrix that encodes possible spin transitions
-    Rhbar: auxiliary operator for spin phonon coupling
-      Rhbar will be reconstructed completely from X and the eigenvalues.
-    h0_diag: diagonal matrix elements of the initial Hamiltonian on the perturbed basis
-    indices_nonzero_X: indices of the nonzero matrix elements of X
-    indices_nonzero_C: indices of the nonzero matrix elements of C
-    lambdaa: spin-phonon coupling constant in wavenumbers
-    I0: prefactor for the phonon density of states
-    T: temperature in Kelvin
-    dim: dimension of the Hilbert space
-    dims: dimension of superoperators
-    dimds: dimension of double superoperators
-    save_mag: logical, save the magnetic moment at chosen time steps?
-    deltat_mag: time step for saving the magnetic moment
-    save_rho: logical, save the double super density matrix at chosen time steps?
-    deltat_rho: time step for saving the double super density matrix
-    """
-
-    half_deltat = deltat/2
-    nt = int( np.round((t1 - t0)/deltat) )
-    t1 = t0 + nt*deltat
-
-    B0 = Bt(t0)
-    B1 = Bt(t1)
-
-    print("deltat = {:18.3f}".format(deltat))
-    print("nt = {:18d}".format(nt))
-    print("t0/t1 = {:18.3f}/{:18.3f}".format(t0, t1))
-    print("B0/B1 = {:18.3f}/{:18.3f}\n".format(B0, B1))
-
-    nt_rho = round( deltat_rho / deltat )
-
-    nround = nt // nt_rho
-    nremain = nt % nt_rho
-
-    fname1 = root_dir + 'output/double_super_rho_{:.3f}-{:.3f}.hdf5'.format(t0, t1)
-
-    # Save the double super density matrix peirodically
-    if save_rho:
-        with h5py.File(fname1, 'w') as f1:
-            # Save the double super density matrix at t0
-            dset = f1.create_dataset("{:.3f}".format(t0), data=double_super_rho)
-
-            # Loop over the rounds of nt_rho steps
-            for iround in range(nround):
-                for it in range(nt_rho):
-                    t = t0 + (iround*nt_rho + it)*deltat + half_deltat
-                    B = Bt(t)
-                    # Print t and B for debugging
-                    print("it = {:6d}, t = {:18.3f}, B = {:15.3e}".format(iround*nt_rho + it, t, B))
-                    D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-                    double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-                # Save the double super density matrix at t. The tag is uique and accurate if t < 5e12 ps.
-                dset = f1.create_dataset("{:.3f}".format(t + half_deltat), data=double_super_rho)
-
-        # Loop over the remaining steps
-        for it in range(nremain):
-            t = t0 + (nround*nt_rho + it)*deltat + half_deltat
-            B = Bt(t)
-            D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-            double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-    # Do not save the double super density matrix
-    else:
-        # Loop over the rounds of nt_rho steps
-        for iround in range(nround):
-            for it in range(nt_rho):
-                t = t0 + (iround*nt_rho + it)*deltat + half_deltat
-                B = Bt(t)
-                # Print t and B for debugging
-                print("it = {:6d}, t = {:18.3f}, B = {:15.3e}".format(iround*nt_rho + it, t, B))
-                D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-                double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-
-        # Loop over the remaining steps
-        for it in range(nremain):
-            t = t0 + (nround*nt_rho + it)*deltat + half_deltat
-            B = Bt(t)
-            D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-            double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-
-    return ( t1, double_super_rho )
-
-# ============================================================================ #
-# Functions for calculating the long-time evolution operator.
-# ============================================================================ #
-
-def get_U_dsqe_longtime(t0, t1, deltat, Bt, D, D0, Mz_diag, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds):
-    r"""
-    Get the long-time evolution operator \Pi_i U = exp(D_i * deltat), where \Pi is the product operator.
-    The operators exp(D_i * deltat) are time-ordered such that later times are to the left of earlier times.
-    """
-
-    half_deltat = deltat/2
-    nt = int( np.round((t1 - t0)/deltat) )
-    t1 = t0 + nt*deltat
-
-    B0 = Bt(t0)
-    B1 = Bt(t1)
-
-    print("deltat = {:18.3f}".format(deltat))
-    print("nt = {:18d}".format(nt))
-    print("t0/t1 = {:18.3f}/{:18.3f}".format(t0, t1))
-    print("B0/B1 = {:18.3f}/{:18.3f}\n".format(B0, B1))
-
-    # Initialize the long-time evolution operator
-    U = np.identity(dimds, dtype=np.float64)
-
-    # Loop over the time steps and multiply the short-time evolution operators to get the long-time evolution operator
-    for it in range(nt):
-        t = t0 + it*deltat + half_deltat
-        B = Bt(t)
-        # Print t and B for debugging
-        # print("it = {:6d}, t = {:18.3f}, B = {:15.3e}".format(it, t, B))
-        D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-        U = np.matmul(expm(D*deltat), U)
-
-    # file name for saving the long-time evolution operator
-    # fname      = root_dir + 'output/double_super_U.hdf5'
-    # fname_lock = root_dir + 'output/double_super_U.hdf5.lock'
-
-    ta = int( t0 / 1e6 // 1 ) # micro second 
-    fname      = root_dir + 'output/double_super_U_{:d}-{:d}us.hdf5'.format(ta, ta+1)
-    fname_lock = root_dir + 'output/double_super_U_{:d}-{:d}us.hdf5.lock'.format(ta, ta+1)
-
-    # Lock the file to prevent other processes from writing to it
-    with FileLock(fname_lock):
-        # The tag is uique and accurate if t < 5e12 ps.
-        tag = "{:.3f}-{:.3f}".format(t0, t1)
-        # Save the long-time double super evolution operator
-        with h5py.File(fname, "a") as f1:
-            # Write data safely. 
-            if tag in f1:
-                # print("The dataset {} already exists in the file {}. Deleting the dataset ...".format(tag, fname))
-                del f1[tag]
-            # print("Creating the dataset {} in the file {} ...".format(tag, fname))
-            dset = f1.create_dataset("{:.3f}-{:.3f}".format(t0, t1), data=U)
-
-    return (t0, t1, U)
-
-
 

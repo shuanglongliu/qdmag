@@ -12,7 +12,6 @@ from spin_dynamics.dynamics.constants import meV2wavenumber, Tesla2wavenumber, K
 from spin_dynamics.dynamics.constants import x_mu_B, mu_B_per_Tesla_2_cm3_per_mol_phi
 from spin_dynamics.dynamics.Operators import Operator
 from spin_dynamics.dynamics.StevensOperators import StevensOpA
-from spin_dynamics import __file__ as root_dir
 
 
 
@@ -306,6 +305,16 @@ def check_zero(x, epsilon=1e-9):
         print("No, it is not zero." + " maxdiff = {:15.10f}.".format(maxentry))
     return
 
+def check_diagonal(O, epsilon=1e-9):
+    O_abs = np.abs(O)
+    np.fill_diagonal(O_abs, 0)
+    is_diagonal = np.all( O_abs < epsilon )
+    if is_diagonal:
+        print("Yes, it is diagonal.")
+    else:
+        print("No, it is not diagonal.")
+    return
+
 def check_eigen(O, eigen):
     """
     Check if the given vectors are the eigenvectors of an operator.
@@ -366,7 +375,7 @@ def convert_cmatrix_to_rmatrix(M, tag):
 
 def read_input():
 
-    with open(root_dir + "dynamics/input.yaml", "r") as f:
+    with open("./input.yaml", "r") as f:
         data = yaml.safe_load(f)
     
     Ss = data['spins']
@@ -382,20 +391,21 @@ def read_input():
     BET_BEgrid = data['BET_BEgrid']
     BET_Tgrid = data['BET_Tgrid']
     dynamics = data['dynamics']
+    n_thread = data['n_thread']
 
-    return (Ss, nS, positions, exchange, anisotropy, gfactor, dipole, ext_field, BET_Bgrid, BET_Egrid, BET_BEgrid, BET_Tgrid, dynamics)
+    return (Ss, nS, positions, exchange, anisotropy, gfactor, dipole, ext_field, BET_Bgrid, BET_Egrid, BET_BEgrid, BET_Tgrid, dynamics, n_thread)
 
 def save_eigenvalues(eigen, offset=True):
-    
+
     if offset:
         eigenvalues = eigen.eigenvalues_offset
     else:
         eigenvalues = eigen.eigenvalues
 
-    if not os.path.exists(root_dir + "output"):
-        subprocess.run(["mkdir", root_dir + "output"])
+    if not os.path.exists("./output"):
+        subprocess.run(["mkdir", "./output"])
 
-    with open(root_dir + "output/eigenvalues.dat", "w") as f:
+    with open("./output/eigenvalues.dat", "w") as f:
         for i in range(eigen.dim):
             f.write("{:16.12f}\n".format(eigenvalues[i]))
 
@@ -403,10 +413,10 @@ def save_eigenvalues(eigen, offset=True):
 
 def save_eigenvectors(eigen):
 
-    if not os.path.exists(root_dir + "output"):
-        subprocess.run(["mkdir", root_dir + "output"])
+    if not os.path.exists("./output"):
+        subprocess.run(["mkdir", "./output"])
 
-    with open(root_dir + "output/eigenvectors.dat", "w") as f:
+    with open("./output/eigenvectors.dat", "w") as f:
         for i in range(eigen.dim):
             state = eigen.eigenvectors[:, i]
             f.write((eigen.dim*" {:16.12f}" + "\n").format(*state))
@@ -420,15 +430,15 @@ def save_operator(op, base_name):
     o_real = np.real(op)
     o_imag = np.imag(op)
 
-    if not os.path.exists(root_dir + "output"):
-        subprocess.run(["mkdir", root_dir + "output"])
+    if not os.path.exists("./output"):
+        subprocess.run(["mkdir", "./output"])
 
-    with open(root_dir + "output/{:s}.real".format(base_name), "w") as f:
+    with open("./output/{:s}.real".format(base_name), "w") as f:
         for i in range(Dim):
             for j in range(Dim):
                 f.write("{:8.3f}\n".format( o_real[i, j] ))
 
-    with open(root_dir + "output/{:s}.imag".format(base_name), "w") as f:
+    with open("./output/{:s}.imag".format(base_name), "w") as f:
         for i in range(Dim):
             for j in range(Dim):
                 f.write("{:8.3f}\n".format( o_imag[i, j] ))
@@ -440,10 +450,10 @@ def save_spins(spins, eigen):
     Calculate and save expectation of spins for all eigenvectors.
     """
 
-    if not os.path.exists(root_dir + "output"):
-        subprocess.run(["mkdir", root_dir + "output"])
+    if not os.path.exists("./output"):
+        subprocess.run(["mkdir", "./output"])
 
-    with open(root_dir + "output/spins.dat", "w") as f:
+    with open("./output/spins.dat", "w") as f:
         f.write("## s1x, s1y, s1z, s2x, s2y, s2z, ..., snx, sny, snz, sx_tot, sy_tot, sz_tot, s2_tot, s_tot # eigenvalue (cm^-1)\n")
 
         for i in range(spins.dim):
@@ -614,6 +624,28 @@ def get_h_Zeeman_Mv_tot(Mv_tot, Bv, coord):
 
 
 ## =================================================================
+## Functions for the Stark term.
+## =================================================================
+
+def get_h_Stark(spins, Ev, coord):
+    r""" 
+    H = - \vec{E} \cdot \vec{P}, where \vec{P} is the electric polarization.
+
+    Units: mV/Angfor E, e Ang for dipole, cm^-1 for energy, deg for angles.
+    """
+
+    if coord[0] == 's' or coord[0] == 'S':
+        Ev = np.array(sph2cart_deg(Ev))
+
+    Px, Py, Pz = spins.Pv
+
+    h_stark = -1 * meV2wavenumber * (Ev[0]*Px + Ev[1]*Py + Ev[2]*Pz)
+
+    return h_stark
+
+
+
+## =================================================================
 ## Functions for energy levels versus B field
 ## =================================================================
 
@@ -636,7 +668,10 @@ def get_energy_levels_vs_B(spins, h_ex, h_ani, Bgrid):
         eigenvalues[i] = eigen.eigenvalues[eigen.indices]
     eigenvalues = eigenvalues - energy0
 
-    with open(root_dir + "output/Zeeman.dat", "w") as f:
+    if not os.path.exists("./output"):
+        subprocess.run(["mkdir", "./output"])
+
+    with open("./output/Zeeman.dat", "w") as f:
         for i in range(nB):
             B = Bmin + i*Bstep
             f.write((" {:12.6f}" + eigen.dim*" {:15.9f}" + "\n").format(B, *eigenvalues[i]))
@@ -658,7 +693,10 @@ def get_energy_levels_vs_B_Mv_tot(h0, Mv_tot, Bgrid):
         eigenvalues[i] = eigen.eigenvalues[eigen.indices]
     eigenvalues = eigenvalues - energy0
 
-    with open(root_dir + "output/Zeeman.dat", "w") as f:
+    if not os.path.exists("./output"):
+        subprocess.run(["mkdir", "./output"])
+
+    with open("./output/Zeeman.dat", "w") as f:
         for i in range(nB):
             B = Bmin + i*Bstep
             f.write((" {:12.6f}" + eigen.dim*" {:15.9f}" + "\n").format(B, *eigenvalues[i]))
@@ -687,7 +725,10 @@ def get_energy_levels_vs_B_Mz_tot_diag(h0, Mz_tot, Bgrid):
         eigenvalues[i] = h0_diag + h_zee_diag
     eigenvalues = eigenvalues - energy0
 
-    with open(root_dir + "output/Zeeman.dat", "w") as f:
+    if not os.path.exists("./output"):
+        subprocess.run(["mkdir", "./output"])
+
+    with open("./output/Zeeman.dat", "w") as f:
         for i in range(nB):
             B = Bmin + i*Bstep
             f.write((" {:12.6f}" + eigen.dim*" {:15.9f}" + "\n").format(B, *eigenvalues[i]))
@@ -913,13 +954,13 @@ def get_M_vs_B(spins, h_ex, h_ani, BET_Bgrid):
         Ms_per_T = get_M_vs_B_kernel(spins, h_ex, h_ani, Bs, Bgrid[3], Bgrid[4], Efield, Ts[iT])
         Ms.append(Ms_per_T)
 
-    if not os.path.exists(root_dir + "output/M_vs_B"):
-        subprocess.run(["mkdir", "-p", root_dir + "output/M_vs_B"])
+    if not os.path.exists("./output/M_vs_B"):
+        subprocess.run(["mkdir", "-p", "./output/M_vs_B"])
 
-    M1name  = root_dir + "output/M_vs_B/Mmod-B_thetaB{:.1f}_phiB{:.1f}_E{:.3f}_thetaE{:.1f}_phiE{:.1f}.dat".format(Bgrid[3], Bgrid[4], *Efield)
-    M1xname = root_dir + "output/M_vs_B/Mx-B_thetaB{:.1f}_phiB{:.1f}_E{:.3f}_thetaE{:.1f}_phiE{:.1f}.dat".format(Bgrid[3], Bgrid[4], *Efield)
-    M1yname = root_dir + "output/M_vs_B/My-B_thetaB{:.1f}_phiB{:.1f}_E{:.3f}_thetaE{:.1f}_phiE{:.1f}.dat".format(Bgrid[3], Bgrid[4], *Efield)
-    M1zname = root_dir + "output/M_vs_B/Mz-B_thetaB{:.1f}_phiB{:.1f}_E{:.3f}_thetaE{:.1f}_phiE{:.1f}.dat".format(Bgrid[3], Bgrid[4], *Efield)
+    M1name  = "./output/M_vs_B/Mmod-B_thetaB{:.1f}_phiB{:.1f}_E{:.3f}_thetaE{:.1f}_phiE{:.1f}.dat".format(Bgrid[3], Bgrid[4], *Efield)
+    M1xname = "./output/M_vs_B/Mx-B_thetaB{:.1f}_phiB{:.1f}_E{:.3f}_thetaE{:.1f}_phiE{:.1f}.dat".format(Bgrid[3], Bgrid[4], *Efield)
+    M1yname = "./output/M_vs_B/My-B_thetaB{:.1f}_phiB{:.1f}_E{:.3f}_thetaE{:.1f}_phiE{:.1f}.dat".format(Bgrid[3], Bgrid[4], *Efield)
+    M1zname = "./output/M_vs_B/Mz-B_thetaB{:.1f}_phiB{:.1f}_E{:.3f}_thetaE{:.1f}_phiE{:.1f}.dat".format(Bgrid[3], Bgrid[4], *Efield)
 
     with open(M1name,  "w") as M1 , \
          open(M1xname, "w") as M1x, \
@@ -949,9 +990,12 @@ def spy_sparsity(M, tag, precision=1.0e-20, figsize=(20, 20), markersize=1):
     Visualize the sparsity of the matrix M
     """
 
+    if not os.path.exists("./output"):
+        subprocess.run(["mkdir", "./output"])
+
     fig, ax = plt.subplots(figsize=figsize)
     ax.spy(M, precision=precision, markersize=markersize)
-    plt.savefig(root_dir + "output/sparsity_of_" + tag + ".pdf")
+    plt.savefig("./output/sparsity_of_" + tag + ".pdf")
 
     return
 
@@ -1157,7 +1201,6 @@ def get_Mz_from_rho(rho, Mz_tot):
 
     return np.real( np.trace( np.matmul(rho, Mz_tot) ) )
 
-
 def get_rho_upper(rho, indices_upper):
     rho_upper = rho[indices_upper]
     rho_upper_real = np.real(rho_upper)
@@ -1167,8 +1210,11 @@ def get_rho_upper(rho, indices_upper):
 
 
 def get_indices_of_rho_upper(dim):
+    if not os.path.exists("./output"):
+        subprocess.run(["mkdir", "./output"])
+
     indices_upper = np.triu_indices(dim)
-    with open(root_dir + "output/indices_of_rho_upper.dat", "w") as f:
+    with open("./output/indices_of_rho_upper.dat", "w") as f:
         for i in range(indices_upper[0].shape[0]):
             f.write("{:6d} {:6d} {:6d}\n".format(i+1, indices_upper[0][i], indices_upper[1][i]))
         for i in range(indices_upper[0].shape[0]):
@@ -1182,7 +1228,10 @@ def get_indices_of_rho_upper(dim):
 
 def spy_M(M, tag, width=10, markersize=2, threshold=1e-9):
 
-    with open(root_dir + "output/" + tag + ".dat", "w") as f:
+    if not os.path.exists("./output"):
+        subprocess.run(["mkdir", "./output"])
+
+    with open("./output/" + tag + ".dat", "w") as f:
         for i in range(M.shape[0]):
             for j in range(M.shape[1]):
                 if np.abs(M[i, j]) >= threshold:

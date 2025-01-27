@@ -1,7 +1,6 @@
 import numpy as np
 from spin_dynamics.dynamics.common import spy_sparsity
 from spin_dynamics.dynamics.quantum_master import construct_Rhbar
-from spin_dynamics import __file__ as root_dir
 
 def get_effective_operator(O_full, selected_states, dtype=np.complex128):
     """
@@ -146,7 +145,7 @@ def set_up_the_effective_system(h0_full, h_tmin_full, S2_full, Sz_full, Mv_full,
 
     X_eff = construct_X_eff(Sz_full, selected_states)
 
-    return (h0_eff, h_tmin_eff, S2_eff, Sz_eff, Mv_eff, X_eff)
+    return (h0_eff, h_tmin_eff, S2_eff, Sz_eff, Mx_eff, My_eff, Mz_eff, Mv_eff, X_eff)
 
 def set_up_the_effective_system_args(selected_states, *args):
     """
@@ -192,37 +191,37 @@ def spy_the_effective_system(h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff):
     My_eff_abs = np.abs(Mv_eff[1])
     Mz_eff_abs = np.abs(Mv_eff[2])
 
-    with open (root_dir + "output/h0_eff_abs.dat", "w") as f:
+    with open ("./output/h0_eff_abs.dat", "w") as f:
         for i in range(n):
             for j in range(n):
                 f.write("{:5d} {:5d} {:12.4e}\n".format(i, j, h0_eff_abs[i, j]))
 
-    with open (root_dir + "output/S2_eff_abs.dat", "w") as f:
+    with open ("./output/S2_eff_abs.dat", "w") as f:
         for i in range(n):
             for j in range(n):
                 f.write("{:5d} {:5d} {:12.4e}\n".format(i, j, S2_eff_abs[i, j]))
 
-    with open (root_dir + "output/Sz_eff_abs.dat", "w") as f:
+    with open ("./output/Sz_eff_abs.dat", "w") as f:
         for i in range(n):
             for j in range(n):
                 f.write("{:5d} {:5d} {:12.4e}\n".format(i, j, Sz_eff_abs[i, j]))
 
-    with open (root_dir + "output/Mx_eff_abs.dat", "w") as f:
+    with open ("./output/Mx_eff_abs.dat", "w") as f:
         for i in range(n):
             for j in range(n):
                 f.write("{:5d} {:5d} {:12.4e}\n".format(i, j, Mx_eff_abs[i, j]))
 
-    with open (root_dir + "output/My_eff_abs.dat", "w") as f:
+    with open ("./output/My_eff_abs.dat", "w") as f:
         for i in range(n):
             for j in range(n):
                 f.write("{:5d} {:5d} {:12.4e}\n".format(i, j, My_eff_abs[i, j]))
 
-    with open (root_dir + "output/Mz_eff_abs.dat", "w") as f:
+    with open ("./output/Mz_eff_abs.dat", "w") as f:
         for i in range(n):
             for j in range(n):
                 f.write("{:5d} {:5d} {:12.4e}\n".format(i, j, Mz_eff_abs[i, j]))
 
-    with open(root_dir + "output/X_eff.dat", "w") as f:
+    with open("./output/X_eff.dat", "w") as f:
         for i in range(n):
             for j in range(n):
                 f.write("i   j   Sz_i   Sz_j   X_ij   = {:5d}   {:5d}   {:8.3f}   {:8.3f}   {:5.1f}\n".format( \

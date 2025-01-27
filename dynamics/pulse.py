@@ -4,40 +4,92 @@
 
 import numpy as np
 import pickle
-from spin_dynamics import __file__ as root_dir
+from spin_dynamics import root_dir
 from scipy.optimize import fsolve
+from scipy.interpolate import interp1d
+
+def get_Bt(Bt_params):
+    """
+    Bt_params: dictionary with the following keys and values:
+        'Bt_type': 'linear' or 'pwlinear' or 'sin' or 'cs'
+        'sweep_rate': sweep rate in T per 0s
+        'times': turning time points in ps
+        'fields': magnetic fields at the turning points in Tesla
+        'omega': angular frequency of the sine wave in rad ms^-1
+        'amplitude': amplitude of the sine wave in T
+        'theta_B': polar angle of magnetic field in deg
+        'phi_B': azimuthal angle of magnetic field in deg
+    """
+
+    Bt_type = Bt_params['Bt_type']
+
+    if Bt_type == 'linear':
+        sweep_rate = Bt_params['sweep_rate']
+        Bt = get_B_linear(sweep_rate)
+    elif Bt_type == 'pwlinear':
+        times = Bt_params['times']
+        fields = Bt_params['fields']
+        Bt = get_B_pwlinear(times, fields)
+    elif Bt_type == 'sin':
+        omega = Bt_params['omega']
+        amplitude = Bt_params['amplitude']
+        Bt = get_B_sin(omega, amplitude)
+    elif Bt_type == 'cs':
+        Bt = get_B_cs()
+    else:
+        print("Invalid Bt_type. Stopping ...")
+        exit()
+
+    return Bt
 
 def get_B_sin_offset(t, *argv):
     B0 = argv[0]
     return get_B_sin(t) - B0
 
-def get_B_sin(t):
+def get_B_sin(omega, amplitude):
     """
     t: time in ps
-    B = a*sin(b*t): magnetic field in Tesla
+    B = amplitude*sin(omega*t/1e9): magnetic field in Tesla
 
-    Test: 
-        t = np.linspace(0, 1e10, 101)
-        B = get_B_sin(t)
-        plt.plot(t, B)
+    An example: 65.3473*np.sin(0.187486*t/1e9) as fitted to a pulsed field
     """
 
-    return 65.3473*np.sin(0.187486*t/1e9)
+    def B_sin(t):
+        return amplitude*np.sin(omega*t/1e9)
 
-    # return 65.3473*np.sin(0.5*t/1e9)
+    return B_sin
 
-    # return 65.3473*np.sin(100.0*t/1e9)
+def get_B_linear(sweep_rate):
+    """
+    sweep_rate: rate in T per ms
+    t: time in ps
+    B = a*t/1e9: magnetic field in Tesla
+    """
+    def B_linear(t):
+        return sweep_rate*t/1e9
 
-def load_cs():
+    return B_linear
+
+def get_B_pwlinear(times=[0, 1e6, 1e7, 1e8, 1e9], fields=[0, 3, 5, 8, 10]):
+    """
+    times: turning time points in ps
+    fields: magnetic fields at the turning points in Tesla
+    Return a piecewise linear magnetic field function
+    """
+    # Create the piecewise linear function
+    B_pwlinear = interp1d(times, fields, kind='linear', fill_value="extrapolate")
+    return B_pwlinear
+
+def get_B_cs():
     """
     Load the monotone cubic spline object for the pulse field
     Units: ps for time and T for magnetic field
     """
 
     with open(root_dir + "pulse/cs_pulse.pickle", "rb") as f:
-        cs = pickle.load(f)
+        B_cs = pickle.load(f)
 
-    return cs
+    return B_cs
 
 
 def get_pulse_for_TEO(Bt, tmin, tmax, deltat):
