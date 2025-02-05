@@ -116,6 +116,11 @@ dynamics:
       save_rho: {save_rho:s} # Save the density matrix ?
       nt_rho: {nt_rho:d}  # Save the density matrix every nt_rho*deltat ps, nt_rho will be adjusted to be a multiple of nt_mag
 
+    - multiphonon: {multiphonon:s} # Include multiphonon processes in the dynamics ?
+      imbalance: {imbalance:s} # Make X unsymmetrical for single phonon processes ?
+
+    - states: {states:s} # List of spin states to be included in the dynamics.
+    
 n_thread: {n_thread:d} # Number of threads used in the calculation
 
 """

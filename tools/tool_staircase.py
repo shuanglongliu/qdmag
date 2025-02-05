@@ -42,6 +42,11 @@ if __name__ == "__main__":
     save_rho      = dynamics[3]['save_rho']      # Save rho ?
     nt_rho        = dynamics[3]['nt_rho']        # Save rho every nt_rho*deltat ps
 
+    multiphonon   = dynamics[4]['multiphonon']   # Include multiphonon processes ?
+    imbalance     = dynamics[4]['imbalance']     # Make X unsymmetric ? 
+
+    states        = dynamics[5]['states']        # Make X unsymmetric ? 
+
 
 
     # Set up the pulsed magnetic field
@@ -72,10 +77,7 @@ if __name__ == "__main__":
 
     # Get the effective system
 
-    # dim = 16
-    selected_states = [200,150,88,30,10,0,1,2,3,4,5,17,41,99,173,215]
-
-    h0_eff, h_tmin_eff, S2_eff, Sz_eff, Mx_eff, My_eff, Mz_eff, Mv_eff, X_eff = set_up_the_effective_system(h_ex_p, h_tmin_p, S2_tot_p, Sz_tot_p, Mv_tot_p, selected_states)
+    h0_eff, h_tmin_eff, S2_eff, Sz_eff, Mx_eff, My_eff, Mz_eff, Mv_eff, X_eff = set_up_the_effective_system(h_ex_p, h_tmin_p, S2_tot_p, Sz_tot_p, Mv_tot_p, states, multiphonon=multiphonon, imbalance=imbalance)
 
 
 

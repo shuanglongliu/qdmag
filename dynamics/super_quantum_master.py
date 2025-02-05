@@ -585,6 +585,9 @@ def examine_D_max_and_expDdeltat_max(Bs, deltats, tag, D, D0, Mz_diag, C, CST, X
             # Get the maximum of the absolute values of the elements of D and exp(D * deltat)
             D_max[i, j], expDdeltat_max[i, j] = get_D_max_and_expDdeltat_max(D, D0, deltat, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
 
+    if not os.path.exists("./output"):
+        os.makedirs("./output")
+
     # Save D_max in the file D_max.dat, the first column is the magnetic field, and the first row is the time step.
     # Ths first row should be a comment line starting with #.
     with open("./output/D_max_" + tag + ".dat", "w") as f:
@@ -640,6 +643,9 @@ def get_U_dsqe_longtime(t0, t1, deltat, Bt, D, D0, Mz_diag, C, CST, X, Rhbar, h0
         # print("it = {:6d}, t = {:18.3f}, B = {:15.3e}".format(it, t, B))
         D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
         U = np.matmul(expm(D*deltat), U)
+
+    if not os.path.exists("./output"):
+        os.makedirs("./output")
 
     # file name for saving the long-time evolution operator
     ta = int( t0 / 1e6 // 1 ) # micro second 

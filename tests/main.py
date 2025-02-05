@@ -60,11 +60,9 @@ if __name__ == "__main__":
 
     # Check commutation relation
 
-    check_commutation(h_ex, h_zee)
-    # check_commutation(h_ex, spins.Sv_tot[2])
-    # check_commutation(h_ex, spins.S2_tot)
-
-    exit()
+    # check_commutation(h_ex, h_zee); exit()
+    # check_commutation(h_ex, spins.Sv_tot[2]); exit()
+    # check_commutation(h_ex, spins.S2_tot); exit()
 
 
 
@@ -120,11 +118,14 @@ if __name__ == "__main__":
     # Get the effective Hamiltonian
 
     # dim = 16
-    selected_states = [200,150,88,30,10,0,1,2,3,4,5,17,41,99,173,215]
+    # selected_states = [200,150,88,30,10,0,1,2,3,4,5,17,41,99,173,215]
+
+    # dim = 20
+    selected_states = [200,150,88,30,10,0,1,6,2,7,3,8,4,9,5,17,41,99,173,215]
 
     h0_eff, h_tmin_eff, S2_eff, Sz_eff, Mx_eff, My_eff, Mz_eff, Mv_eff, X_eff = set_up_the_effective_system(h_ex_p, h_tmin_p, S2_tot_p, Sz_tot_p, Mv_tot_p, selected_states)
 
-    #spy_the_effective_system(h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff); exit()
+    spy_the_effective_system(h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff); exit()
 
 
 

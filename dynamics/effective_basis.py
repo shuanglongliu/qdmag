@@ -76,7 +76,7 @@ def get_effective_Mv(Mv_full, selected_states):
 
     return Mv_eff
 
-def construct_X_eff(Sz_full, selected_states):
+def construct_X_eff(Sz_full, selected_states, multiphonon=False, imbalance=False):
     """
     Construct the operator in the spin space, which couples to phonons.
     X_{ij} = 1 if | M_{iz} - M_{jz} | = 1. Otherwise, X_{ij} = 0. 
@@ -85,19 +85,55 @@ def construct_X_eff(Sz_full, selected_states):
     n = len(selected_states)
     X_eff = np.zeros((n, n), dtype=np.float64)
 
-    for i in range(n):
-        for j in range(n):
-            ii = selected_states[i]
-            jj = selected_states[j]
-            diff = abs(Sz_full[ii, ii] - Sz_full[jj, jj])
-            # When a B field of 1e-9 T is added to the isotropic qunatum Heisenberg Hamiltonian, 
-            # the deviation in Sz from half integers is within 1e-8 mu_B.
-            if abs(diff - 1.0) < 1e-6:
-                X_eff[i, j] = 1.0
+    if multiphonon:
+        for i in range(n):
+            for j in range(n):
+                ii = selected_states[i]
+                jj = selected_states[j]
+                diff = abs(Sz_full[ii, ii] - Sz_full[jj, jj])
+                # When a B field of 1e-9 T is added to the isotropic qunatum Heisenberg Hamiltonian,
+                # the deviation in Sz from half integers is within 1e-8 mu_B.
+                if abs(diff - 1.0) < 1e-6:
+                    X_eff[i, j] = 1.0
+                elif abs(diff - 2.0) < 1e-6:
+                    # X_eff[i, j] = 0.1
+                    X_eff[i, j] = 1.0
+                elif abs(diff - 3.0) < 1e-6:
+                    # X_eff[i, j] = 0.05
+                    X_eff[i, j] = 1.0
+                elif abs(diff - 4.0) < 1e-6:
+                    # X_eff[i, j] = 0.02
+                    X_eff[i, j] = 1.0
+                elif abs(diff - 5.0) < 1e-6:
+                    # X_eff[i, j] = 0.01
+                    X_eff[i, j] = 1.0
+    else:
+        if imbalance:
+            for i in range(n):
+                for j in range(n):
+                    ii = selected_states[i]
+                    jj = selected_states[j]
+                    diff = Sz_full[ii, ii] - Sz_full[jj, jj]
+                    # When a B field of 1e-9 T is added to the isotropic qunatum Heisenberg Hamiltonian, 
+                    # the deviation in Sz from half integers is within 1e-8 mu_B.
+                    if abs(diff - 1.0) < 1e-6:
+                        X_eff[i, j] = 1.0
+                    elif abs(diff + 1.0) < 1e-6:
+                        X_eff[i, j] = 0.1
+        else:
+            for i in range(n):
+                for j in range(n):
+                    ii = selected_states[i]
+                    jj = selected_states[j]
+                    diff = abs(Sz_full[ii, ii] - Sz_full[jj, jj])
+                    # When a B field of 1e-9 T is added to the isotropic qunatum Heisenberg Hamiltonian, 
+                    # the deviation in Sz from half integers is within 1e-8 mu_B.
+                    if abs(diff - 1.0) < 1e-6:
+                        X_eff[i, j] = 1.0
 
     return X_eff
 
-def set_up_the_effective_system(h0_full, h_tmin_full, S2_full, Sz_full, Mv_full, selected_states):
+def set_up_the_effective_system(h0_full, h_tmin_full, S2_full, Sz_full, Mv_full, selected_states, multiphonon=False, imbalance=False):
     """
     Obtain h0_eff and Mv_eff on the basis of selected states. 
     All the operators are on the perturbed basis, i.e. the eigenstates of h_ex + h_zee(B = 1e-4 T).
@@ -143,7 +179,7 @@ def set_up_the_effective_system(h0_full, h_tmin_full, S2_full, Sz_full, Mv_full,
 
     Mv_eff = [Mx_eff, My_eff, Mz_eff]
 
-    X_eff = construct_X_eff(Sz_full, selected_states)
+    X_eff = construct_X_eff(Sz_full, selected_states, multiphonon=multiphonon, imbalance=imbalance)
 
     return (h0_eff, h_tmin_eff, S2_eff, Sz_eff, Mx_eff, My_eff, Mz_eff, Mv_eff, X_eff)
 
