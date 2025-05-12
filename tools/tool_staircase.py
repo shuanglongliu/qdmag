@@ -57,17 +57,25 @@ if __name__ == "__main__":
     # Hamiltonian
 
     h_ex = get_h_exchange(spins, exchange, -2)
-    h_zee = get_h_Zeeman(spins, [0,0,Bt(tmin)], 'cartesian')
+    h_ani = get_h_anisotropy(spins, anisotropy)
+    h_zee_tmin = get_h_Zeeman(spins, [0,0,Bt(tmin)], 'cartesian')
 
-    h_tmin = h_ex + h_zee
+    # Spin Hamiltonian at t=0
+    h_t0 = h_ex + h_ani 
+
+    # Spin Hamiltonian at t=tmin
+    h_tmin = h_ex + h_ani + h_zee_tmin
 
 
 
     # Basis transformation
+    # The basis functions are the common eigenstates of the isotropic exchange interaction and the Sz_tot operator
+    # A perturbation is added to the isotropic exchange interaction to void mixing of different Sz states
 
-    eigen_p = get_perturbed_basis(h_ex, spins, [0,0,1e-4])
+    h_ex_iso = get_h_exchange_iso(spins, exchange, -2)
+    eigen_p = get_perturbed_basis(h_ex_iso, spins, [0,0,1e-4])
 
-    h_ex_p = transform_O(h_ex, eigen_p)
+    h_t0_p = transform_O(h_t0, eigen_p)
     h_tmin_p = transform_O(h_tmin, eigen_p)
     S2_tot_p = transform_O(spins.S2_tot, eigen_p)
     Sz_tot_p = transform_O(spins.Sv_tot[2], eigen_p)
@@ -77,15 +85,23 @@ if __name__ == "__main__":
 
     # Get the effective system
 
-    h0_eff, h_tmin_eff, S2_eff, Sz_eff, Mx_eff, My_eff, Mz_eff, Mv_eff, X_eff = set_up_the_effective_system(h_ex_p, h_tmin_p, S2_tot_p, Sz_tot_p, Mv_tot_p, states, multiphonon=multiphonon, imbalance=imbalance)
+    h_t0_eff, h_tmin_eff, S2_eff, Sz_eff, Mv_eff, X_eff, dim = \
+    set_up_the_effective_system(h_t0_p, h_tmin_p, S2_tot_p, Sz_tot_p, Mv_tot_p, states, multiphonon=multiphonon, imbalance=imbalance)
+
+    Mx_eff, My_eff, Mz_eff = Mv_eff
+    Mz_eff_diag = get_Mz_eff_diag(Mz_eff)
 
 
 
     # Set up the double super quantum master equation
 
-    D0_eff, D_eff, h0_eff_diag, h_tmin_eff_diag, Mz_eff_diag, Rhbar_eff, C_eff, CST_eff, dim, dims, dimds = set_up_double_super_qme(h0_eff, h_tmin_eff, Mz_eff, X_eff, I0, T, lambdaa)
+    D0_eff, D_eff, Rhbar_eff, C_eff, CST_eff, dims, dimds = set_up_double_super_qme(h_t0_eff, h_tmin_eff, X_eff, dim, I0, T, lambdaa)
 
-    indices_nonzero_X_eff, indices_nonzero_C_eff = get_indices_nonzero_X_and_C(X_eff, dim)
+
+
+    # Which elements of the C operator are non-zero ?
+
+    n_nzC, indices_nzC = get_indices_nzC(X_eff, dim)
 
 
 
@@ -93,14 +109,13 @@ if __name__ == "__main__":
 
     ## Construct the initial density matrix
 
-    rho0_eff = get_rhoe(h_tmin_eff_diag, T)
+    eigen_tmin_eff = eigen_spin_hamiltonian(h_tmin_eff)
 
-    #rho0_eff = np.eye(dim) / dim
+    ### Construct the initial density matrix on the eigenbasis of h_tmin_eff
+    rho0_eff = get_rhoe(eigen_tmin_eff.eigenvalues, T)
 
-    #rho0_eff = get_rho0(eigen0_eff, T)
-
-    #rho0_eff = np.zeros((dim, dim))
-    #rho0_eff[0, 0] = 1.0
+    ### Transform the density matrix from the eigenbasis of h_tmin_eff to the common eigenbasis (the perturbed basis)
+    rho0_eff = back_transform_O(rho0_eff, eigen_tmin_eff)
 
     ## Read the initial density matrix from a file
 
@@ -117,7 +132,7 @@ if __name__ == "__main__":
     double_super_rho0_eff = convert_rho_to_dsrho(rho0_eff)
 
     # Evolve the double super density matrix
-    tmax, double_super_rho_eff = evolve_rho_dsqme_stairs(tmin, tmax, deltat, Bt_params, double_super_rho0_eff, D_eff, D0_eff, Mz_eff, Mz_eff_diag, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds, save_mag, nt_mag, save_rho, nt_rho)
+    tmax, double_super_rho_eff = evolve_rho_dsqme_stairs(tmin, tmax, deltat, Bt_params, double_super_rho0_eff, D_eff, D0_eff, h_t0_eff, Mz_eff, Mz_eff_diag, C_eff, CST_eff, X_eff, Rhbar_eff, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds, save_mag, nt_mag, save_rho, nt_rho)
 
     # Convert the double super density matrix to the density matrix
     # rho_eff = convert_dsrho_to_rho(double_super_rho_eff, dim, dims, dimds)

@@ -10,6 +10,9 @@ from spin_dynamics.dynamics.schrodinger import *
 from spin_dynamics.dynamics.quantum_master import *
 from spin_dynamics.dynamics.effective_basis import * 
 from spin_dynamics.dynamics.super_quantum_master import *
+from spin_dynamics.dynamics.pulse import get_Bt
+from spin_dynamics.dynamics.hdf5_functions import get_rho_from_hdf5
+
 
 
 if __name__ == "__main__":
@@ -42,6 +45,11 @@ if __name__ == "__main__":
     save_rho      = dynamics[3]['save_rho']      # Save rho ?
     nt_rho        = dynamics[3]['nt_rho']        # Save rho every nt_rho*deltat ps
 
+    multiphonon   = dynamics[4]['multiphonon']   # Include multiphonon processes ?
+    imbalance     = dynamics[4]['imbalance']     # Make X unsymmetric ? 
+
+    states        = dynamics[5]['states']        # Make X unsymmetric ? 
+
 
 
     # Set up the pulsed magnetic field
@@ -55,6 +63,10 @@ if __name__ == "__main__":
     h_ani = get_h_anisotropy(spins, anisotropy)
     h_zee = get_h_Zeeman(spins, [0,0,1e-4], 'cartesian')
 
+    # Spin Hamiltonian at t=0
+    h_t0 = h_ex + h_ani
+
+    # Spin Hamiltonian at t=tmin
     h_tmin = h_ex + h_zee
 
 
@@ -73,10 +85,13 @@ if __name__ == "__main__":
 
 
     # Basis transformation
+    # The basis functions are the common eigenstates of the isotropic exchange interaction and the Sz_tot operator
+    # A perturbation is added to the isotropic exchange interaction to void mixing of different Sz states
 
-    eigen_p = get_perturbed_basis(h_ex, spins, [0,0,1e-4])
+    h_ex_iso = get_h_exchange_iso(spins, exchange, -2)
+    eigen_p = get_perturbed_basis(h_ex_iso, spins, [0,0,1e-4])
 
-    h_ex_p = transform_O(h_ex, eigen_p)
+    h_t0_p = transform_O(h_t0, eigen_p)
     h_tmin_p = transform_O(h_tmin, eigen_p)
     S2_tot_p = transform_O(spins.S2_tot, eigen_p)
     Sz_tot_p = transform_O(spins.Sv_tot[2], eigen_p)
@@ -105,7 +120,7 @@ if __name__ == "__main__":
 
     # Zeeman diagram for the full system
 
-    # get_energy_levels_vs_B(spins, h_ex, h_ani, BET_Bgrid[0])
+    # get_energy_levels_vs_B(spins, h_ex, h_ani, BET_Bgrid[0]); exit()
 
 
 
@@ -117,15 +132,10 @@ if __name__ == "__main__":
 
     # Get the effective Hamiltonian
 
-    # dim = 16
-    # selected_states = [200,150,88,30,10,0,1,2,3,4,5,17,41,99,173,215]
+    h_t0_eff, h_tmin_eff, S2_eff, Sz_eff, Mv_eff, X_eff, dim = \
+    set_up_the_effective_system(h_t0_p, h_tmin_p, S2_tot_p, Sz_tot_p, Mv_tot_p, states, multiphonon=multiphonon, imbalance=imbalance)
 
-    # dim = 20
-    selected_states = [200,150,88,30,10,0,1,6,2,7,3,8,4,9,5,17,41,99,173,215]
-
-    h0_eff, h_tmin_eff, S2_eff, Sz_eff, Mx_eff, My_eff, Mz_eff, Mv_eff, X_eff = set_up_the_effective_system(h_ex_p, h_tmin_p, S2_tot_p, Sz_tot_p, Mv_tot_p, selected_states)
-
-    spy_the_effective_system(h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff); exit()
+    # spy_the_effective_system(h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff); exit()
 
 
 
@@ -142,7 +152,7 @@ if __name__ == "__main__":
 
     # Zeeman diagram for the effective system
 
-    # get_energy_levels_vs_B_Mv_tot(h0_eff, Mv_eff, BET_Bgrid[0])
+    get_energy_levels_vs_B_Mv_tot(h_t0_eff, Mv_eff, BET_Bgrid[0]); exit()
 
     # get_energy_levels_vs_B_Mz_tot_diag(h0_eff, Mz_eff, BET_Bgrid[0])
 
