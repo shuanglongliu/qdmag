@@ -6,10 +6,10 @@ from filelock import FileLock
 from scipy.linalg import expm
 from spin_dynamics.dynamics.constants import const1, Tesla2wavenumber
 from spin_dynamics.dynamics.common import kronecker_delta
-from spin_dynamics.dynamics.common import convert_cmatrix_to_rmatrix
 from spin_dynamics.dynamics.common import spy_sparsity
 from spin_dynamics.dynamics.common import get_Mv_from_rho, get_Mz_from_rho
-from spin_dynamics.dynamics.quantum_master import construct_Rhbar, update_Rhbar
+from spin_dynamics.dynamics.common import eigen_simple
+from spin_dynamics.dynamics.quantum_master import get_Rhbar, update_Rhbar
 from spin_dynamics.dynamics.pulse import get_Bt
 
 r"""
@@ -47,21 +47,6 @@ Dimensions:
 """
 
 # ============================================================================ #
-# Auxiliary functions
-# ============================================================================ #
-
-def get_hdf5_file_size():
-    t = 17000000 # Total time
-    span = 100000 # Time span for each data set of U
-    dimds = 2048
-    # The factor 8 converts bits to bytes
-    # The factor 1024 / 1024 /1024 converts bytes to Gb
-    fsize = ( t / span ) * 2048 * 2048 * 8 / 1024 / 1024 /1024 
-    print("File size of double_super_U.hdf5: {:.2f} Gb".format(fsize))
-
-
-
-# ============================================================================ #
 # Functions for formatting the density matrix.
 # ============================================================================ #
 
@@ -72,15 +57,15 @@ def convert_rho_to_dsrho(rho):
     super_rho = rho.flatten()
     super_rho_re = np.real(super_rho)
     super_rho_im = np.imag(super_rho)
-    double_super_rho = np.concatenate((super_rho_re, super_rho_im))
-    return double_super_rho
+    dsrho = np.concatenate((super_rho_re, super_rho_im))
+    return dsrho
 
-def convert_dsrho_to_rho(double_super_rho, dim, dims, dimds):
+def convert_dsrho_to_rho(dsrho, dim, dims, dimds):
     """
     Convert double super density matrix to density matrix.
     """
-    super_rho_re = double_super_rho[0:dims]
-    super_rho_im = double_super_rho[dims:dimds]
+    super_rho_re = dsrho[0:dims]
+    super_rho_im = dsrho[dims:dimds]
     super_rho = super_rho_re + 1j * super_rho_im
     rho = super_rho.reshape((dim, dim))
     return rho
@@ -91,20 +76,17 @@ def convert_dsrho_to_rho(double_super_rho, dim, dims, dimds):
 # Functions for calculating magnetic moment. 
 # ============================================================================ #
 
-def get_magnetic_moment_dsrho(double_super_rho, Mv, dim, dims, dimds):
+def get_Mv_from_dsrho(dsrho, Mv, dim, dims, dimds):
 
-    rho = convert_dsrho_to_rho(double_super_rho, dim, dims, dimds)
+    rho = convert_dsrho_to_rho(dsrho, dim, dims, dimds)
 
-    #spy_M(rho, "rho", threshold=0)
-    #print("Trace of the density matrix = {:20.16f}".format( np.real( np.trace(rho) ) ))
-    
     M = get_Mv_from_rho(rho, Mv)
 
     return M
 
-def get_Mz_from_dsrho(double_super_rho, Mz, dim, dims, dimds):
+def get_Mz_from_dsrho(dsrho, Mz, dim, dims, dimds):
 
-    rho = convert_dsrho_to_rho(double_super_rho, dim, dims, dimds)
+    rho = convert_dsrho_to_rho(dsrho, dim, dims, dimds)
 
     return get_Mz_from_rho(rho, Mz)
 
@@ -112,36 +94,76 @@ def get_Mz_from_dsrho(double_super_rho, Mz, dim, dims, dimds):
 # Functions for calculating magnetic susceptibility.
 # ============================================================================ #
 
-def get_chimz_from_rho(H, Bt, t, Mz_tot, rho, X, Rhbar, lambdaa):
+def get_chimz_from_rho(h, Bt, t, Mz_tot, rho, X, Rhbar, lambdaa, dt=1e+3):
     r"""
-    Assume that the system is isotropic and the magnetic field is along the z direction.
+    Assume that the magnetic field is along the z direction.
+
+    I do not know why but this function only works for isotropic exchange interaction.
 
     chimz = dMz/dBz
-          = Tr( drho/dBz Mz )
+          = d ( Tr(rho Mz) ) / dBz
+          = Tr( drho/dBz Mz ) # Use the same basis functions/states throughout the calculation.
           = Tr( drho/dt dt/dBz Mz )
           = Tr( drho/dt (dBz/dt)^-1 Mz )
           = Tr( (-i * const1 * [H, rho] - { [X, Rhbar rho] + [X, Rhbar rho]^\dagger } * lambdaa^2 * pi* const1^2) (dBz/dt)^-1 Mz )
     """
-    drhodt = -1j * const1 * (np.matmul(H, rho) - np.matmul(rho, H))
+    drhodt = -1j * const1 * (np.matmul(h, rho) - np.matmul(rho, h))
     commutator = np.matmul(X, np.matmul(Rhbar, rho)) - np.matmul(np.matmul(Rhbar, rho), X)
     drhodt = drhodt - (commutator + np.conjugate(np.transpose(commutator))) * lambdaa**2 * np.pi * const1**2
-    dt = 1e+3 # ps
     dBzdt = (Bt(t+dt) - Bt(t-dt))/(2*dt) # Tesla/ps
-    return np.real( np.trace( np.matmul(drhodt, Mz_tot) ) / dBzdt )
+    chimz = np.real( np.trace( np.matmul(drhodt, Mz_tot) ) / dBzdt )
+    # print("    chimz = {:15.6e}".format(chimz))
+    return chimz
 
-def get_chimz_from_dsrho(h0_diag, Bt, t, Mz, Mz_diag, dsrho, X, Rhbar, lambdaa, dim, dims, dimds):
+def get_chimz_from_dsrho(h, h_t0, Bt, t, Mz, dsrho, X, Rhbar, lambdaa, I0, T, dim, dims, dimds):
     """
     Wrapper for get_chimz_from_rho
-    Assumption: h0 and Mz_tot are written on the perturbed basis.
+    h_t0: Hamiltonian at time t=0 ps
+    Bt: Magnetic field as a function of time t
+    t: Time
+    Mz: z component of the total magnetic moment operator
+    dsrho: Double super density matrix
+    X: Spin transition matrix
+    Rhbar: Spin-phonon coupling superoperator
+    lambdaa: Spin-phonon coupling constant
+    dim: Dimension of the effective Hamiltonian
+    dims: Dimension of superoperators
+    dimds: Dimension of double superoperators
     """
-    # Total Hamiltonian
-    H = np.diag(h0_diag - Tesla2wavenumber * Bt(t) * Mz_diag)
-    
+
+    # Hamiltonian at time t
+    h = h_t0 - Tesla2wavenumber * Bt(t) * Mz
+
+    # Rhbar at time t
+    Rhbar = update_Rhbar(Rhbar, h, X, I0, T)
+
     # Get the density matrix rho from the double super density matrix dsrho
     rho = convert_dsrho_to_rho(dsrho, dim, dims, dimds)
 
     # Call get_chimz_from_rho
-    return get_chimz_from_rho(H, Bt, t, Mz, rho, X, Rhbar, lambdaa)
+    chimz = get_chimz_from_rho(h, Bt, t, Mz, rho, X, Rhbar, lambdaa)
+
+    return chimz
+
+
+def get_chimz_finite_diff(dsrho, t1, dt, Bt, D, D0, h, h_t0, Mz_op, Mz_diag, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds):
+    """
+    dsrho: Double super density matrix at time t1
+    """
+
+    B1 = Bt(t1)
+    B2 = Bt(t1 + dt)
+
+    M1 = get_Mz_from_dsrho(dsrho, Mz_op, dim, dims, dimds)
+
+    dsrho2 = evolve_rho_dsqme_onestair(dsrho, dt, D, D0, h, h_t0, Mz_diag, B1, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+    M2 = get_Mz_from_dsrho(dsrho2, Mz_op, dim, dims, dimds)
+
+    chimz = (M2 - M1) / (B2 - B1)
+
+    # print("    chimz = {:15.6e}".format(chimz))
+
+    return chimz
 
 
 # ============================================================================ #
@@ -157,32 +179,7 @@ def dec_composite_index(I, N):
     j = I % N
     return (i, j)
 
-def get_indices_nonzero_X_and_C(X, dim):
-    """
-    Get indices of nonzero matrix elements of X and C
-    X: a spin operator of dimension dim storing information of possible spin transitions
-    C: a super operator of dimension dims due to the interaction with bath
-    """
-
-    indices_nonzero_X = np.nonzero(X)
-
-    X2 = X @ X
-    indices_nonzero_X2 = np.nonzero(X2)
-
-    set_index_tuples_nonzero_X = set( [(indices_nonzero_X[0][i], indices_nonzero_X[1][i]) for i in range(indices_nonzero_X[0].shape[0])] )
-    set_index_tuples_nonzero_X2 = set( [(indices_nonzero_X2[0][i], indices_nonzero_X2[1][i]) for i in range(indices_nonzero_X2[0].shape[0])] )
-
-    indices_nonzero_C = []
-    for i in range(dim):
-        for j in range(dim):
-            for k in range(dim):
-                for l in range(dim):
-                    if ( (i, k) in set_index_tuples_nonzero_X2 and l == j) or  ( (i, k) in set_index_tuples_nonzero_X and (l, j) in set_index_tuples_nonzero_X ):
-                        indices_nonzero_C.append( (i, j, k, l) )
-
-    return (indices_nonzero_X, indices_nonzero_C)
-
-def construct_A_from_H(H, dtype=np.complex128):
+def construct_A(H, dim, dims, diagonal_H=False, dtype=np.complex128):
     """
     [H, rho]_I = A_{IJ} rho_J
       I = i * N + j, N = dim(H)
@@ -192,123 +189,52 @@ def construct_A_from_H(H, dtype=np.complex128):
       j = I % N
       k = J // N
       l = J % N
-    dype = np.complex128 or np.float64
-    """
-
-    N = H.shape[0]
-    dim = N**2
-
-    A = np.zeros((dim, dim), dtype=dtype)
-    for I in range(dim):
-        i, j = dec_composite_index(I, N)
-        for J in range(dim):
-            k, l = dec_composite_index(J, N)
-            A[I, J] = H[i, k] * kronecker_delta(l, j) - kronecker_delta(i, k) * H[l, j]
-
-    return A
-
-def construct_A_from_diagonalH(H):
-    """
-    [H, rho]_I = A_{IJ} rho_J
-      I = i * N + j, N = dim(H)
-      J = k * N + l, N = dim(H)
-    A_{IJ} = H_{ik} delta_{lj} - delta_{ik} H_{lj}
-      i = I // N
-      j = I % N
-      k = J // N
-      l = J % N
-
-    If H is diagonal, then A is diagonal with 
-      A_{II} = Hii - Hjj
-      i = I // N
-      j = I % N
-
-    If H is diagonal, then H (and thus A) is real.
-    """
-
-    N = H.shape[0]
-    dim = N**2
-
-    A = np.zeros((dim, dim), dtype=np.float64)
-
-    #for I in range(dim):
-        #i, j = dec_composite_index(I, N)
-        #A[I, I] = H[i, i] - H[j, j]
-
-    # Faster
-    #for i in range(N):
-        #for j in range(N):
-            #I = i * N + j
-            #A[I, I] = H[i, i] - H[j, j]
-
-    # Even faster
-    I = 0
-    for i in range(N):
-        for j in range(N):
-            A[I, I] = H[i, i] - H[j, j]
-            I = I + 1
-
-    return A
-
-def construct_A_diag_from_diagonalH(H):
-    """
-    [H, rho]_I = A_{IJ} rho_J
-      I = i * N + j, N = dim(H)
-      J = k * N + l, N = dim(H)
-    A_{IJ} = H_{ik} delta_{lj} - delta_{ik} H_{lj}
-      i = I // N
-      j = I % N
-      k = J // N
-      l = J % N
-
-    If H is diagonal, then A is diagonal with 
-      A_{II} = Hii - Hjj
-      i = I // N
-      j = I % N
-
-    Let A_diag = A.diagonal()
-
-    If H is diagonal, then H (and thus A) is real.
-    """
-
-    N = H.shape[0]
-    dim = N**2
-
-    A_diag = np.zeros(dim, dtype=np.float64)
-
-    I = 0
-    for i in range(N):
-        for j in range(N):
-            A_diag[I] = H[i, i] - H[j, j]
-            I = I + 1
-
-    return A_diag
-
-def construct_A_diag_from_H_diag(H_diag, dim, dims):
-    """
-    [H, rho]_I = A_{IJ} rho_J
-      I = i * N + j, N = dim(H)
-      J = k * N + l, N = dim(H)
-    A_{IJ} = H_{ik} delta_{lj} - delta_{ik} H_{lj}
-      i = I // N
-      j = I % N
-      k = J // N
-      l = J % N
-
-    If H is diagonal, then A is diagonal with 
-      A_{II} = Hii - Hjj
-      i = I // N
-      j = I % N
-
-    Let H_diag = H.diagonal()
-        A_diag = A.diagonal()
-
-    If H is diagonal, then H (and thus A) is real.
-
-    dim: dimension of the Hilbert space.
+    dim: dimension of the Hilbert space. N = dim in the above comments.
     dims: dimension of a super operator. dims = dim**2.
+    diagonal_H: If True, then H is diagonal and construct A from the diagonal elements of H.
+    dype = np.complex128 or np.float64
+    If H is diagonal, then A is diagonal with 
+      A_{II} = Hii - Hjj
+      i = I // N
+      j = I % N
+    If H is diagonal, then H (and thus A) is real.
     """
 
+    A = np.zeros((dims, dims), dtype=dtype)
+    
+    if diagonal_H:
+        #for I in range(dims):
+            #i, j = dec_composite_index(I, dim)
+            #A[I, I] = H[i, i] - H[j, j]
+        
+        # Faster
+        #for i in range(dim):
+            #for j in range(dim):
+                #I = i * dim + j
+                #A[I, I] = H[i, i] - H[j, j]
+        
+        # Even faster
+        I = 0
+        for i in range(dim):
+            for j in range(dim):
+                A[I, I] = H[i, i] - H[j, j]
+                I = I + 1
+    else:
+        for I in range(dims):
+            i, j = dec_composite_index(I, dim)
+            for J in range(dims):
+                k, l = dec_composite_index(J, dim)
+                A[I, J] = H[i, k] * kronecker_delta(l, j) - kronecker_delta(i, k) * H[l, j]
+
+    result = A
+
+    return result
+
+def construct_A_diag(H_diag, dim, dims):
+    """
+    Assumption: H is diagonal and real.
+    Get the diagonal elements of the superoperator A from the diagonal elements of the Hamiltonian H.
+    """
     A_diag = np.zeros(dims, dtype=np.float64)
 
     I = 0
@@ -321,6 +247,8 @@ def construct_A_diag_from_H_diag(H_diag, dim, dims):
 
 def construct_C(X, Rhbar, dim, dims):
     """
+    Both X and Rhbar are in the S representation.
+
     [X, Rhbar rho]_{I} = C_{IJ} rho_{J}
       I = i * N + j, N = dim(H)
       J = k * N + l, N = dim(H)
@@ -330,12 +258,16 @@ def construct_C(X, Rhbar, dim, dims):
       k = J // N
       l = J % N
 
-    Note: X and Rhbar are matrices of real numbers, and thus C is a matrix of real numbers.
+    Note: 
+        X_S (where S denotes the representation) is a matrix of real numbers. 
+        X_E = M^dagger X_S M can be a matrix of complex numbers.
+        The matrix element Rhbar_E(m, n) = X_E(m, n) * Phi(m, n) thus can be a complex number.
+        So are the matrix elments of Rhbar_S = M Rhbar_E M^dagger.
     """
 
     XRhbar = np.matmul(X, Rhbar)
 
-    C = np.zeros((dims, dims), dtype=np.float64)
+    C = np.zeros((dims, dims), dtype=np.complex128)
 
     for I in range(dims):
         i, j = dec_composite_index(I, dim)
@@ -345,6 +277,32 @@ def construct_C(X, Rhbar, dim, dims):
 
     return C
 
+def get_indices_nzC(X, dim):
+    """
+    Get indices of nonzero matrix elements of C
+    X: a matrix of dimension dim x dim for the spin transitions
+    C: a super operator of dimension dims due to the interaction with bath
+       see the function construct_C for the definition of C
+    """
+
+    # Get indices of nonzero matrix elements of X
+    indices_nzX = np.nonzero(X)
+
+    # Convert the list [[i1, i2, ..., in], [j1, j2, ..., jn]] to the set {(i1, j1), (i2, j2), ..., (in, jn)}
+    set_index_tuples_nzX = set( [(indices_nzX[0][i], indices_nzX[1][i]) for i in range(indices_nzX[0].shape[0])] )
+
+    # Get indices of nonzero matrix elements of C
+    indices_nzC = []
+    for i in range(dim):
+        for j in range(dim):
+            for k in range(dim):
+                for l in range(dim):
+                    if (l == j) or  ( (l, j) in set_index_tuples_nzX ):
+                        indices_nzC.append( (i, j, k, l) )
+    n_nzC = len(indices_nzC)
+
+    return (n_nzC, indices_nzC)
+
 def construct_CST(C, dim, dims):
     """
     Get super transpose of the superoperator C.
@@ -352,7 +310,7 @@ def construct_CST(C, dim, dims):
       I -> ij -> ji -> It
     """
 
-    CST = np.zeros((dims, dims), dtype=np.float64)
+    CST = np.zeros((dims, dims), dtype=np.complex128)
 
     for I in range(dims):
         i, j = dec_composite_index(I, dim)
@@ -361,7 +319,7 @@ def construct_CST(C, dim, dims):
 
     return CST
 
-def construct_D_from_A_and_C(A, C, lambdaa, is_real=True):
+def construct_D(A, C, dim, dims, lambdaa):
     """
     The quantum master equation reads (in the units given at the beginning of this file)
         d (rhore, rhoim)^T / d t = np.array([[D11, D12], [D21, D22]]) (rhore, rhoim)^T
@@ -371,67 +329,40 @@ def construct_D_from_A_and_C(A, C, lambdaa, is_real=True):
         D21 = -const1 * Are - lambdaa**2 pi const1**2 (Cim - CSTim)
         D22 =  const1 * Aim - lambdaa**2 pi const1**2 (Cre - CSTre)
 
-    is_real: Is H (and thus A) real? C is always real.
+    A: Superoperator for coherent evolution. See the function construct_A.
+    C: Superoperator for spin-phonon coupling (incoherent evolution). See the function construct_C.
+    dim: Dimension of the effective Hamiltonian
+    dims: Dimension of superoperators
+    lambdaa: spin-phonon coupling constant
+    only_from_A: If True, then only the contribution from A are included in D.
+
+    Note:
+        A is real if H is diagonal (and thus real).
     """
 
-    CST = construct_CST(C)
+    Are = np.real(A)
+    Aim = np.imag(A)
 
-    if is_real:
-        D11 = - lambdaa**2 * np.pi * const1**2 * (C + CST)
-        D12 =   const1 * A                                             
-        D21 = - const1 * A                                             
-        D22 = - lambdaa**2 * np.pi * const1**2 * (C - CST)
+    if C is None:
+        # Construct D from A only
+        D11 =  const1 * Aim
+        D12 =  const1 * Are
+        D21 = -const1 * Are
+        D22 =  const1 * Aim
     else:
-        Are = np.real(A)
-        Aim = np.imag(A)
-        
-        D11 =  const1 * Aim - lambdaa**2 * np.pi * const1**2 * (C + CST)
-        D12 =  const1 * Are 
-        D21 = -const1 * Are 
-        D22 =  const1 * Aim - lambdaa**2 * np.pi * const1**2 * (C - CST)
+        CST = construct_CST(C, dim, dims)
+        Cre = np.real(C)
+        Cim = np.imag(C)
+        CSTre = np.real(CST)
+        CSTim = np.imag(CST)
+        D11 =  const1 * Aim - lambdaa**2 * np.pi * const1**2 * (Cre + CSTre)
+        D12 =  const1 * Are + lambdaa**2 * np.pi * const1**2 * (Cim + CSTim)
+        D21 = -const1 * Are - lambdaa**2 * np.pi * const1**2 * (Cim - CSTim)
+        D22 =  const1 * Aim - lambdaa**2 * np.pi * const1**2 * (Cre - CSTre)
         
     D1 = np.hstack((D11, D12))
     D2 = np.hstack((D21, D22))
     D  = np.vstack((D1 , D2 ))
-
-    return D
-
-def construct_D_from_A_diag_and_C(A_diag, C, lambdaa, dims):
-    """
-    The quantum master equation reads (in the units given at the beginning of this file)
-        d (rhore, rhoim)^T / d t = np.array([[D11, D12], [D21, D22]]) (rhore, rhoim)^T
-    
-        D11 =  const1 * Aim - lambdaa**2 pi const1**2 (Cre + CSTre)
-        D12 =  const1 * Are + lambdaa**2 pi const1**2 (Cim + CSTim)
-        D21 = -const1 * Are - lambdaa**2 pi const1**2 (Cim - CSTim)
-        D22 =  const1 * Aim - lambdaa**2 pi const1**2 (Cre - CSTre)
-
-    A_diag = A.diagonal()
-
-    Assume that A is diagonal and thus real. C is always real.
-
-    dims: dimension of a super operator. dims = dim**2, where dim is the dimenion of the Hilbert space.
-    """
-
-    CST = construct_CST(C)
-
-    D11 = - lambdaa**2 * np.pi * const1**2 * (C + CST)
-
-    D12 = np.zeros(C.shape, dtype=np.float64)
-    D21 = np.zeros(C.shape, dtype=np.float64)
-    c1A_diag = const1 * A_diag
-    for i in range(dims):
-        D12[i, i] =   c1A_diag[i]
-        D21[i, i] = - c1A_diag[i]
-
-    D22 = - lambdaa**2 * np.pi * const1**2 * (C - CST)
-
-    D1 = np.hstack((D11, D12))
-    D2 = np.hstack((D21, D22))
-    D  = np.vstack((D1 , D2 ))
-
-    # Sparse matrix
-    #D = csr_array(D)
 
     return D
 
@@ -470,46 +401,98 @@ def construct_D_from_A_diag(A_diag, dims):
 
     return D
 
+def set_up_double_super_qme(h_t0_eff, h_tmin_eff, X_eff, dim, I0, T, lambdaa):
+    """
+    h_t0: Hamiltonian at t = 0
+    h_tmin: Hamiltonian at t = tmin
+
+    D0_eff: D matrix at t = 0 ps without spin-phonon coupling
+    D_eff: D matrix at t = tmin ps with spin-phonon coupling
+
+    dim: dimension of the effective Hilbert space.
+    """
+
+    # Dimensions
+
+    dims  = dim*dim              # Dimension of superoperators
+    dimds = 2*dims               # Dimension of double superoperators
+
+    print("Dimension of the effective Hamiltonian: {:6d}".format(dim))
+    print("Dimension of superoperators: {:6d}".format(dims))
+    print("Dimension of double superoperators: {:6d}\n".format(dimds))
+
+    # Construct the superoperator D_t0_eff at t = 0 ps without spin-phonon coupling
+    A_t0_eff = construct_A(h_t0_eff, dim, dims, diagonal_H=False, dtype=np.complex128)
+    D_t0_eff = construct_D(A_t0_eff, None, dim, dims, lambdaa)
+
+    # Construct the superoperator A_tmin_eff at t = tmin ps
+    A_tmin_eff = construct_A(h_tmin_eff, dim, dims, diagonal_H=False, dtype=np.complex128)
+
+    # Construct Rhbar, C, and CST using the energy spectrum at t = tmin
+    # We set them up at the beginning to reuse the memory and save time.
+    # Rhbar_eff will also be used to calculate chimz at t = tmin.
+
+    # Construct the superoperator Rhbar_eff in the S representation at t = tmin
+    Rhbar_eff = get_Rhbar(h_tmin_eff, X_eff, T, I0)
+
+    # Construct the superoperator C_eff using the energy spectrum at t = tmin
+    C_eff = construct_C(X_eff, Rhbar_eff, dim, dims)
+    CST_eff = construct_CST(C_eff, dim, dims)
+
+    # Construct the superoperator D_tmin_eff at t = tmin ps with spin-phonon coupling
+    D_tmin_eff = construct_D(A_tmin_eff, C_eff, dim, dims, lambdaa)
+
+    return (D_t0_eff, D_tmin_eff, Rhbar_eff, C_eff, CST_eff, dims, dimds)
+
 # ============================================================================ #
 # Functions for updating the Liouville superoperator.
 # ============================================================================ #
 
-def update_C_and_CST(C, CST, X, Rhbar, dim, indices_nonzero_C):
+def update_C_and_CST(C, CST, X, Rhbar, dim, n_nzC, indices_nzC):
     """
     Save time by avoiding memory allocation for C.
     Rhbar is time dependent, and so is C.
     C and CST are recomputed completely at each time step.
+    
+    Numba njit version is 4-15 timems slower than the pure Python version for this function when dim=16.
     """
 
     XRhbar = np.matmul(X, Rhbar)
 
-    for m in indices_nonzero_C:
-        i, j, k, l = m
-        I = get_composite_index(i, j, dim)
-        J = get_composite_index(k, l, dim)
+    for idx in range(n_nzC):
+        i, j, k, l = indices_nzC[idx]
+        I = i * dim + j
+        J = k * dim + l
         C[I, J] = XRhbar[i, k] * kronecker_delta(l, j) - Rhbar[i, k] * X[l, j]
-        It = get_composite_index(j, i, dim)
+        It = j * dim + i
         CST[It, J] = C[I, J]
 
     return (C, CST)
 
-def update_D_under_magnetic_field(D, D0, Mz_tot_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds):
+def update_D_under_magnetic_field(D, D0, h, h_t0, Mz_diag, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds):
     """
     D: D matrix to be updated.
     D0: D matrix at t = 0 ps.
-    Mz_tot_diag: np.diagonal(Mz_tot), converted into a vector of real number in set_up_double_super_qme
+    h: Hamiltonian at t = t ps
+      h is recalculated at each time step.
+      save memory by avoiding memory allocation for h.
+      The off-diagonal elements of h do not change with time.
+    h_t0: spin Hamiltonian at t = 0 ps
+    Mz_diag: diagonal matrix element of the z component of the total magnetic moment operator M = (Mx, My, Mz).
+      Mz is diagonal and real in the S representation where the basis functions are the eigenstates of the spin operator Sz_tot.
     B: Magnetic field in Tesla.
     C: The superoperator for spin-phonon coupling.
     CST: super transpose of C
     X: The matrix that encodes possible spin transitions
-    Rhbar_{ij} = X_{ij} * Phi_{ij}
-      Phi_{ij} = ( I(omega_ij) - I(-omega_ij) ) / ( exp(beta * hbar * omega_ij ) - 1 )
-      omega_ij = ( E_i - E_j ) / hbar.
-      I(omega) = I0 omega^2 theta(omega): spectral density for phonons
-      theta(omega) is the step function.
-    h0_diag: diagonal matrix elements of h0, i.e. the initial energy spectrum 
-    indices_nonzero_X: indices of nonzero matrix elements of X
-    indices_nonzero_C: indices of nonzero matrix elements of C
+    Rhbar: The superoperator for the spin-phonon coupling in the S representation.
+      In the E representation
+        Rhbar_{ij} = X_{ij} * Phi_{ij} 
+        Phi_{ij} = ( I(omega_ij) - I(-omega_ij) ) / ( exp(beta * hbar * omega_ij ) - 1 )
+        omega_ij = ( E_i - E_j ) / hbar.
+        I(omega) = I0 omega^2 theta(omega): spectral density for phonons
+        theta(omega) is the step function.
+    n_nzC: number of nonzero matrix elements of C
+    indices_nzC: indices of nonzero matrix elements of C
     lambdaa: spin-phonon coupling constant
     I0: prefactor for the phonon spectral density
     T: Temperature
@@ -518,45 +501,58 @@ def update_D_under_magnetic_field(D, D0, Mz_tot_diag, B, C, CST, X, Rhbar, h0_di
     dimds = 2*dim^2: Dimension of double superoperators
     """
 
-    # Add Zeeman interaction to the D matrix
+    # In general, the D operator is as follows
+    # D11 =  const1 * Aim - lambdaa**2 * np.pi * const1**2 * (Cre + CSTre)
+    # D12 =  const1 * Are + lambdaa**2 * np.pi * const1**2 * (Cim + CSTim)
+    # D21 = -const1 * Are - lambdaa**2 * np.pi * const1**2 * (Cim - CSTim)
+    # D22 =  const1 * Aim - lambdaa**2 * np.pi * const1**2 * (Cre - CSTre)
 
+    # Since Azee is diagonal and real, only the following update is needed
     # D = [[D11, D12], [D21, D22]]
     #       D12 = D012 + const1 * Azee
     #       D21 = D021 - const1 * Azee
 
-    hzee_diag = -1 * Mz_tot_diag * Tesla2wavenumber * B
-    Azee_diag = construct_A_diag_from_H_diag(hzee_diag, dim, dims)
+    # Calculate the A operator corresponding to the Zeeman interaction
+    hzee_diag = -1 * Mz_diag * Tesla2wavenumber * B
+    Azee_diag = construct_A_diag(hzee_diag, dim, dims)
 
+    # Add Zeeman interaction to the D matrix
     c1Azee_diag = const1 * Azee_diag
     for i in range(dims):
         D[     i, dims+i] = D0[     i, dims+i] + c1Azee_diag[i]
         D[dims+i,      i] = D0[dims+i,      i] - c1Azee_diag[i]
 
-    # Update the spin-phonon coupling of the D matrix. Both A and C are real.
+    # Update the diagonal elements of the Hamiltonian h
+    for i in range(dim):
+        h[i, i] = h_t0[i, i] + hzee_diag[i]
 
-    # D = [[D11, D12], [D21, D22]]
-    #       D11 =  const1 * Aim - lambdaa**2 pi const1**2 (Cre + CSTre)
-    #       D22 =  const1 * Aim - lambdaa**2 pi const1**2 (Cre - CSTre)
+    # Update the superoperator C and CST
+    Rhbar = update_Rhbar(Rhbar, h, X, I0, T)
+    C, CST = update_C_and_CST(C, CST, X, Rhbar, dim, n_nzC, indices_nzC)
 
-    Rhbar = update_Rhbar(Rhbar, T, X, indices_nonzero_X, h0_diag + hzee_diag, I0)
-    C, CST = update_C_and_CST(C, CST, X, Rhbar, dim, indices_nonzero_C)
+    # Update the spin-phonon coupling of the D matrix. 
+    Cre = np.real(C)
+    Cim = np.imag(C)
+    CSTre = np.real(CST)
+    CSTim = np.imag(CST)
+    D[0:dims, 0:dims]         = D0[0:dims, 0:dims]         - lambdaa**2 * np.pi * const1**2 * (Cre + CSTre)
+    D[0:dims, dims:dimds]     = D[0:dims, dims:dimds]      + lambdaa**2 * np.pi * const1**2 * (Cim + CSTim)
+    D[dims:dimds, 0:dims]     = D[dims:dimds, 0:dims]      - lambdaa**2 * np.pi * const1**2 * (Cim - CSTim)
+    D[dims:dimds, dims:dimds] = D0[dims:dimds, dims:dimds] - lambdaa**2 * np.pi * const1**2 * (Cre - CSTre)
 
-    D[0:dims, 0:dims]         = - lambdaa**2 * np.pi * const1**2 * (C + CST)
-    D[dims:dimds, dims:dimds] = - lambdaa**2 * np.pi * const1**2 * (C - CST)
-
-    return D
+    return (D, h, Rhbar)
 
 # ====================================================================================================== #
 # Functions for examining the maximum of the absolute values of the elements of D and exp(D * deltat).
 # ====================================================================================================== #
 
-def get_D_max_and_expDdeltat_max(D, D0, deltat, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds):
-    D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
+def get_D_max_and_expDdeltat_max(D, D0, deltat, h, h_t0, Mz_diag, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds):
+    D, h, Rhbar = update_D_under_magnetic_field(D, D0, h, h_t0, Mz_diag, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
     D_max, expDdeltat_max = np.max(np.abs(D)), np.max(np.abs(expm(D*deltat)))
     # print("B = {:15.6f} T, deltat = {:15.3f}  ps, max(|D|) = {:12.6f}, max(|exp(D * deltat)|) = {:12.6f}\n".format(B, deltat, D_max, expDdeltat_max))
     return (D_max, expDdeltat_max)
     
-def examine_D_max_and_expDdeltat_max(Bs, deltats, tag, D, D0, Mz_diag, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds):
+def examine_D_max_and_expDdeltat_max(Bs, deltats, tag, D, D0, Mz_diag, C, CST, X, Rhbar, h0_diag, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds):
     """
     Examine the maximum of the absolute values of the elements of D and exp(D * deltat)
     at various B fields and time steps.
@@ -583,7 +579,7 @@ def examine_D_max_and_expDdeltat_max(Bs, deltats, tag, D, D0, Mz_diag, C, CST, X
             print("B = {:15.6f} T, deltat = {:15.3f}  ps".format(B, deltat))
 
             # Get the maximum of the absolute values of the elements of D and exp(D * deltat)
-            D_max[i, j], expDdeltat_max[i, j] = get_D_max_and_expDdeltat_max(D, D0, deltat, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
+            D_max[i, j], expDdeltat_max[i, j] = get_D_max_and_expDdeltat_max(D, D0, deltat, Mz_diag, B, C, CST, X, Rhbar, h0_diag, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
 
     if not os.path.exists("./output"):
         os.makedirs("./output")
@@ -622,7 +618,7 @@ def examine_D_max_and_expDdeltat_max(Bs, deltats, tag, D, D0, Mz_diag, C, CST, X
 # Functions for calculating the long-time evolution operator.
 # ============================================================================ #
 
-def get_U_dsqe_longtime(t0, t1, deltat, Bt, D, D0, Mz_diag, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds):
+def get_U_dsqe_longtime(t0, t1, deltat, D, D0, h, h_t0, Mz_diag, Bt, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds):
     r"""
     Get the long-time evolution operator \Pi_i U = exp(D_i * deltat), where \Pi is the product operator.
     The operators exp(D_i * deltat) are time-ordered such that later times are to the left of earlier times.
@@ -641,7 +637,7 @@ def get_U_dsqe_longtime(t0, t1, deltat, Bt, D, D0, Mz_diag, C, CST, X, Rhbar, h0
         B = Bt(t)
         # Print t and B for debugging
         # print("it = {:6d}, t = {:18.3f}, B = {:15.3e}".format(it, t, B))
-        D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
+        D, h, Rhbar = update_D_under_magnetic_field(D, D0, h, h_t0, Mz_diag, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
         U = np.matmul(expm(D*deltat), U)
 
     if not os.path.exists("./output"):
@@ -673,64 +669,7 @@ def get_U_dsqe_longtime(t0, t1, deltat, Bt, D, D0, Mz_diag, C, CST, X, Rhbar, h0
 # Functions for solving the quantum master equation.
 # ============================================================================ #
 
-def set_up_double_super_qme(h0_eff, h1_eff, Mz_eff, X_eff, I0, T, lambdaa):
-    """
-    h0: Hamiltonian at t = 0
-    h1: Hamiltonian at t = tmin
-
-    D0_eff: D matrix at t = 0 ps without spin-phonon coupling
-    D_eff: D matrix at t = tmin ps with spin-phonon coupling
-    """
-
-    # Dimensions
-
-    dim   = h0_eff.shape[0]      # Dimension of effective Hilbert space
-    dims  = dim*dim              # Dimension of superoperators
-    dimds = 2*dims               # Dimension of double superoperators
-
-    print("Dimension of the effective Hamiltonian: {:6d}".format(dim))
-    print("Dimension of superoperators: {:6d}".format(dims))
-    print("Dimension of double superoperators: {:6d}\n".format(dimds))
-
-    # Build real matrices to speed up the construction of the D matrix, which will be done at each time step.
-
-    h0_eff = convert_cmatrix_to_rmatrix(h0_eff, "h0_eff")
-    h1_eff = convert_cmatrix_to_rmatrix(h1_eff, "h1_eff")
-    Mz_eff = convert_cmatrix_to_rmatrix(Mz_eff, "Mz_eff")
-    print()
-
-    # Diagonal matrix elements
-
-    h0_eff_diag = np.diagonal(h0_eff)
-    h1_eff_diag = np.diagonal(h1_eff)
-    Mz_eff_diag = np.diagonal(Mz_eff)
-
-    # Construct the superoperator A0 from h0. 
-
-    A0_eff_diag = construct_A_diag_from_H_diag(h0_eff_diag, dim, dims)
-    A1_eff_diag = construct_A_diag_from_H_diag(h1_eff_diag, dim, dims)
-
-    # Construct the superoperator D0 that corresponds to h0_eff/A0_eff using the diagonal elements of A0_eff
-
-    D0_eff = construct_D_from_A_diag(A0_eff_diag, dims)
-    D_eff  = construct_D_from_A_diag(A1_eff_diag, dims)
-
-    # Construct Rhbar, C, and CST using the energy spectrum at t = tmin
-    # The matrix elements of Rhbar_eff, C, and CST_eff do not matter here, since they will be reconstructed completely later.
-    # We set them up at the beginning to reuse the memory and save time.
-
-    Rhbar_eff = construct_Rhbar(T, X_eff, h1_eff_diag, I0)
-    C_eff = construct_C(X_eff, Rhbar_eff, dim, dims)
-    CST_eff = construct_CST(C_eff, dim, dims)
-
-    # Add the spin-phonon cuopling to the D_eff matrix
-
-    D_eff[0:dims, 0:dims]         = - lambdaa**2 * np.pi * const1**2 * (C_eff + CST_eff)
-    D_eff[dims:dimds, dims:dimds] = - lambdaa**2 * np.pi * const1**2 * (C_eff - CST_eff)
-
-    return (D0_eff, D_eff, h0_eff_diag, h1_eff_diag, Mz_eff_diag, Rhbar_eff, C_eff, CST_eff, dim, dims, dimds)
-
-def get_Dabc(Bs2_wavenumber, it, h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nonzero_X, indices_nonzero_C):
+def get_Dabc(Bs2_wavenumber, it, h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nzC):
     """
     Obtain Da = D(ts[it])
            Db = D(ts[it] + deltat/2)
@@ -742,13 +681,13 @@ def get_Dabc(Bs2_wavenumber, it, h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, 
     dims: dimension of a super operator. dims = dim**2.
     """
 
-    Da = get_D_at_Bfield(Bs2_wavenumber[2*it  ], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nonzero_X, indices_nonzero_C)
-    Db = get_D_at_Bfield(Bs2_wavenumber[2*it+1], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nonzero_X, indices_nonzero_C)
-    Dc = get_D_at_Bfield(Bs2_wavenumber[2*it+2], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nonzero_X, indices_nonzero_C)
+    Da = get_D_at_Bfield(Bs2_wavenumber[2*it  ], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nzC)
+    Db = get_D_at_Bfield(Bs2_wavenumber[2*it+1], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nzC)
+    Dc = get_D_at_Bfield(Bs2_wavenumber[2*it+2], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nzC)
 
     return (Da, Db, Dc)
 
-def get_Dabc_reuse_Da(Bs2_wavenumber, it, h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nonzero_X, indices_nonzero_C, Da, Db, Dc):
+def get_Dabc_reuse_Da(Bs2_wavenumber, it, h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nzC, Da, Db, Dc):
     """
     Obtain Da = D(ts[it])
            Db = D(ts[it] + deltat/2)
@@ -760,8 +699,8 @@ def get_Dabc_reuse_Da(Bs2_wavenumber, it, h0_diag, minus_Mz_tot_diag, X, lambdaa
     dims: dimension of a super operator. dims = dim**2.
     """
 
-    Db = get_D_at_Bfield(Bs2_wavenumber[2*it+1], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nonzero_X, indices_nonzero_C)
-    Dc = get_D_at_Bfield(Bs2_wavenumber[2*it+2], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nonzero_X, indices_nonzero_C)
+    Db = get_D_at_Bfield(Bs2_wavenumber[2*it+1], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nzC)
+    Dc = get_D_at_Bfield(Bs2_wavenumber[2*it+2], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nzC)
 
     return (Da, Db, Dc)
 
@@ -788,7 +727,7 @@ def evolve_deltat_dsqme(Da, Db, Dc, rho, deltat):
 
     return rho_new
 
-def evolve_rho_dsqme(D0, Mz_tot_diag, double_super_rho, nt, deltat, Bs2, dim, dims):
+def evolve_rho_dsqme(D0, Mz_tot_diag, dsrho, nt, deltat, Bs2, dim, dims):
     """
     Evolve the density matrix using the Runge-Kutta method according to the quantum master equation.
 
@@ -797,7 +736,7 @@ def evolve_rho_dsqme(D0, Mz_tot_diag, double_super_rho, nt, deltat, Bs2, dim, di
     Input:
       D0: double superoperator at t0 = ts[0]
       Mz_tot_diag: diagnal matrix elements of the z component of the magnetization operators
-      double_super_rho: initial double super density matrix at t0.
+      dsrho: initial double super density matrix at t0.
       nt: number of time steps.
       delta: time step in unit of ps.
       Bs2: list of magnetic field on the double grid.
@@ -820,16 +759,16 @@ def evolve_rho_dsqme(D0, Mz_tot_diag, double_super_rho, nt, deltat, Bs2, dim, di
 
     Da, Db, Dc = get_Dabc(D0, minus_Mz_tot_diag, 0, deltat, Bs2_wavenumber, dim, dims)
 
-    double_super_rho = evolve_deltat_dsqme(Da, Db, Dc, double_super_rho, deltat)
-    #print("i = 0, max(double_super_rho) = ", np.max(np.absolute(double_super_rho)))
+    dsrho = evolve_deltat_dsqme(Da, Db, Dc, dsrho, deltat)
+    #print("i = 0, max(dsrho) = ", np.max(np.absolute(dsrho)))
 
     for i in range(1, nt):
         Da, Db, Dc = get_Dabc_reuse_Da(D0, minus_Mz_tot_diag, i, deltat, Bs2_wavenumber, Dc, Da, Db, dim, dims)
-        double_super_rho = evolve_deltat_dsqme(Da, Db, Dc, double_super_rho, deltat)
+        dsrho = evolve_deltat_dsqme(Da, Db, Dc, dsrho, deltat)
 
-    return double_super_rho
+    return dsrho
 
-def evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds):
+def evolve_rho_dsqme_onestair(dsrho, deltat, D, D0, h, h_t0, Mz_diag, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds):
     """
     Evolve rho by deltat of constant Bfield using the analytical solution of the quantum master equation
         d rho / d t = D rho
@@ -837,19 +776,19 @@ def evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CS
         rho_new = exp(int_t1^t2 D dt) rho = exp(D deltat) rho
 
     Input: 
-        double_super_rho: double super density matrix
+        dsrho: double super density matrix
         deltat: time period for evolution
         D: double superoperator
         D0: double superoperator at zero magnetic field.
+        h: Hamiltonian at time t
+        h_t0: the initial Hamiltonian on the perturbed basis
         Mz_diag: diagnal matrix elements of the z component of the magnetization operators
         B: magnetic field in Tesla
         C: super operator for spin-phonon coupling
         CST: super transpose of C
         X: spin operator that encodes possible spin transitions
         Rhbar: auxiliary operator for spin phonon coupling
-        h0_diag: diagonal matrix elements of the initial Hamiltonian on the perturbed basis
-        indices_nonzero_X: indices of the nonzero matrix elements of X
-        indices_nonzero_C: indices of the nonzero matrix elements of C
+        indices_nzC: indices of the nonzero matrix elements of C
         lambdaa: spin-phonon coupling constant in wavenumbers
         I0: prefactor for the phonon density of states
         T: temperature in Kelvin
@@ -859,11 +798,11 @@ def evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CS
         dims: dimension of superoperators
     """
 
-    D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
+    D, h, Rhbar = update_D_under_magnetic_field(D, D0, h, h_t0, Mz_diag, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+    
+    dsrho = expm(D * deltat) @ dsrho
 
-    double_super_rho = expm(D * deltat) @ double_super_rho
-
-    return double_super_rho
+    return dsrho
 
 def get_outdirs(T, I0, lambdaa, Bt_params):
     """
@@ -874,7 +813,7 @@ def get_outdirs(T, I0, lambdaa, Bt_params):
     Bt_params: parameters for the magnetic fields. See pulse.py for details.
     """
     if Bt_params['Bt_type'] == 'linear':
-        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1f}/double_super_rho'.format(T, I0, lambdaa, Bt_params['sweep_rate'])
+        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1f}/dsrho'.format(T, I0, lambdaa, Bt_params['sweep_rate'])
         outdir_mag = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1f}/magnetometry'.format(T, I0, lambdaa, Bt_params['sweep_rate'])
     elif Bt_params['Bt_type'] == 'pwlinear':
         times = Bt_params['times']
@@ -884,19 +823,23 @@ def get_outdirs(T, I0, lambdaa, Bt_params):
         for i in range(1, len(times)):
             outdir += '_t{:.1e}ps-B{:.1f}T'.format(times[i], fields[i])
         outdir = outdir.replace('+', '')
-        outdir_rho = outdir + '/double_super_rho'
+        outdir_rho = outdir + '/dsrho'
+        outdir_mag = outdir + '/magnetometry'
+    elif Bt_params['Bt_type'] == 'pwlinear_by_slope':
+        outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_pwlinear_average_sweep_rate_{:.1f}'.format(T, I0, lambdaa, Bt_params['sweep_rate_ave'])
+        outdir_rho = outdir + '/dsrho'
         outdir_mag = outdir + '/magnetometry'
     elif Bt_params['Bt_type'] == 'sin':
-        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_sin_amplitude_{:.1f}_omega_{:.2f}/double_super_rho'.format(T, I0, lambdaa, Bt_params['amplitude'], Bt_params['omega'])
+        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_sin_amplitude_{:.1f}_omega_{:.2f}/dsrho'.format(T, I0, lambdaa, Bt_params['amplitude'], Bt_params['omega'])
         outdir_mag = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_sin_amplitude_{:.1f}_omega_{:.2f}/magnetometry'.format(T, I0, lambdaa, Bt_params['amplitude'], Bt_params['omega'])
     elif Bt_params['Bt_type'] == 'cs':
-        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_cs/double_super_rho'.format(T, I0, lambdaa)
+        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_cs/dsrho'.format(T, I0, lambdaa)
         outdir_mag = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_cs/magnetometry'.format(T, I0, lambdaa)
     else:
         raise ValueError("Invalid Bt_type: {}".format(Bt_params['Bt_type']))
     return (outdir_rho, outdir_mag)
 
-def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, double_super_rho, D, D0, Mz_full, Mz_diag, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds, save_mag, nt_mag, save_rho, nt_rho):
+def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, dsrho, D, D0, h_t0, Mz_op, Mz_diag, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds, save_mag, nt_mag, save_rho, nt_rho):
     """
     Evolve the double super density matrix using the staircase method according to the quantum master equation.
     Multiple staircases are used. All stairs have the same width deltat.
@@ -905,20 +848,20 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, double_super_rho, D, D0, 
     t1: final time
     deltat: time step in ps
     turning_points: turning points of the magnetic field as a function of time. turning_points = [times, fields]
-    double_super_rho: initial double super density matrix at t0
+    dsrho: initial double super density matrix at t0
     D: The double super operator D at tmin
     D0: The exchange-only double super operator at tmin
-    Mz_full: The z component of the magnetization operators
+    h_t0: the initial Hamiltonian on the perturbed basis
+    Mz_op: The z component of the magnetization operators
     Mz_diag: diagnal matrix elements of the z component of the magnetization operators
     C: The superoperator for spin-phonon coupling
     CST: super transpose of C
       C and CST will be reconstructed completely from X and Rhbar.
     X: The matrix that encodes possible spin transitions
-    Rhbar: auxiliary operator for spin phonon coupling
+    Rhbar: auxiliary operator for spin phonon coupling at t0
       Rhbar will be reconstructed completely from X and the eigenvalues.
-    h0_diag: diagonal matrix elements of the initial Hamiltonian on the perturbed basis
-    indices_nonzero_X: indices of the nonzero matrix elements of X
-    indices_nonzero_C: indices of the nonzero matrix elements of C
+    n_nzC: number of nonzero matrix elements of C
+    indices_nzC: indices of the nonzero matrix elements of C
     lambdaa: spin-phonon coupling constant in wavenumbers
     I0: prefactor for the phonon density of states
     T: temperature in Kelvin
@@ -930,6 +873,10 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, double_super_rho, D, D0, 
     save_rho: logical, save the double super density matrix at chosen time steps?
     nt_rho: save the double super density matrix per nt_rho*delta ps. nt_rho will be adjusted to be a multiple of nt_mag.
     """
+
+    # Make a copy of the hamiltonian h_t0 to store the Hamiltonian at time t
+    # This is to avoid repeated memory allocation for h.
+    h = copy.deepcopy(h_t0)
 
     half_deltat = deltat/2
 
@@ -961,11 +908,19 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, double_super_rho, D, D0, 
 
         with h5py.File(fname1, 'w') as f1,  open(fname2, 'w') as f2:
             tag = "{:.3f}".format(t0)
-            dset = f1.create_dataset(tag, data=double_super_rho)
+            dset = f1.create_dataset(tag, data=dsrho)
 
-            Mz = get_Mz_from_dsrho(double_super_rho, Mz_full, dim, dims, dimds)
-            chimz = get_chimz_from_dsrho(h0_diag, Bt, 0, Mz_full, Mz_diag, double_super_rho, X, Rhbar, lambdaa, dim, dims, dimds)
+            Mz = get_Mz_from_dsrho(dsrho, Mz_op, dim, dims, dimds)
+            # chimz = get_chimz_from_dsrho(h, h_t0, Bt, t0, Mz_op, dsrho, X, Rhbar, lambdaa, I0, T, dim, dims, dimds)
+            # chimz = get_chimz_finite_diff(dsrho, t0, 1e6, Bt, D, D0, h, h_t0, Mz_op, Mz_diag, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+            chimz = 0.0 # I do not know how to calculate the magnetic susceptibility correctly.
             f2.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(t0, Bt(t0), Mz, chimz))
+
+            # Save the initial magnetic moment for calculating the magnetic susceptibility using finite difference
+            Mz_old = Mz + 0.0
+
+            # Step of magnetic field for calculating the magnetic susceptibility using finite difference
+            dB = Bt(deltat) - Bt(0) # Assume that the magnetic field changes linearly with time.
     
             # Loop over the rounds for saving the double super density matrix
             for iround_rho in range(nround_rho):
@@ -977,15 +932,24 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, double_super_rho, D, D0, 
                         t = t0 + it*deltat + half_deltat
                         B = Bt(t)
                         print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
-                        D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-                        double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-                    # Save magnetic moment
-                    Mz = get_Mz_from_dsrho(double_super_rho, Mz_full, dim, dims, dimds)
-                    chimz = get_chimz_from_dsrho(h0_diag, Bt, t + half_deltat, Mz_full, Mz_diag, double_super_rho, X, Rhbar, lambdaa, dim, dims, dimds)
+                        # h and Rhbar are updated at each time step
+                        dsrho = evolve_rho_dsqme_onestair(dsrho, deltat, D, D0, h, h_t0, Mz_diag, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+                    # Calculate the magnetic moment
+                    Mz = get_Mz_from_dsrho(dsrho, Mz_op, dim, dims, dimds)
+
+                    # Calculate the magnetic susceptibility
+                    # Attempt 1 
+                    # chimz = get_chimz_from_dsrho(h, h_t0, Bt, t+half_deltat, Mz_op, dsrho, X, Rhbar, lambdaa, I0, T, dim, dims, dimds)
+                    # Attempt 2
+                    # chimz = get_chimz_finite_diff(dsrho, t0, 1e3, Bt, D, D0, h, h_t0, Mz_op, Mz_diag, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+                    # Attempt 3
+                    chimz = (Mz - Mz_old) / dB; Mz_old = Mz + 0.0
+
+                    # Save the magnetic moment and the magnetic susceptibility
                     f2.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(t+half_deltat, Bt(t+half_deltat), Mz, chimz))
                 # Save the double super density matrix
                 tag = "{:.3f}".format(t + half_deltat)
-                dset = f1.create_dataset(tag, data=double_super_rho)
+                dset = f1.create_dataset(tag, data=dsrho)
     elif save_rho and (not save_mag):
         # nt should be a multiple of nt_rho
         nround_rho = int( (t1 - t0)//deltat // nt_rho )
@@ -1004,7 +968,7 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, double_super_rho, D, D0, 
 
         with h5py.File(fname1, 'w') as f1:
             tag = "{:.3f}".format(t0)
-            dset = f1.create_dataset(tag, data=double_super_rho)
+            dset = f1.create_dataset(tag, data=dsrho)
 
             # Loop over the rounds for saving the double super density matrix
             for iround_rho in range(nround_rho):
@@ -1014,11 +978,10 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, double_super_rho, D, D0, 
                     t = t0 + it*deltat + half_deltat
                     B = Bt(t)
                     print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
-                    D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-                    double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
+                    dsrho = evolve_rho_dsqme_onestair(dsrho, deltat, D, D0, h, h_t0, Mz_diag, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
                 # Save the double super density matrix
                 tag = "{:.3f}".format(t + half_deltat)
-                dset = f1.create_dataset(tag, data=double_super_rho)
+                dset = f1.create_dataset(tag, data=dsrho)
     elif (not save_rho) and save_mag:
         # nt should be a multiple of nt_mag
         nround_mag = int( (t1 - t0)//deltat // nt_mag )
@@ -1036,8 +999,8 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, double_super_rho, D, D0, 
         fname2 = outdir_mag + '/{:.3f}-{:.3f}ps_dt{:.3f}ps.dat'.format(t0, t1, deltat)
 
         with open(fname2, 'w') as f2:
-            Mz = get_Mz_from_dsrho(double_super_rho, Mz_full, dim, dims, dimds)
-            chimz = get_chimz_from_dsrho(h0_diag, Bt, 0, Mz_full, Mz_diag, double_super_rho, X, Rhbar, lambdaa, dim, dims, dimds)
+            Mz = get_Mz_from_dsrho(dsrho, Mz_op, dim, dims, dimds)
+            chimz = get_chimz_from_dsrho(h, h_t0, Bt, t0, Mz_op, dsrho, X, Rhbar, lambdaa, I0, T, dim, dims, dimds)
             f2.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(t0, Bt(t0), Mz, chimz))
     
             # Loop over the rounds for saving the magnetic moment
@@ -1048,11 +1011,10 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, double_super_rho, D, D0, 
                     t = t0 + it*deltat + half_deltat
                     B = Bt(t)
                     print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
-                    D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-                    double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
+                    dsrho = evolve_rho_dsqme_onestair(dsrho, deltat, D, D0, h, h_t0, Mz_diag, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
                 # Save magnetic moment
-                Mz = get_Mz_from_dsrho(double_super_rho, Mz_full, dim, dims, dimds)
-                chimz = get_chimz_from_dsrho(h0_diag, Bt, t + half_deltat, Mz_full, Mz_diag, double_super_rho, X, Rhbar, lambdaa, dim, dims, dimds)
+                Mz = get_Mz_from_dsrho(dsrho, Mz_op, dim, dims, dimds)
+                chimz = get_chimz_from_dsrho(h, h_t0, Bt, t+half_deltat, Mz_op, dsrho, X, Rhbar, lambdaa, I0, T, dim, dims, dimds)
                 f2.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(t+half_deltat, Bt(t+half_deltat), Mz, chimz))
     else:
         # the time period should be a multiple of deltat
@@ -1066,8 +1028,7 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, double_super_rho, D, D0, 
             t = t0 + it*deltat + half_deltat
             B = Bt(t)
             print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
-            D = update_D_under_magnetic_field(D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
-            double_super_rho = evolve_rho_dsqme_onestair(double_super_rho, deltat, D, D0, Mz_diag, B, C, CST, X, Rhbar, h0_diag, indices_nonzero_X, indices_nonzero_C, lambdaa, I0, T, dim, dims, dimds)
+            dsrho = evolve_rho_dsqme_onestair(dsrho, deltat, D, D0, h, h_t0, Mz_diag, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
 
-    return ( t1, double_super_rho )
+    return ( t1, dsrho )
 

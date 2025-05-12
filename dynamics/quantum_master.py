@@ -6,6 +6,7 @@ from spin_dynamics.dynamics.common import get_commutation
 from spin_dynamics.dynamics.common import spy_sparsity
 from spin_dynamics.dynamics.common import get_habc_Mv, get_habc_Mz, get_habc_reuse_ha_Mv, get_habc_reuse_ha_Mz
 from spin_dynamics.dynamics.common import get_rho_upper
+from spin_dynamics.dynamics.common import eigen_simple
 from spin_dynamics.dynamics.pulse import get_partial_double_grid, get_partial_double_grid_left
 
 r"""
@@ -102,60 +103,90 @@ def construct_X(Sz_tot):
 
     return X
 
-def construct_Rhbar(T, X, energies, I0):
+def get_Rhbar(h, X, T, I0):
     """
-    Construct the auxiliary operator R multiplied by hbar.
+    Construct the auxiliary operator R multiplied by hbar in both the E and S representations.
+    The E representation is spanned by the eigenstates of the Hamiltonian. 
+    The S representation is spanned by the eigenstates of the spin operator Sz_tot.
 
-    energies: energies of perturbed basis under any finite magnetic field (along z direction)
+    h: Hamiltonian at a certain time in the S representation.
+    T: temperature in Kelvin.
+    X: the operator in the spin space in the S representation, which couples to phonons. 
+    I0: prefactor for the spectral density for phonons. 
+    dim: dimension of the Hilbert space or the Hamiltonian, or the X operator.
 
-    Rhbar_{ij} = X_{ij} * Phi_{ij}
+    Rhbar_E_{ij} = X_E_{ij} * Phi_{ij}
     Phi_{ij} = ( I(omega_ij) - I(-omega_ij) ) / ( exp(beta * hbar * omega_ij ) - 1 )
     omega_ij = ( E_i - E_j ) / hbar.
     I(omega) = I0 omega^2 theta(omega): spectral density for phonons
     theta(omega) is the step function.
     """
+    # Diagonalize the Hamiltonian to find eigenvalues and eigenvectors
+    eigen = eigen_simple(h)
 
-    Rhbar = np.zeros(X.shape, dtype=np.float64)
+    # Unitary transformation matrix
+    M = eigen.eigenvectors
+    M_dagger = np.conjugate(np.transpose(M))
 
-    omegas = energy2omega(energies)
+    # Change the basis functions from the eigenstates of the spin operator Sz_tot (S representation)
+    # to the eigenstates of the Hamiltonian H (E representation) 
+    X_E = np.matmul(M_dagger, np.matmul(X, M))
 
+    # Construct Rhbar in the E representation
+    Rhbar = np.zeros(X.shape, dtype=np.complex128)
+    omegas = energy2omega(eigen.eigenvalues)
     for i in range(X.shape[0]):
-        for j in range(X.shape[0]):
+        for j in range(X.shape[1]):
             omega_ij = omegas[i] - omegas[j]
-            if X[i, j] != 0:
-                Rhbar[i, j] = X[i, j] * Phi(T, omega_ij, I0)
+            Rhbar[i, j] = X_E[i, j] * Phi(T, omega_ij, I0)
+
+    # Change the basis functions from the eigenstates of the Hamiltonian H (E representation)
+    # to the eigenstates of the spin operator Sz_tot (S representation)
+    Rhbar = np.matmul(M, np.matmul(Rhbar, M_dagger))
 
     return Rhbar
 
-def update_Rhbar(Rhbar, T, X, indices_nonzero_X, energies, I0):
+def update_Rhbar(Rhbar, h, X, I0, T):
     """
-    Update the auxiliary operator R multiplied by hbar.
-    Save time by avoiding memory allocation for Rhbar.
+    Construct the auxiliary operator R multiplied by hbar in both the E and S representations.
+    The E representation is spanned by the eigenstates of the Hamiltonian. 
+    The S representation is spanned by the eigenstates of the spin operator Sz_tot.
 
-    indices_nonzero_X: indices of nonzero matrix elements of X
-    energies: energies of perturbed basis under any finite magnetic field (along z direction)
+    h: Hamiltonian at a certain time in the S representation.
+    X: the operator in the spin space in the S representation, which couples to phonons. 
+    I0: prefactor for the spectral density for phonons. 
+    T: temperature in Kelvin.
 
-    Rhbar is recomputed completely using the updated energy levels.
-
-    Rhbar_{ij} = X_{ij} * Phi_{ij}
-    Phi_{ij} = ( I(omega_ij) - I(-omega_ij) ) / ( exp(beta * hbar * omega_ij ) - 1 )
-    omega_ij = ( E_i - E_j ) / hbar.
-    I(omega) = I0 omega^2 theta(omega): spectral density for phonons
-    theta(omega) is the step function.
-
-    Assumption:
-      1. The perturbed basis are the eigenvectors under zero and finite magnetic fields.
-      2. The order of the perturbed basis functions does not change, although the order of their energies do change.
+    In the E representation,
+      Rhbar_E_{ij} = X_E_{ij} * Phi_{ij}
+      Phi_{ij} = ( I(omega_ij) - I(-omega_ij) ) / ( exp(beta * hbar * omega_ij ) - 1 )
+      omega_ij = ( E_i - E_j ) / hbar.
+      I(omega) = I0 omega^2 theta(omega): spectral density for phonons
+      theta(omega) is the step function.
     """
+    # Diagonalize the Hamiltonian to find eigenvalues and eigenvectors
+    eigen = eigen_simple(h)
 
-    omegas = energy2omega(energies)
+    # Unitary transformation matrix
+    M = eigen.eigenvectors
+    M_dagger = np.conjugate(np.transpose(M))
 
-    n = indices_nonzero_X[0].shape[0] # Number of nonzero matrix elements of X
-    for k in range(n):
-        i = indices_nonzero_X[0][k]
-        j = indices_nonzero_X[1][k]
-        omega_ij = omegas[i] - omegas[j]
-        Rhbar[i, j] = X[i, j] * Phi(T, omega_ij, I0)
+    # Change the basis functions from the eigenstates of the spin operator Sz_tot (S representation)
+    # to the eigenstates of the Hamiltonian H (E representation) 
+    # using the unitary transformation matrix M
+    # for the X_eff operator.
+    X_E = np.matmul(M_dagger, np.matmul(X, M))
+
+    # Construct Rhbar in the E representation
+    omegas = energy2omega(eigen.eigenvalues)
+    for i in range(X.shape[0]):
+        for j in range(X.shape[1]):
+            omega_ij = omegas[i] - omegas[j]
+            Rhbar[i, j] = X_E[i, j] * Phi(T, omega_ij, I0)
+
+    # Change the basis functions from the eigenstates of the Hamiltonian H (E representation)
+    # to the eigenstates of the spin operator Sz_tot (S representation)
+    Rhbar = np.matmul(M, np.matmul(Rhbar, M_dagger))
 
     return Rhbar
 
@@ -207,7 +238,7 @@ def evolve_rho_by_deltat_qme(ha, hb, hc, rho, X, Rhbar, lambda1, lambda2, deltat
       hc: h(t+deltat). ha, hb, and hc are  written on the basis of the eigenvectors of h0, i.e. the zero-field spin Hamiltonian.
       rho: density matrix at time t rho(t) on the basis of the eigenvectors of h0.
       X: the operator in the spin space, which couples to phonons. See construct_X in this file. Unitless.
-      Rhbar: an auxiliary operator R multiplied by hbar. See construct_Rhbar in this file. Unitless.
+      Rhbar: an auxiliary operator R multiplied by hbar. See get_Rhbar in this file. Unitless.
       lambda1 = -1j * const1
       lambda2 = lambdaa^2 * pi * const1^2, lambdaa: spin-phonon coupling constant in cm-1.
       deltat: time step in ps.

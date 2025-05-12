@@ -215,6 +215,16 @@ class eigen_spin_hamiltonian:
         self.eigenvalues_offset = self.eigenvalues - self.eigenvalues[self.indices[0]]
 
         return
+
+
+
+class eigen_simple:
+    def __init__(self, hamiltonian):
+        ## Unit for eigenvalues: wavenumber
+        self.eigenvalues, self.eigenvectors = np.linalg.eigh(hamiltonian) 
+        self.eigenvalues = np.real(self.eigenvalues)
+
+        return
     
 
     
@@ -305,15 +315,25 @@ def check_zero(x, epsilon=1e-9):
         print("No, it is not zero." + " maxdiff = {:15.10f}.".format(maxentry))
     return
 
-def check_diagonal(O, epsilon=1e-9):
+def check_diagonal(O, epsilon=1e-9, verbose=True):
     O_abs = np.abs(O)
     np.fill_diagonal(O_abs, 0)
     is_diagonal = np.all( O_abs < epsilon )
+    if verbose:
+        if is_diagonal:
+            print("Yes, it is diagonal.")
+        else:
+            print("No, it is not diagonal.")
+    return is_diagonal
+
+def get_Mz_eff_diag(Mz_eff, epsilon=1e-9):
+    is_diagonal = check_diagonal(Mz_eff, epsilon=epsilon, verbose=False)
     if is_diagonal:
-        print("Yes, it is diagonal.")
+        print("Mz_eff is diagonal.\n")
+        return np.real( np.diagonal(Mz_eff) )
     else:
-        print("No, it is not diagonal.")
-    return
+        print("Mz_eff is not diagonal. Stopping ...")
+        exit()
 
 def check_eigen(O, eigen):
     """
@@ -367,7 +387,10 @@ def convert_cmatrix_to_rmatrix(M, tag):
         print(tag, "is a complex matrix. Please make sure that the matrix elements are real. Stopping ...")
         exit()
 
-    return np.real(M)
+    M_real = np.real(M)
+    M_diag = np.diag(M_real)
+
+    return (M_real, M_diag)
 
 ## =================================================================
 ## Functions for input and output.
@@ -436,12 +459,12 @@ def save_operator(op, base_name):
     with open("./output/{:s}.real".format(base_name), "w") as f:
         for i in range(Dim):
             for j in range(Dim):
-                f.write("{:8.3f}\n".format( o_real[i, j] ))
+                f.write("{:12.3e}\n".format( o_real[i, j] ))
 
     with open("./output/{:s}.imag".format(base_name), "w") as f:
         for i in range(Dim):
             for j in range(Dim):
-                f.write("{:8.3f}\n".format( o_imag[i, j] ))
+                f.write("{:12.3e}\n".format( o_imag[i, j] ))
     return
 
 def save_spins(spins, eigen):
@@ -537,6 +560,35 @@ def get_h_exchange(spins, exchange, factor):
     h_ex = spins.zero
     for i_pair in range(n_pair):
         h_ex = h_ex + get_h_exchange_one_pair(spins, exchange[i_pair], factor)
+    return h_ex
+
+def get_h_exchange_iso_one_pair(spins, spin_pair, factor):
+    i, j = spin_pair['pair']
+    Si = spins.local_spins[i-1].Sv
+    Sj = spins.local_spins[j-1].Sv
+    Jprime = spin_pair['coupling_matrix']
+    Jprime = np.array(Jprime).reshape((3,3))
+    J_iso = np.mean(np.diagonal(Jprime))
+    Jprime = J_iso * np.eye(3)
+    A = spin_pair['reference_frame']
+    A = np.array(A).reshape((3,3))
+    Siprime = get_Sprime(A, Si)
+    Sjprime = get_Sprime(A, Sj)
+    h_ex = spins.zero
+    for ii in range(3):
+        jj = ii
+        ## Jprime[ii,jj] * Siprime[ii] * Sjprime[jj]
+        ops = copy.deepcopy(spins.IDs)
+        ops[i-1] = Siprime[ii]
+        ops[j-1] = Sjprime[jj]
+        h_ex = h_ex + Jprime[ii,jj] * get_kronecker_product(ops, spins.nS)
+    return factor*h_ex
+
+def get_h_exchange_iso(spins, exchange, factor):
+    n_pair = len(exchange)
+    h_ex = spins.zero
+    for i_pair in range(n_pair):
+        h_ex = h_ex + get_h_exchange_iso_one_pair(spins, exchange[i_pair], factor)
     return h_ex
 
 ## =================================================================
@@ -981,6 +1033,58 @@ def get_M_vs_B(spins, h_ex, h_ani, BET_Bgrid):
 
 
 
+### =================================================================================
+### First order derivatives of magnetization against B field
+### at different temperatures
+### =================================================================================
+
+def get_dMdB(spins, h_ex, h_ani, B0v_sph, E0v_sph, T, dBv_sph):
+    r"""
+    dMdB = \partial M / \partial B along the e_n direction.
+    B0v: B vector in spherical coordinate. Angles in deg.
+    unit: mu_B/T.
+    """
+    result = get_chim_tensor_kernel(spins, h_ex, h_ani, B0v_sph, E0v_sph, T, dBv_sph, verbose=False)
+    return result
+
+def get_dMdB_vs_B(spins, h_ex, h_ani, BET_Bgrid, dB=0.001):
+    """
+    """
+
+    Bgrid = BET_Bgrid[0]
+    Efield = BET_Bgrid[1]
+    Ts = BET_Bgrid[2]
+
+    nB = int((Bgrid[1]-Bgrid[0])/Bgrid[2]) + 1
+    Bs = np.linspace(Bgrid[0], Bgrid[1], nB, endpoint=True)
+
+    dBv_sph = [dB, Bgrid[3], Bgrid[4]]
+
+    nT = len(Ts)
+
+    dMdBs = []
+    for iT in range(nT):
+        dMdBs.append([])
+        for iB in range(nB):
+            Bfield = [Bs[iB], Bgrid[3], Bgrid[4]]
+            print("T = {:6.2f} B = {:6.2f}".format(Ts[iT], Bs[iB]))
+            dMdB = get_dMdB(spins, h_ex, h_ani, Bfield, Efield, Ts[iT], dBv_sph)
+            dMdBs[iT].append(dMdB)
+
+    if not os.path.exists("./output"):
+        subprocess.run(["mkdir", "-p", "./output"])
+
+    for iT in range(nT):
+        #print("T = {:6.3f} K".format(Ts[iT]))
+
+        with open("./output/dMdB_vs_B_T{:.3f}K.dat".format(Ts[iT]),  "w") as f:
+            for iB in range(nB):
+                # Note that only the z component is saved.
+                f.write( "{:12.6f} {:12.6f}\n".format(Bs[iB], dMdBs[iT][iB][2]))
+    return
+
+
+
 ## =================================================================
 ## Functions for plotting
 ## =================================================================
@@ -1007,12 +1111,30 @@ def spy_sparsity(M, tag, precision=1.0e-20, figsize=(20, 20), markersize=1):
 def transform_O(O, eigen):
     """
     Transform an operator from the common basis to a specified basis
+    O and the eigenvectors (of the eigen object) should be in the common basis.
+    O_new is on the basis of the eigenvectors of the eigen object.
     """
 
     M = eigen.eigenvectors
     M_dagger = np.conjugate(np.transpose(M))
 
     O_new = np.matmul(M_dagger, np.matmul(O, M))
+
+    return O_new
+
+
+def back_transform_O(O, eigen):
+    """
+    Transform an operator from a specified basis to the common basis
+    The eigenvectors (of the eigen object) is in the common basis.
+    O is on the basis of the eigenvectors of the eigen object.
+    O_new is on the common basis after transformation.
+    """
+
+    M = eigen.eigenvectors
+    M_dagger = np.conjugate(np.transpose(M))
+
+    O_new = np.matmul(M, np.matmul(O, M_dagger))
 
     return O_new
 
@@ -1207,18 +1329,6 @@ def get_rho_upper(rho, indices_upper):
     rho_upper_imag = np.imag(rho_upper)
     rho_upper = np.hstack((rho_upper_real, rho_upper_imag))
     return rho_upper
-
-
-def get_indices_of_rho_upper(dim):
-    if not os.path.exists("./output"):
-        subprocess.run(["mkdir", "./output"])
-
-    indices_upper = np.triu_indices(dim)
-    with open("./output/indices_of_rho_upper.dat", "w") as f:
-        for i in range(indices_upper[0].shape[0]):
-            f.write("{:6d} {:6d} {:6d}\n".format(i+1, indices_upper[0][i], indices_upper[1][i]))
-        for i in range(indices_upper[0].shape[0]):
-            f.write("{:6d} {:6d} {:6d}\n".format(indices_upper[0].shape[0] + i + 1, indices_upper[0][i], indices_upper[1][i]))
 
 
 
