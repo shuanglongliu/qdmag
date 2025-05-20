@@ -1,6 +1,4 @@
 import os
-import sys
-from os import environ
 from timeit import default_timer as timer
 from spin_dynamics.dynamics.common import *
 from spin_dynamics.dynamics.pulse import *
@@ -8,54 +6,68 @@ from spin_dynamics.dynamics.von_neumann import *
 from spin_dynamics.dynamics.schrodinger import *
 from spin_dynamics.dynamics.quantum_master import *
 from spin_dynamics.dynamics.effective_basis import * 
-from spin_dynamics import __file__ as root_dir
-
-environ['OMP_NUM_THREADS'] = '2'
 
 
 
 if __name__ == "__main__":
 
-    # Spin system
+    # Read input parameters
+    Ss, nS, positions, exchange, anisotropy, gfactor, dipole, ext_field, BET_Bgrid, BET_Egrid, BET_BEgrid, BET_Tgrid, dynamics, n_thread = read_input()
 
-    Ss, nS, positions, exchange, anisotropy, gfactor, dipole, ext_field, BET_Bgrid, BET_Egrid, BET_BEgrid, BET_Tgrid, dynamics = read_input()
+    # Set the number of threads
+    os.environ['OMP_NUM_THREADS'] = str(n_thread)
+
+    # Spin system
     spins = many_spins(Ss, nS, gfactor, dipole, positions)
 
 
 
     # Control parameters for time evolution
 
-    T          = dynamics[0]['T']             # Temperature in K
-    lambdaa    = dynamics[0]['lambdaa']       # Spin phonon coupling constant in cm-1
-    I0         = dynamics[0]['I0']            # Prefactor for the phonon density of states
-               
-    tmin       = dynamics[1]['tmin']          # Initial time in ps
-    tmax       = dynamics[1]['tmax']          # Finial time in ps
-    deltat     = dynamics[1]['deltat']        # Time step in ps
+    T             = dynamics[0]['T']             # Temperature in K
+    lambdaa       = dynamics[0]['lambdaa']       # Spin phonon coupling constant in cm-1
+    I0            = dynamics[0]['I0']            # Prefactor for the phonon density of states
 
-    save_mag   = dynamics[2]['save_mag']      # Calculate and save magnetization during the dynamics ?
-    deltat_mag = dynamics[2]['deltat_mag']    # Calculate and save magnetization every deltat_mag ps
-    save_rho   = dynamics[2]['save_rho']      # Save rho ?
-    deltat_rho = dynamics[2]['deltat_rho']    # Save rho every deltat_rho ps
+    Bt_params     = dynamics[1]                  # Parameters for the pulsed magnetic field
 
-    theta_B    = dynamics[3]['theta_B']       # Polar angle of magnetic field in deg
-    phi_B      = dynamics[3]['phi_B']         # Azimuthal angle of magnetic field in deg
+    tmin          = dynamics[2]['tmin']          # Initial time in ps
+    tmax          = dynamics[2]['tmax']          # Finial time in ps
+    deltat        = dynamics[2]['deltat']        # Time step in ps
+                  
+    save_mag      = dynamics[3]['save_mag']      # Save magnetization ?
+    nt_mag        = dynamics[3]['nt_mag']        # Calculate and save magnetization every nt_mag*deltat ps
+    save_rho      = dynamics[3]['save_rho']      # Save rho ?
+    nt_rho        = dynamics[3]['nt_rho']        # Save rho every nt_rho*deltat ps
 
-    print(dynamics); exit()
+    multiphonon   = dynamics[4]['multiphonon']   # Include multiphonon processes ?
+    imbalance     = dynamics[4]['imbalance']     # Make X unsymmetric ? 
+
+    states        = dynamics[5]['states']        # Chosen basis states for the effective system
+
+
+
+    # Set up the pulsed magnetic field
+    Bt = get_Bt(Bt_params)
 
 
 
     # Hamiltonian
 
     h_ex = get_h_exchange(spins, exchange, -2)
+    h_ani = get_h_anisotropy(spins, anisotropy)
+    h = h_ex + h_ani
 
 
 
     # Basis transformation
 
-    eigen_p = get_perturbed_basis(h_ex, spins, [0,0,1e-4])
+    # The basis functions are the common eigenstates of the isotropic exchange interaction and the Sz_tot operator
+    # A perturbation is added to the isotropic exchange interaction to void mixing of different Sz states
 
-    h_ex_p = transform_O(h_ex, eigen_p)
+    h_ex_iso = get_h_exchange_iso(spins, exchange, -2)
+    eigen_p = get_perturbed_basis(h_ex_iso, spins, [0,0,1e-4])
+
+    h_p = transform_O(h, eigen_p)
     S2_tot_p = transform_O(spins.S2_tot, eigen_p)
     Sz_tot_p = transform_O(spins.Sv_tot[2], eigen_p)
     Mv_tot_p = transform_Mv_tot(spins.Mv_tot, eigen_p)
@@ -64,72 +76,78 @@ if __name__ == "__main__":
 
     # Get the effective Hamiltonian
 
-    selected_states = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+    dim = len(states)
+    h_eff = get_effective_O(h_p, states)
+    S2_eff = get_effective_O(S2_tot_p, states)
+    Sz_eff = get_effective_O(Sz_tot_p, states)
+    Mx_eff, My_eff, Mz_eff, Mv_eff = get_effective_Mv(Mv_tot_p, states)
+    X_eff = construct_X_eff(Sz_tot_p, states, multiphonon=multiphonon, imbalance=imbalance)
+    Rhbar_eff = get_Rhbar(h_eff, X_eff, T, I0)
 
-    h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff, indices_nonzero_X_eff, indices_nonzero_X2_eff = set_up_the_effective_system(h_ex_p, S2_tot_p, Sz_tot_p, Mv_tot_p, selected_states, T, I0)
 
-    #spy_the_effective_system(h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff, Rhbar_eff); exit()
+
+    # Check the matrix elements of the above operators
+
+    # spy_the_effective_system(h_eff, S2_eff, Sz_eff, Mv_eff, X_eff)
 
 
 
     # Eigenvalues and eigenvectors of the effective Hamiltonian
 
-    #eigen0_eff = eigen_spin_hamiltonian(h0_eff)
+    # eigen_eff = eigen_spin_hamiltonian(h_eff)
 
-    #save_eigenvalues(eigen0_eff, offset=True)
-    #save_eigenvectors(eigen0_eff)
+    # save_eigenvalues(eigen_eff, offset=True, suffix="eff")
+    # save_eigenvectors(eigen_eff, suffix="eff")
 
 
 
-    # Energy levels vs B field
+    # Get Zeeman energy levels
 
-    #get_energy_levels_vs_B_Mv_tot(h0_eff, Mv_eff, BET_Bgrid[0])
+    get_Zeeman_energy_levels_Mv_tot(h_eff, Mv_eff, BET_Bgrid)
 
 
 
     # Initial density matrix
+    # h0_eff = h_eff
+    # eigen0_eff = eigen_spin_hamiltonian(h0_eff)
+    # rho0_eff = get_rho0(eigen0_eff, T)
 
-    #rho0_eff = get_rho0(eigen0_eff, T)
-
-    rho0_eff = np.zeros(h0_eff.shape, dtype = np.complex128)
-    rho0_eff[0, 0] = 1.0
+    # rho0_eff = np.zeros(h0_eff.shape, dtype = np.complex128)
+    # rho0_eff[0, 0] = 1.0
 
 
 
-    # Get the magnetic field pulse
+    # Set up the time grid for the Runge-Kutta method
 
-    #Bt = load_cs()
-    Bt = get_B_sin
-
-    nt, ts, Bs2, deltat = get_pulse_for_Runge_Kutta_double_grid(Bt, tmin, tmax, deltat)
+    # nt, ts, Bs2, deltat = get_pulse_for_Runge_Kutta_double_grid(Bt, tmin, tmax, deltat)
 
 
 
     # Evolve the density matrix
 
-    start = timer()
+    # start = timer()
 
-    lambda1, lambda2 = get_constants(lambdaa)
-    if theta_B == 0.0 and phi_B == 0.0:
-        rho_eff = evolve_rho_qme_Mz(h0_eff, Mv_eff[2], rho0_eff, nt, ts, deltat, Bs2, X_eff, Rhbar_eff, lambda1, lambda2, save_mag, deltat_mag, save_rho, deltat_rho)
-    else:
-        rho_eff = evolve_rho_qme_Mv(h0_eff, Mv_eff, rho0_eff, nt, deltat, Bs2, theta_B, phi_B, X_eff, Rhbar_eff, lambda1, lambda2)
+    # lambda1, lambda2 = get_constants(lambdaa)
+    # if Bt_params["theta_B"] == 0.0 and Bt_params["phi_B"] == 0.0:
+    #     rho_eff = evolve_rho_qme_Mz(h0_eff, Mv_eff[2], rho0_eff, nt, ts, deltat, Bs2, X_eff, Rhbar_eff, lambda1, lambda2, save_mag, nt_mag, save_rho, nt_rho)
+    # else:
+    #     rho_eff = evolve_rho_qme_Mv(h0_eff, Mv_eff, rho0_eff, nt, ts, deltat, Bs2, Bt_params["theta_B"], Bt_params["phi_B"], X_eff, Rhbar_eff, lambda1, lambda2, save_mag, nt_mag, save_rho, nt_rho)
 
-    end = timer()
+    # end = timer()
 
-    print("Time used for evolution: {:8.3f} s".format(end - start) )
+    # print("Time used for evolution: {:8.3f} s".format(end - start) )
 
 
     # Initial magnetic moment
 
-    M = get_Mv_from_rho(rho0_eff, Mv_eff)
-    print("tmin = {:8.4f} ps, tmax = {:8.4f} ps, deltat = {:8.4f} ps, initial M = {:20.8E} {:20.8E} {:20.8E} mu_B".format(tmin, tmax, deltat, *np.real(M)))
+    # M = get_Mv_from_rho(rho0_eff, Mv_eff)
+    # print("tmin = {:8.4f} ps, tmax = {:8.4f} ps, deltat = {:8.4f} ps, initial M = {:20.8E} {:20.8E} {:20.8E} mu_B".format(tmin, tmax, deltat, *np.real(M)))
 
 
 
     # Final magnetic moment as the system is driven
 
-    M = get_Mv_from_rho(rho_eff, Mv_eff)
-    print("tmin = {:8.4f} ps, tmax = {:8.4f} ps, deltat = {:8.4f} ps,   final M = {:20.8E} {:20.8E} {:20.8E} mu_B".format(tmin, tmax, deltat, *np.real(M)))
+    # M = get_Mv_from_rho(rho_eff, Mv_eff)
+    # print("tmin = {:8.4f} ps, tmax = {:8.4f} ps, deltat = {:8.4f} ps,   final M = {:20.8E} {:20.8E} {:20.8E} mu_B".format(tmin, tmax, deltat, *np.real(M)))
 
 

@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-import ray
 from common import *
 from fitting import fit_magnetization
 from pulse import *
@@ -13,15 +12,6 @@ from schrodinger import *
 
 
 if __name__ == "__main__":
-
-    use_ray = False
-
-    # Ray initialization
-
-    if use_ray:
-        num_cpus = 16 # int(os.getenv('SLURM_CPUS_PER_TASK'))
-        ray.init(num_cpus=num_cpus)
-
 
     # Spin system
 
@@ -132,12 +122,5 @@ if __name__ == "__main__":
 
     end   = time.time()
     print("Time: {:8.3f} s".format(end - start) )
-
-
-    # Ray finalization
-
-    if use_ray:
-        ray.shutdown()
-
 
 

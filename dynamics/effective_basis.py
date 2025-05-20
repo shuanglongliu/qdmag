@@ -59,10 +59,58 @@ def construct_X_eff(Sz_full, selected_states, multiphonon=False, imbalance=False
 
     return X_eff
 
+def get_effective_O(O_full, selected_states):
+    """
+    Input: 
+        O_full: the operator in the whole Hilbert space. 
+            it should be on the perturbed basis, i.e. the eigenstates of h_ex + h_zee(B = 1e-4 T).
+        selected_states: a list of indices of the selected states counting from zero.
+    """
+
+    n = len(selected_states)
+
+    # np.complex64 is not enough to capture the energy differences between the nearly degenerate states (which are indeed degenerate without perturbation).
+    O_eff = np.zeros((n, n), dtype=np.complex128)
+
+    for i in range(n):
+        for j in range(n):
+            ii = selected_states[i]
+            jj = selected_states[j]
+            O_eff[i, j]     = O_full[ii, jj]
+
+    return O_eff
+
+def get_effective_Mv(Mv_full, selected_states):
+    """
+    Input: 
+        Mv_full: the magnetic moment operator in the whole Hilbert space. 
+            it should be on the perturbed basis, i.e. the eigenstates of h_ex + h_zee(B = 1e-4 T).
+        selected_states: a list of indices of the selected states counting from zero.
+    """
+
+    n = len(selected_states)
+
+    # np.complex64 is not enough to capture the energy differences between the nearly degenerate states (which are indeed degenerate without perturbation).
+    Mx_eff     = np.zeros((n, n), dtype=np.complex128)
+    My_eff     = np.zeros((n, n), dtype=np.complex128)
+    Mz_eff     = np.zeros((n, n), dtype=np.complex128)
+
+    for i in range(n):
+        for j in range(n):
+            ii = selected_states[i]
+            jj = selected_states[j]
+            Mx_eff[i, j]     = Mv_full[0][ii, jj]
+            My_eff[i, j]     = Mv_full[1][ii, jj]
+            Mz_eff[i, j]     = Mv_full[2][ii, jj]
+
+    Mv_eff = [Mx_eff, My_eff, Mz_eff]
+
+    return (Mx_eff, My_eff, Mz_eff, Mv_eff)
+
 def set_up_the_effective_system(h_t0_full, h_tmin_full, S2_full, Sz_full, Mv_full, selected_states, multiphonon=False, imbalance=False):
     """
     Obtain h_t0_eff and Mv_eff on the basis of selected states. 
-    All the operators are on the perturbed basis, i.e. the eigenstates of h_ex + h_zee(B = 1e-4 T).
+    All the input operators should be on the perturbed basis, i.e. the eigenstates of h_ex + h_zee(B = 1e-4 T).
 
     Input: 
         h_t0_full:       The full initial hamiltonian in the whole Hilbert space. 
@@ -109,9 +157,9 @@ def set_up_the_effective_system(h_t0_full, h_tmin_full, S2_full, Sz_full, Mv_ful
 
     X_eff = construct_X_eff(Sz_full, selected_states, multiphonon=multiphonon, imbalance=imbalance)
 
-    return (h_t0_eff, h_tmin_eff, S2_eff, Sz_eff, Mv_eff, X_eff, n)
+    return (h_t0_eff, h_tmin_eff, S2_eff, Sz_eff, Mx_eff, My_eff, Mz_eff, Mv_eff, X_eff, n)
 
-def spy_the_effective_system(h_t0_eff, S2_eff, Sz_eff, Mv_eff, X_eff):
+def spy_the_effective_system(h_eff, S2_eff, Sz_eff, Mv_eff, X_eff):
     """
     When the perturbative magnetic field is 1e-4 T, the matrix elements of Mx,y,z_eff smaller than 1e-8 are numerically insigficant.
     These small numbers are numerical errors for Mz_eff which should be exactly diagonal.
@@ -119,19 +167,19 @@ def spy_the_effective_system(h_t0_eff, S2_eff, Sz_eff, Mv_eff, X_eff):
     If the perturbative magnetic field is smaller than 1e-4 T, there could be bigger matrix elements in Mx,y,z_eff that cannot be ignored numerically.
     """
 
-    n = h_t0_eff.shape[0]
+    n = h_eff.shape[0]
 
-    h_t0_eff_abs = np.abs(h_t0_eff)
+    h_eff_abs = np.abs(h_eff)
     S2_eff_abs = np.abs(S2_eff)
     Sz_eff_abs = np.abs(Sz_eff)
     Mx_eff_abs = np.abs(Mv_eff[0])
     My_eff_abs = np.abs(Mv_eff[1])
     Mz_eff_abs = np.abs(Mv_eff[2])
 
-    with open ("./output/h_t0_eff_abs.dat", "w") as f:
+    with open ("./output/h_eff_abs.dat", "w") as f:
         for i in range(n):
             for j in range(n):
-                f.write("{:5d} {:5d} {:12.4e}\n".format(i, j, h_t0_eff_abs[i, j]))
+                f.write("{:5d} {:5d} {:12.4e}\n".format(i, j, h_eff_abs[i, j]))
 
     with open ("./output/S2_eff_abs.dat", "w") as f:
         for i in range(n):
@@ -164,7 +212,7 @@ def spy_the_effective_system(h_t0_eff, S2_eff, Sz_eff, Mv_eff, X_eff):
                 f.write("i   j   Sz_i   Sz_j   X_ij   = {:5d}   {:5d}   {:8.3f}   {:8.3f}   {:5.1f}\n".format( \
                      i, j, np.real(Sz_eff[i, i]), np.real(Sz_eff[j, j]), X_eff[i, j]))
 
-    spy_sparsity(h_t0_eff_abs, "h_t0_eff_abs", precision=1.0e-8, figsize=(10, 10), markersize=5) 
+    spy_sparsity(h_eff_abs,    "h_eff_abs",    precision=1.0e-8, figsize=(10, 10), markersize=5) 
     spy_sparsity(S2_eff_abs,   "S2_eff_abs",   precision=1.0e-8, figsize=(10, 10), markersize=5)
     spy_sparsity(Sz_eff_abs,   "Sz_eff_abs",   precision=1.0e-8, figsize=(10, 10), markersize=5)
     spy_sparsity(Mx_eff_abs,   "Mx_eff_abs",   precision=1.0e-8, figsize=(10, 10), markersize=5)

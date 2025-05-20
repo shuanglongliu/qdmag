@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-import ray
 from common import *
 from fitting import fit_magnetization
 from pulse import *
@@ -12,15 +11,6 @@ from von_neumann import *
 
 
 if __name__ == "__main__":
-
-    use_ray = True
-
-    # Ray initialization
-
-    if use_ray:
-        num_cpus = 16 # int(os.getenv('SLURM_CPUS_PER_TASK'))
-        ray.init(num_cpus=num_cpus)
-
 
     # Spin system
 
@@ -96,7 +86,7 @@ if __name__ == "__main__":
 
     # Get time evolution operators
 
-    DeltaUs = get_DeltaUs_ray(h0, Mv_tot, nt, ts, deltat, Bs, theta_B, phi_B, nperiod)
+    DeltaUs = get_DeltaUs(h0, Mv_tot, nt, ts, deltat, Bs, theta_B, phi_B, nperiod)
 
     # Evolve the density matrix due to the magnetic field pulse
 

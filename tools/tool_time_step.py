@@ -81,15 +81,9 @@ if __name__ == "__main__":
 
     selected_states = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
 
-    h0_eff, h_tmin_eff, S2_eff, Sz_eff, Mv_eff, X_eff = set_up_the_effective_system(h_ex_p, h_tmin_p, S2_tot_p, Sz_tot_p, Mv_tot_p, selected_states)
+    h0_eff, h_tmin_eff, S2_eff, Sz_eff, Mx_eff, My_eff, Mz_eff, Mv_eff, X_eff = set_up_the_effective_system(h_ex_p, h_tmin_p, S2_tot_p, Sz_tot_p, Mv_tot_p, selected_states)
 
     #spy_the_effective_system(h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff, Rhbar_eff); exit()
-
-
-
-    # Energy levels vs B field
-
-    #get_energy_levels_vs_B_Mv_tot(h0_eff, Mv_eff, BET_Bgrid[0])
 
 
 
@@ -140,16 +134,16 @@ if __name__ == "__main__":
     start = time.time()
 
     tmin = 0; tmax = 10; deltat = 1
-    tmax, double_super_rho_eff1 = evolve_rho_dsqme_stairs_light(tmin, tmax, deltat, get_B_sin, double_super_rho0_eff, D_eff, D0_eff, Mz_eff_diag, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds, save_rho, deltat_rho)
+    tmax, double_super_rho_eff1 = evolve_rho_dsqme_stairs_light(tmin, tmax, deltat, get_B_sin, double_super_rho0_eff, D_eff, D0_eff, Mz_eff, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds, save_rho, deltat_rho)
 
     tmin = 0; tmax = 10; deltat = 10
-    tmax, double_super_rho_eff2 = evolve_rho_dsqme_stairs_light(tmin, tmax, deltat, get_B_sin, double_super_rho0_eff, D_eff, D0_eff, Mz_eff_diag, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds, save_rho, deltat_rho)
+    tmax, double_super_rho_eff2 = evolve_rho_dsqme_stairs_light(tmin, tmax, deltat, get_B_sin, double_super_rho0_eff, D_eff, D0_eff, Mz_eff, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds, save_rho, deltat_rho)
 
     # Check the maximal difference between double_super_rho_eff1 and double_super_rho_eff2
     print("The maximal difference between dsrho1 and dsrho2 is", np.max(np.abs(double_super_rho_eff1 - double_super_rho_eff2)))
 
     tmin = 0; tmax = 10; deltat = 1
-    t0, t1, U = get_U_dsqe_longtime(tmin, tmax, deltat, get_B_sin, D_eff, D0_eff, Mz_eff_diag, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
+    t0, t1, U = get_U_dsqe_longtime(tmin, tmax, deltat, get_B_sin, D_eff, D0_eff, Mz_eff, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
 
     double_super_rho_eff3 = U @ double_super_rho0_eff
 

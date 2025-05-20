@@ -85,5 +85,5 @@ if __name__ == "__main__":
 
 
     # Obtain the long time evolution operator
-    t0, t1, U = get_U_dsqe_longtime(tmin, tmax, deltat, get_B_sin, D_eff, D0_eff, Mz_eff_diag, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, n_nzC, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
+    t0, t1, U = get_U_dsqe_longtime(tmin, tmax, deltat, get_B_sin, D_eff, D0_eff, Mz_eff, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, n_nzC, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
 

@@ -1,5 +1,4 @@
 import numpy as np
-import ray
 from scipy.linalg import expm
 from spin_dynamics.dynamics.common import sph2cart_deg
 from spin_dynamics.dynamics.common import get_h_Zeeman_Mv_tot
@@ -68,37 +67,7 @@ def get_DeltaU(h0, Mv_tot, Bs, theta_B, phi_B, iB, jB, deltat):
 
 
 
-@ray.remote(num_cpus=1)
-def get_DeltaU_ray(args):
-    r"""
-    Input: 
-      h0: Spin Hamiltonian under zero field on the basis of of eigenvectors of h0. 
-      Mv_tot: Magnetization operators on the basis of of eigenvectors of h0.
-      nB: nB = len(Bs), the number of magnet fields.
-      Bs: A time sequence of magnetic fields. Unit: Tesla.
-      theta_B: polar angle of Bs. Unit: deg.
-      phi_B: azimuthal angle of Bs. Unit: deg.
-      deltat: time step
-    Output: DeltaU = deltaU(ts[nt]) \cdot deltaU(ts[nt-1]) \codt ... \cdot deltaU(ts[1]) \cdot deltaU(ts[0]). ts correspond to Bs.
-
-    Note: The first letter "D" in DeltaU here is a capital letter, indicating time evolution over a period which may be long.
-    """
-
-    h0, Mv_tot, nB, Bs, theta_B, phi_B, deltat = args
-
-    h = get_h_Mv(h0, Mv_tot, Bs[0], theta_B, phi_B)
-    DeltaU = get_deltaU(h, deltat)
-
-    for i in range(1, nB):
-        h = get_h_Mv(h0, Mv_tot, Bs[i], theta_B, phi_B)
-        deltaU = get_deltaU(h, deltat)
-        DeltaU = np.matmul(deltaU, DeltaU)
-
-    return DeltaU
-
-
-
-def get_DeltaUs_ray(h0, Mv_tot, nt, ts, deltat, Bs, theta_B, phi_B, nperiod):
+def get_DeltaUs(h0, Mv_tot, nt, ts, deltat, Bs, theta_B, phi_B, nperiod):
     r"""
     Get TIME EVOLUTION OPERATORS DeltaUs.
     DeltaU (not deltaU) is defined as deltaU(ts[nt]) \cdot deltaU(ts[nt-1]) \codt ... \cdot deltaU(ts[1]) \cdot deltaU(ts[0]).
@@ -114,7 +83,7 @@ def get_DeltaUs_ray(h0, Mv_tot, nt, ts, deltat, Bs, theta_B, phi_B, nperiod):
       phi_B: azimuthal angle of Bs. Unit: deg.
       nperiod: number of time periods, one time period can have many deltats.
 
-    Output: DeltaUs = [DeltaU_n, ..., DeltaU_2, DeltaU_1]
+    Output: DeltaUs = [DeltaU_1, DeltaU_2, ..., DeltaU_n]
     """
 
     nDeltaU = nperiod
@@ -130,23 +99,18 @@ def get_DeltaUs_ray(h0, Mv_tot, nt, ts, deltat, Bs, theta_B, phi_B, nperiod):
 
     # get a list of arguments for get_DeltaU_ray
 
-    list_of_args = []
+    DeltaUs = []
 
     for iperiod in range(nperiod):
         iB = iperiod * nt_per_period
         jB = iB + nt_per_period
-        list_of_args.append( (h0, Mv_tot, nt_per_period, Bs[iB: jB], theta_B, phi_B, deltat) )
+        DeltaU = get_DeltaU(h0, Mv_tot, Bs, theta_B, phi_B, iB, jB, deltat)
+        DeltaUs.append(DeltaU)
 
     if nt_left_over != 0:
         iB = nperiod * nt_per_period
-        list_of_args.append( (h0, Mv_tot, nt_left_over, Bs[iB: nt], theta_B, phi_B, deltat) )
-
-        nperiod = nperiod + 1
-
-    # Parallel calculations of DeltaUs
-
-    futures = [ get_DeltaU_ray.remote(list_of_args[i]) for i in range(nperiod) ]
-    DeltaUs = ray.get(futures)
+        DeltaU = get_DeltaU(h0, Mv_tot, Bs, theta_B, phi_B, iB, nt, deltat)
+        DeltaUs.append(DeltaU)
 
     return DeltaUs
 

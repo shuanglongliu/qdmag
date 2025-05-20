@@ -323,7 +323,7 @@ def evolve_rho_qme_Mz_light(h0, Mz_tot, rho, nt, deltat, Bs2, X, Rhbar, lambda1,
 
     return rho
 
-def evolve_rho_qme_Mv(h0, Mv_tot, rho, nt, ts, deltat, Bs2, theta_B, phi_B, X, Rhbar, lambda1, lambda2, save_mag, deltat_mag, save_rho, deltat_rho):
+def evolve_rho_qme_Mv(h0, Mv_tot, rho, nt, ts, deltat, Bs2, theta_B, phi_B, X, Rhbar, lambda1, lambda2, save_mag, nt_mag, save_rho, nt_rho):
     r"""
     Evolve the density matrix using the Runge-Kutta method according to the quantum master equation.
 
@@ -344,15 +344,12 @@ def evolve_rho_qme_Mv(h0, Mv_tot, rho, nt, ts, deltat, Bs2, theta_B, phi_B, X, R
       lambda1 = -1j * const1
       lambda2 = lambdaa^2 * pi * const1^2, lambdaa: spin-phonon coupling constant in cm-1.
       save_mag: calculate and save magnetization?
-      deltat_mag: calculate and save magnetization per deltat_mag ps
+      nt_mag: calculate and save magnetization per nt_mag ps
       save_rho: save the density matrix?
-      deltat_rho: save the density matrix per deltat_rho ps
+      nt_rho: save the density matrix per nt_rho ps
     """
 
 
-
-    nt_mag = round( deltat_mag / deltat )
-    nt_rho = round( deltat_rho / deltat )
 
     if nt_rho > nt_mag:
         ratio = round(nt_rho/nt_mag)
@@ -566,7 +563,7 @@ def evolve_rho_qme_Mv(h0, Mv_tot, rho, nt, ts, deltat, Bs2, theta_B, phi_B, X, R
 
 
 
-def evolve_rho_qme_Mz(h0, Mz_tot, rho, nt, ts, deltat, Bs2, X, Rhbar, lambda1, lambda2, save_mag, deltat_mag, save_rho, deltat_rho):
+def evolve_rho_qme_Mz(h0, Mz_tot, rho, nt, ts, deltat, Bs2, X, Rhbar, lambda1, lambda2, save_mag, nt_mag, save_rho, nt_rho):
     r"""
     Evolve the density matrix using the Runge-Kutta method according to the quantum master equation.
 
@@ -587,18 +584,14 @@ def evolve_rho_qme_Mz(h0, Mz_tot, rho, nt, ts, deltat, Bs2, X, Rhbar, lambda1, l
       lambda1 = -1j * const1
       lambda2 = lambdaa^2 * pi * const1^2, lambdaa: spin-phonon coupling constant in cm-1.
       save_mag: calculate and save magnetization?
-      deltat_mag: calculate and save magnetization per deltat_mag ps
+      nt_mag: calculate and save magnetization per nt_mag * deltat ps
       save_rho: save the density matrix?
-      deltat_rho: save the density matrix per deltat_rho ps
+      nt_rho: save the density matrix per nt_rho * deltat ps
 
     Assumptions:
       The magnetic field is along the z direction.
     """
 
-
-
-    nt_mag = round( deltat_mag / deltat )
-    nt_rho = round( deltat_rho / deltat )
 
     if nt_rho > nt_mag:
         ratio = round(nt_rho/nt_mag)

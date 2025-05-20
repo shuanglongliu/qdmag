@@ -4,9 +4,9 @@ import copy
 import math
 import numpy as np
 import yaml
-import ray
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import pandas as pd
 from scipy.constants import N_A, mu_0
 from spin_dynamics.dynamics.constants import meV2wavenumber, Tesla2wavenumber, Kelvin2meV, Kelvin2wavenumber
 from spin_dynamics.dynamics.constants import x_mu_B, mu_B_per_Tesla_2_cm3_per_mol_phi
@@ -120,6 +120,11 @@ class many_spins:
                 self.global_magmoms[i].append( get_kronecker_product(ops, self.nS) )
 
     def get_total_magmom(self):
+        r"""
+        Total magnetic moment operator in the whole Hilbert space.
+        \vec{M} = \sum_{i=1}^{nS} \vec{\mu}_i = \sum_{i=1}^{nS} matmul(g_s[i], \vec{S}_i)
+        In general, each component of \vec{M} is a matrix of complex numbers.
+        """
         
         self.Mv_tot = [self.zero for i in range(3)]
         for i in range(3):
@@ -327,6 +332,9 @@ def check_diagonal(O, epsilon=1e-9, verbose=True):
     return is_diagonal
 
 def get_Mz_eff_diag(Mz_eff, epsilon=1e-9):
+    r"""
+    This is function is used for cases where the g tensors are isotropic.
+    """
     is_diagonal = check_diagonal(Mz_eff, epsilon=epsilon, verbose=False)
     if is_diagonal:
         print("Mz_eff is diagonal.\n")
@@ -418,7 +426,7 @@ def read_input():
 
     return (Ss, nS, positions, exchange, anisotropy, gfactor, dipole, ext_field, BET_Bgrid, BET_Egrid, BET_BEgrid, BET_Tgrid, dynamics, n_thread)
 
-def save_eigenvalues(eigen, offset=True):
+def save_eigenvalues(eigen, offset=True, suffix=None):
 
     if offset:
         eigenvalues = eigen.eigenvalues_offset
@@ -428,18 +436,28 @@ def save_eigenvalues(eigen, offset=True):
     if not os.path.exists("./output"):
         subprocess.run(["mkdir", "./output"])
 
-    with open("./output/eigenvalues.dat", "w") as f:
+    if suffix is not None:
+        fout = "./output/eigenvalues_" + suffix + ".dat"
+    else:
+        fout = "./output/eigenvalues.dat"
+
+    with open(fout, "w") as f:
         for i in range(eigen.dim):
             f.write("{:16.12f}\n".format(eigenvalues[i]))
 
     return
 
-def save_eigenvectors(eigen):
+def save_eigenvectors(eigen, suffix=None):
 
     if not os.path.exists("./output"):
         subprocess.run(["mkdir", "./output"])
 
-    with open("./output/eigenvectors.dat", "w") as f:
+    if suffix is not None:
+        fout = "./output/eigenvectors_" + suffix + ".dat"
+    else:
+        fout = "./output/eigenvectors.dat"
+
+    with open(fout, "w") as f:
         for i in range(eigen.dim):
             state = eigen.eigenvectors[:, i]
             f.write((eigen.dim*" {:16.12f}" + "\n").format(*state))
@@ -491,6 +509,13 @@ def save_spins(spins, eigen):
             f.write("{:8.3f} ".format(E_S_tot))
             # f.write("# {:8.2f}\n".format(eigen.eigenvalues_offset[eigen.indices[i]]))
             f.write("# {:8.2f}\n".format(eigen.eigenvalues_offset[i]))
+
+def print_emat_array(emat):
+    print("emats_file[0] = [ \\")
+    print("        [ {:15.8f}, {:15.8f}, {:15.8f} ], \\".format(*emat[0]))
+    print("        [ {:15.8f}, {:15.8f}, {:15.8f} ], \\".format(*emat[1]))
+    print("        [ {:15.8f}, {:15.8f}, {:15.8f} ], \\".format(*emat[2]))
+    print("        ]")
 
 ## =================================================================
 ## Functions for analyzing results.
@@ -701,15 +726,17 @@ def get_h_Stark(spins, Ev, coord):
 ## Functions for energy levels versus B field
 ## =================================================================
 
-def get_energy_levels_vs_B(spins, h_ex, h_ani, Bgrid):
+def get_Zeeman_energy_levels(spins, h_ex, h_ani, BET_Bgrid):
 
-    Bmin, Bmax, Bstep, theta_B, phi_B = Bgrid
+    Bmin, Bmax, Bstep, theta_B, phi_B = BET_Bgrid[0]
     nB = int((Bmax-Bmin)/Bstep) + 1
 
     h0 = h_ex + h_ani
 
     eigen = eigen_spin_hamiltonian(h0)
     energy0 = eigen.eigenvalues[eigen.indices[0]]
+
+    print("Calculating the Zeeman energy levels for in the full Hilbert space.")
 
     eigenvalues = np.zeros((nB, eigen.dim))
     for i in range(nB):
@@ -728,13 +755,17 @@ def get_energy_levels_vs_B(spins, h_ex, h_ani, Bgrid):
             B = Bmin + i*Bstep
             f.write((" {:12.6f}" + eigen.dim*" {:15.9f}" + "\n").format(B, *eigenvalues[i]))
 
-def get_energy_levels_vs_B_Mv_tot(h0, Mv_tot, Bgrid):
+    print("The Zeeman energy levels are saved in Zeeman.dat.")
 
-    Bmin, Bmax, Bstep, theta_B, phi_B = Bgrid
+def get_Zeeman_energy_levels_Mv_tot(h0, Mv_tot, BET_Bgrid):
+
+    Bmin, Bmax, Bstep, theta_B, phi_B = BET_Bgrid[0]
     nB = int((Bmax-Bmin)/Bstep) + 1
 
     eigen = eigen_spin_hamiltonian(h0)
     energy0 = eigen.eigenvalues[eigen.indices[0]]
+
+    print("Calculating the Zeeman energy levels for in the effective Hilbert space.")
 
     eigenvalues = np.zeros((nB, eigen.dim))
     for i in range(nB):
@@ -748,42 +779,12 @@ def get_energy_levels_vs_B_Mv_tot(h0, Mv_tot, Bgrid):
     if not os.path.exists("./output"):
         subprocess.run(["mkdir", "./output"])
 
-    with open("./output/Zeeman.dat", "w") as f:
+    with open("./output/Zeeman_eff.dat", "w") as f:
         for i in range(nB):
             B = Bmin + i*Bstep
             f.write((" {:12.6f}" + eigen.dim*" {:15.9f}" + "\n").format(B, *eigenvalues[i]))
 
-def get_energy_levels_vs_B_Mz_tot_diag(h0, Mz_tot, Bgrid):
-    """
-    Assumption: h0 and Mz_tot are written on the perturbed basis. 
-                Thus, both h0 and Mz_tot are diagonal.
-    """
-
-    Bmin, Bmax, Bstep, theta_B, phi_B = Bgrid
-    nB = int((Bmax-Bmin)/Bstep) + 1
-
-    eigen = eigen_spin_hamiltonian(h0)
-    energy0 = eigen.eigenvalues[eigen.indices[0]]
-
-    h0_diag = np.real( h0.diagonal() )
-
-    minus_Mz_tot = -1 * Mz_tot
-    minus_Mz_tot_diag = np.real( minus_Mz_tot.diagonal() )
-
-    eigenvalues = np.zeros((nB, eigen.dim))
-    for i in range(nB):
-        B = Bmin + i*Bstep
-        h_zee_diag = Tesla2wavenumber * B * minus_Mz_tot_diag
-        eigenvalues[i] = h0_diag + h_zee_diag
-    eigenvalues = eigenvalues - energy0
-
-    if not os.path.exists("./output"):
-        subprocess.run(["mkdir", "./output"])
-
-    with open("./output/Zeeman.dat", "w") as f:
-        for i in range(nB):
-            B = Bmin + i*Bstep
-            f.write((" {:12.6f}" + eigen.dim*" {:15.9f}" + "\n").format(B, *eigenvalues[i]))
+    print("The Zeeman energy levels are saved in Zeeman_eff.dat.")
 
 ## ================================================================
 ## Functions for thermodynamic properties.
@@ -1000,87 +1001,29 @@ def get_M_vs_B(spins, h_ex, h_ani, BET_Bgrid):
 
     nT = len(Ts)
 
-    Ms = []
+    # Store results using a data frame with the columns: B field, Mx, My, Mz, and T
     for iT in range(nT):
         print("T={:6.2f} K\n".format(Ts[iT]))
-        Ms_per_T = get_M_vs_B_kernel(spins, h_ex, h_ani, Bs, Bgrid[3], Bgrid[4], Efield, Ts[iT])
-        Ms.append(Ms_per_T)
-
-    if not os.path.exists("./output/M_vs_B"):
-        subprocess.run(["mkdir", "-p", "./output/M_vs_B"])
-
-    M1name  = "./output/M_vs_B/Mmod-B_thetaB{:.1f}_phiB{:.1f}_E{:.3f}_thetaE{:.1f}_phiE{:.1f}.dat".format(Bgrid[3], Bgrid[4], *Efield)
-    M1xname = "./output/M_vs_B/Mx-B_thetaB{:.1f}_phiB{:.1f}_E{:.3f}_thetaE{:.1f}_phiE{:.1f}.dat".format(Bgrid[3], Bgrid[4], *Efield)
-    M1yname = "./output/M_vs_B/My-B_thetaB{:.1f}_phiB{:.1f}_E{:.3f}_thetaE{:.1f}_phiE{:.1f}.dat".format(Bgrid[3], Bgrid[4], *Efield)
-    M1zname = "./output/M_vs_B/Mz-B_thetaB{:.1f}_phiB{:.1f}_E{:.3f}_thetaE{:.1f}_phiE{:.1f}.dat".format(Bgrid[3], Bgrid[4], *Efield)
-
-    with open(M1name,  "w") as M1 , \
-         open(M1xname, "w") as M1x, \
-         open(M1yname, "w") as M1y, \
-         open(M1zname, "w") as M1z:
+        Ms = get_M_vs_B_kernel(spins, h_ex, h_ani, Bs, Bgrid[3], Bgrid[4], Efield, Ts[iT])
         for iB in range(nB):
-            M1.write( "{:15.9f} ".format(Bs[iB]))
-            M1x.write("{:15.9f} ".format(Bs[iB]))
-            M1y.write("{:15.9f} ".format(Bs[iB]))
-            M1z.write("{:15.9f} ".format(Bs[iB]))
-            for iT in range(nT):
-                M1.write( "{:15.9f} ".format(np.linalg.norm(Ms[iT][iB])))
-                M1x.write("{:15.9f} ".format(Ms[iT][iB][0]))
-                M1y.write("{:15.9f} ".format(Ms[iT][iB][1]))
-                M1z.write("{:15.9f} ".format(Ms[iT][iB][2]))
-            M1.write("\n"); M1x.write("\n"); M1y.write("\n"); M1z.write("\n")
-    return
+            if iT == 0 and iB == 0:
+                # Create the data frame for the first entry
+                df = pd.DataFrame({"B": [Bs[iB]], "Mx": [Ms[iB][0]], "My": [Ms[iB][1]], "Mz": [Ms[iB][2]], "T": [Ts[iT]]})
+            else:
+                # Create a DataFrame from the dictionary 
+                new_row = pd.DataFrame([{"B": Bs[iB], "Mx": Ms[iB][0], "My": Ms[iB][1], "Mz": Ms[iB][2], "T": Ts[iT]}])
 
-
-
-### =================================================================================
-### First order derivatives of magnetization against B field
-### at different temperatures
-### =================================================================================
-
-def get_dMdB(spins, h_ex, h_ani, B0v_sph, E0v_sph, T, dBv_sph):
-    r"""
-    dMdB = \partial M / \partial B along the e_n direction.
-    B0v: B vector in spherical coordinate. Angles in deg.
-    unit: mu_B/T.
-    """
-    result = get_chim_tensor_kernel(spins, h_ex, h_ani, B0v_sph, E0v_sph, T, dBv_sph, verbose=False)
-    return result
-
-def get_dMdB_vs_B(spins, h_ex, h_ani, BET_Bgrid, dB=0.001):
-    """
-    """
-
-    Bgrid = BET_Bgrid[0]
-    Efield = BET_Bgrid[1]
-    Ts = BET_Bgrid[2]
-
-    nB = int((Bgrid[1]-Bgrid[0])/Bgrid[2]) + 1
-    Bs = np.linspace(Bgrid[0], Bgrid[1], nB, endpoint=True)
-
-    dBv_sph = [dB, Bgrid[3], Bgrid[4]]
-
-    nT = len(Ts)
-
-    dMdBs = []
-    for iT in range(nT):
-        dMdBs.append([])
-        for iB in range(nB):
-            Bfield = [Bs[iB], Bgrid[3], Bgrid[4]]
-            print("T = {:6.2f} B = {:6.2f}".format(Ts[iT], Bs[iB]))
-            dMdB = get_dMdB(spins, h_ex, h_ani, Bfield, Efield, Ts[iT], dBv_sph)
-            dMdBs[iT].append(dMdB)
+                # Append the new data to the existing data frame
+                df = pd.concat([df, new_row], ignore_index=True)
 
     if not os.path.exists("./output"):
         subprocess.run(["mkdir", "-p", "./output"])
 
-    for iT in range(nT):
-        #print("T = {:6.3f} K".format(Ts[iT]))
+    # Save the data frame to a CSV file
+    df.to_csv("./output/M-B.csv", index=False)
 
-        with open("./output/dMdB_vs_B_T{:.3f}K.dat".format(Ts[iT]),  "w") as f:
-            for iB in range(nB):
-                # Note that only the z component is saved.
-                f.write( "{:12.6f} {:12.6f}\n".format(Bs[iB], dMdBs[iT][iB][2]))
+    print("The magnetization versus B field is saved in M-B.csv.")
+
     return
 
 
@@ -1308,8 +1251,6 @@ def get_habc_reuse_ha_Mz(h0, Mz_tot, it, deltat, Bs2, ha, hb, hc):
 # =======================================================================
 
 def get_Mv_from_rho(rho, Mv_tot):
-    """
-    """
 
     Mv = []
     for i in range(3):

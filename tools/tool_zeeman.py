@@ -45,7 +45,7 @@ if __name__ == "__main__":
     multiphonon   = dynamics[4]['multiphonon']   # Include multiphonon processes ?
     imbalance     = dynamics[4]['imbalance']     # Make X unsymmetric ? 
 
-    states        = dynamics[5]['states']        # Chosen basis states for the effective system
+    states        = dynamics[5]['states']        # Make X unsymmetric ? 
 
 
 
@@ -58,13 +58,26 @@ if __name__ == "__main__":
 
     h_ex = get_h_exchange(spins, exchange, -2)
     h_ani = get_h_anisotropy(spins, anisotropy)
-    h_zee_tmin = get_h_Zeeman(spins, [0,0,Bt(tmin)], 'cartesian')
+    h_zee = get_h_Zeeman(spins, [0,0,1e-4], 'cartesian')
 
     # Spin Hamiltonian at t=0
-    h_t0 = h_ex + h_ani 
+    h_t0 = h_ex + h_ani
 
     # Spin Hamiltonian at t=tmin
-    h_tmin = h_ex + h_ani + h_zee_tmin
+    h_tmin = h_ex + h_zee
+
+
+    # Check commutation relation
+
+    # check_commutation(h_ex, h_zee); exit()
+    # check_commutation(h_ex, spins.Sv_tot[2]); exit()
+    # check_commutation(h_ex, spins.S2_tot); exit()
+
+
+
+    # Solve the eigenvalue problem
+
+    # eigen = eigen_spin_hamiltonian(h)
 
 
 
@@ -83,49 +96,82 @@ if __name__ == "__main__":
 
 
 
-    # Get the effective system
+    # Check if the h_ex_p matrix is diagonal
+    # check_diagonal(h_ex_p, epsilon=1e-12)
+    # check_diagonal(spins.Mv_tot[2], epsilon=1e-12)
+
+
+
+
+    # Save results
+
+    #save_operator(h, "h")
+    #save_operator(spins.Sv_tot[2], "Sz.dat")
+
+    # save_eigenvalues(eigen_p, offset=True); # exit()
+    # save_eigenvectors(eigen_p); # exit()
+
+    # save_spins(spins, eigen_p); exit()
+
+
+
+    # Zeeman diagram for the full system
+
+    get_Zeeman_energy_levels(spins, h_ex, h_ani, BET_Bgrid[0])
+
+
+
+    # Magnetization, polarization, magnetic susceptibility, electric susceptibility
+
+    # get_M_vs_B(spins, h_ex, h_ani, BET_Bgrid)
+    # get_dMdB_vs_B(spins, h_ex, h_ani, BET_Bgrid, dB=0.001)
+
+
+
+    # Get the effective Hamiltonian
 
     h_t0_eff, h_tmin_eff, S2_eff, Sz_eff, Mx_eff, My_eff, Mz_eff, Mv_eff, X_eff, dim = \
-      set_up_the_effective_system(h_t0_p, h_tmin_p, S2_tot_p, Sz_tot_p, Mv_tot_p, states, multiphonon=multiphonon, imbalance=imbalance)
+    set_up_the_effective_system(h_t0_p, h_tmin_p, S2_tot_p, Sz_tot_p, Mv_tot_p, states, multiphonon=multiphonon, imbalance=imbalance)
+
+    # spy_the_effective_system(h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff); exit()
+
+
+
+
+
+    # Eigenvalues and eigenvectors of the effective Hamiltonian
+
+    #eigen0_eff = eigen_spin_hamiltonian(h0_eff)
+
+    #save_eigenvalues(eigen0_eff, offset=True)
+    #save_eigenvectors(eigen0_eff)
+
+
+
+    # Zeeman diagram for the effective system
+
+    get_Zeeman_energy_levels_Mv_tot(h_t0_eff, Mv_eff, BET_Bgrid[0])
+
 
 
 
     # Set up the double super quantum master equation
 
-    D0_eff, D_eff, Rhbar_eff, C_eff, CST_eff, dims, dimds = set_up_double_super_qme(h_t0_eff, h_tmin_eff, X_eff, dim, I0, T, lambdaa)
+    # D0_eff, D_eff, h0_eff_diag, h_tmin_eff_diag, Mz_eff_diag, Rhbar_eff, C_eff, CST_eff, dim, dims, dimds = set_up_double_super_qme(h0_eff, h_tmin_eff, Mv_eff[2], X_eff, I0, T, lambdaa)
+
+    #spy_XRhbar(X_eff, Rhbar_eff, Sz_eff); exit()
 
 
 
-    # Initial density matrix
+    # indices_nonzero_X_eff, indices_nonzero_C_eff = get_indices_nonzero_X_and_C(X_eff, dim)
 
-    ## Construct the initial density matrix
+    #print(indices_nonzero_X_eff); exit()
 
-    eigen_tmin_eff = eigen_spin_hamiltonian(h_tmin_eff)
+    # D_eff = update_D_under_magnetic_field(D_eff, D0_eff, minus_Mz_eff_diag, 3.49, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
 
-    ### Construct the initial density matrix on the eigenbasis of h_tmin_eff
-    rho0_eff = get_rhoe(eigen_tmin_eff.eigenvalues, T)
-
-    ### Transform the density matrix from the eigenbasis of h_tmin_eff to the common eigenbasis (the perturbed basis)
-    rho0_eff = back_transform_O(rho0_eff, eigen_tmin_eff)
-
-    #### Convert the density matrix to the double super density matrix
-    double_super_rho0_eff = convert_rho_to_dsrho(rho0_eff)
-
-    ## Read the initial density matrix from a file
-
-    # fname = "/blue/m2qm-efrc/shuan.liu.neu/projects/spin_dynamics/output/double_super_rho_0.000-10.000_step0.001ps.hdf5"
-    # double_super_rho0_eff = get_rho_from_hdf5(fname, tmin, dimds)
+    # spy_M(D_eff, "D_eff")
 
 
 
-    # Time evolution
 
-    start = time.time()
-
-    # Evolve the double super density matrix
-    tmax, double_super_rho_eff = evolve_rho_dsqme_stairs(tmin, tmax, deltat, Bt_params, double_super_rho0_eff, D_eff, D0_eff, h_t0_eff, Mz_eff, C_eff, CST_eff, X_eff, Rhbar_eff, lambdaa, I0, T, dim, dims, dimds, save_mag, nt_mag, save_rho, nt_rho)
-
-    end   = time.time()
-    
-    print("Time used for evolution: {:8.3f} s\n".format(end - start) )
 
