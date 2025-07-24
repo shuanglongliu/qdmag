@@ -934,7 +934,7 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, dsrho, D, D0, h_t0, Mz_op
                         it = iround_rho * nt_rho + iround_mag * nt_mag + it_mag
                         t = t0 + it*deltat + half_deltat
                         B = Bt(t)
-                        print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
+                        # print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
                         # h and Rhbar are updated at each time step
                         dsrho = evolve_rho_dsqme_onestair(dsrho, deltat, D, D0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
                     # Calculate the magnetic moment
@@ -980,7 +980,7 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, dsrho, D, D0, h_t0, Mz_op
                     it = iround_rho * nt_rho + it_rho
                     t = t0 + it*deltat + half_deltat
                     B = Bt(t)
-                    print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
+                    # print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
                     dsrho = evolve_rho_dsqme_onestair(dsrho, deltat, D, D0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
                 # Save the double super density matrix
                 tag = "{:.3f}".format(t + half_deltat)
@@ -1013,7 +1013,7 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, dsrho, D, D0, h_t0, Mz_op
                     it = iround_mag * nt_mag + it_mag
                     t = t0 + it*deltat + half_deltat
                     B = Bt(t)
-                    print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
+                    # print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
                     dsrho = evolve_rho_dsqme_onestair(dsrho, deltat, D, D0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
                 # Save magnetic moment
                 Mz = get_Mz_from_dsrho(dsrho, Mz_op, dim, dims, dimds)
@@ -1030,7 +1030,7 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, dsrho, D, D0, h_t0, Mz_op
         for it in range(nt):
             t = t0 + it*deltat + half_deltat
             B = Bt(t)
-            print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
+            # print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
             dsrho = evolve_rho_dsqme_onestair(dsrho, deltat, D, D0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
 
     return ( t1, dsrho )

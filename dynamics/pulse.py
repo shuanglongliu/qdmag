@@ -19,8 +19,6 @@ def get_Bt(Bt_params):
         'sweep_rate_ave': average slope in T per ms
         'omega': angular frequency of the sine wave in rad ms^-1
         'amplitude': amplitude of the sine wave in T
-        'theta_B': polar angle of magnetic field in deg
-        'phi_B': azimuthal angle of magnetic field in deg
     """
 
     Bt_type = Bt_params['Bt_type']

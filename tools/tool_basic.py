@@ -54,17 +54,3 @@ if __name__ == "__main__":
 
     # save_spins(spins, eigen)
 
-
-
-    # Zeeman diagram
-
-    get_Zeeman_energy_levels(spins, h_ex, h_ani, BET_Bgrid)
-
-
-
-    # Magnetization, magnetic susceptibility
-
-    # get_M_vs_B(spins, h_ex, h_ani, BET_Bgrid)
-
-
-

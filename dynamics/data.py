@@ -104,8 +104,6 @@ dynamics:
       fields: [{fields:s}] # Magnetic field at the turning points in T. Used only when Bt = 'pwlinear'.
       omega: {omega:.2f} #  Angular frequency of the sine wave in rad ms^-1. The period is 2 pi / omega ms. Used only when Bt = 'sin'.
       amplitude: {amplitude:.1f} # Amplitude of the sine wave in T. Used only when Bt = 'sin'.
-      theta_B: {theta_B:.1f}    # Polar angle of the pulsed magnetic field
-      phi_B: {phi_B:.1f}      # Azimuthal angle of the pulsed magnetic field
 
     - tmin: {tmin:.1e}             # Initial time in ps
       tmax: {tmax:.1e}             # Finial time in ps
@@ -201,7 +199,7 @@ dipole:
 ext_field: [0., 0., 0., 0., 0., 0.] # B, thetaB, phiB, E, thetaE, phiE
 
 BET_Bgrid:
-  - [0., 50., 0.1, 0., 0.] # Bmin, Bmax, Bstep, thetaB, phiB 
+  - [0., {staticB_max:.3f}, {staticB_step:.3f}, 0., 0.] # Bmin, Bmax, Bstep, thetaB, phiB 
   - [0., 0., 0.] # E, thetaE, phiE
   - [0.6] # [2.0, 10.0, 20.0, 40.0] # T1, T2, ..., Tn
 
@@ -231,8 +229,6 @@ dynamics:
       fields: {fields:s} # Magnetic field at the turning points in T. Used only when Bt = 'pwlinear'.
       omega: {omega:.2f} #  Angular frequency of the sine wave in rad ms^-1. The period is 2 pi / omega ms. Used only when Bt = 'sin'.
       amplitude: {amplitude:.1f} # Amplitude of the sine wave in T. Used only when Bt = 'sin'.
-      theta_B: {theta_B:.1f}    # Polar angle of the pulsed magnetic field
-      phi_B: {phi_B:.1f}      # Azimuthal angle of the pulsed magnetic field
 
     - tmin: {tmin:.1e}             # Initial time in ps
       tmax: {tmax:.1e}             # Finial time in ps
@@ -281,7 +277,7 @@ python tool_staircase.py
 job_array = """#!/bin/bash -l
 
 #SBATCH --account=m2qm-efrc
-#SBATCH --qos=m2qm-efrc-b
+#SBATCH --qos=m2qm-efrc
 #SBATCH --job-name=dynamics
 #SBATCH --mail-type=None
 #SBATCH --mail-user=shuan.liu@northeastern.edu
@@ -291,7 +287,7 @@ job_array = """#!/bin/bash -l
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=16gb
 #SBATCH --distribution=cyclic:cyclic
-#SBATCH -t 1-00:00:00
+#SBATCH -t 4-00:00:00
 #SBATCH --error=/dev/null
 #SBATCH --output=/dev/null
 #SBATCH --array=1-{n_jobs:d}
@@ -299,9 +295,38 @@ job_array = """#!/bin/bash -l
 cd ./$SLURM_ARRAY_TASK_ID || exit 1
 
 # Thermal equilibrium
-python tool_magnetization.py
+python /home/shuan.liu.neu/git/spin_dynamics/tools/tool_magnetization.py
 
 # Dynamics
-python tool_staircase.py
+python /home/shuan.liu.neu/git/spin_dynamics/tools/tool_staircase.py
+"""
+
+job_array_scan = """#!/bin/bash -l
+
+#SBATCH --account=m2qm-efrc
+#SBATCH --qos=m2qm-efrc
+#SBATCH --job-name=dynamics
+#SBATCH --mail-type=None
+#SBATCH --mail-user=shuan.liu@northeastern.edu
+#SBATCH --partition=hpg-default
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=16gb
+#SBATCH --distribution=cyclic:cyclic
+#SBATCH -t 4-00:00:00
+#SBATCH --error=/dev/null
+#SBATCH --output=/dev/null
+#SBATCH --array=1-{n_jobs:d}
+
+cd ./$SLURM_ARRAY_TASK_ID || exit 1
+
+# Thermal equilibrium
+if [ $SLURM_ARRAY_TASK_ID -eq 1 ]; then
+    python /home/shuan.liu.neu/git/spin_dynamics/tools/tool_magnetization.py
+fi
+
+# Dynamics
+python /home/shuan.liu.neu/git/spin_dynamics/tools/tool_staircase.py
 """
 

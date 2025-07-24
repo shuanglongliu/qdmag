@@ -645,6 +645,36 @@ def get_h_anisotropy(spins, anisotropy):
         h_ani = h_ani + get_h_anisotropy_one_site(spins, anisotropy[i_site])
     return h_ani
     
+def get_h_anisotropy_one_site_ikq(spins, site, ikq):
+    i = site['site']
+    S = spins.Ss[i-1]
+    ks = site['ks']
+    qs = site['qs']
+    Bkqs = site['Bkqs']
+    A = site['reference_frame']
+    A = np.array(A).reshape((3,3))
+    
+    nB = len(Bkqs)
+    h_ani = spins.zero
+    ops = copy.deepcopy(spins.IDs)
+    if ikq < 0:
+        print("ikq should be non-negative. Stopping ...")
+        exit()
+    if ikq >= nB:
+        print("ikq is out of range. Stopping ...")
+        exit()
+    ops[i-1] = StevensOpA(S, ks[ikq], qs[ikq], A)
+    h_ani = h_ani + Bkqs[ikq]*get_kronecker_product(ops, spins.nS)
+
+    return h_ani
+
+def get_h_anisotropy_ikq(spins, anisotropy, ikq):
+    h_ani = spins.zero
+    ## n_site = number of local spins
+    for i_site in range(spins.nS):
+        h_ani = h_ani + get_h_anisotropy_one_site_ikq(spins, anisotropy[i_site], ikq)
+    return h_ani
+    
 ## =================================================================
 ## Functions for the Zeeman term.
 ## =================================================================
@@ -785,6 +815,26 @@ def get_Zeeman_energy_levels_Mv_tot(h0, Mv_tot, BET_Bgrid):
             f.write((" {:12.6f}" + eigen.dim*" {:15.9f}" + "\n").format(B, *eigenvalues[i]))
 
     print("The Zeeman energy levels are saved in Zeeman_eff.dat.")
+
+def save_projections(eigen, S):
+    """
+    A temporary function to save the projections of all eigenstates on the |Ms> basis.
+    """
+
+    if not os.path.exists("./output"):
+        subprocess.run(["mkdir", "./output"])
+
+    state_indices = [i for i in range(eigen.dim+1)]
+    projections = 100*np.abs( eigen.eigenvectors )**2
+
+    with open("./output/projections.dat", "w") as f:
+        f.write(( eigen.dim*"{:>6d}" + "{:>6d}\n").format(*state_indices))
+        for i_basis in range(eigen.dim):
+            f.write("{:>6.1f}".format(i_basis - S))
+            for i_state in range(eigen.dim):
+                f.write("{:>6.1f}".format(projections[i_basis, i_state]))
+            f.write("\n")
+    return
 
 ## ================================================================
 ## Functions for thermodynamic properties.

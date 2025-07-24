@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from spin_dynamics.dynamics.common import spy_sparsity
 
@@ -219,6 +220,29 @@ def spy_the_effective_system(h_eff, S2_eff, Sz_eff, Mv_eff, X_eff):
     spy_sparsity(My_eff_abs,   "My_eff_abs",   precision=1.0e-8, figsize=(10, 10), markersize=5)
     spy_sparsity(Mz_eff_abs,   "Mz_eff_abs",   precision=1.0e-8, figsize=(10, 10), markersize=5)
     spy_sparsity(X_eff,        "X_eff",        precision=1.0e-8, figsize=(10, 10), markersize=5)
+
+    return
+
+
+def spy_O(O, tag="O"):
+    """
+    Spy an operator O.
+    """
+
+    n = O.shape[0]
+
+    O_abs = np.abs(O)
+
+    # Check if the output directory exists, if not, create it.
+    if not os.path.exists("./output"):
+        os.makedirs("./output")
+
+    with open ("./output/{:s}_abs.dat".format(tag), "w") as f:
+        for i in range(n):
+            for j in range(n):
+                f.write("{:5d} {:5d} {:12.4e}\n".format(i, j, O_abs[i, j]))
+
+    spy_sparsity(O_abs, "{:s}_abs".format(tag), precision=1.0e-8, figsize=(10, 10), markersize=5) 
 
     return
 
