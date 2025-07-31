@@ -4,14 +4,14 @@ import time
 from os import environ
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from spin_dynamics.dynamics.common import *
-from spin_dynamics.dynamics.von_neumann import *
-from spin_dynamics.dynamics.schrodinger import *
-from spin_dynamics.dynamics.quantum_master import *
-from spin_dynamics.dynamics.effective_basis import * 
-from spin_dynamics.dynamics.super_quantum_master import *
-from spin_dynamics.dynamics.pulse import get_Bt
-from spin_dynamics.dynamics.hdf5_functions import get_rho_from_hdf5
+from spin_dynamics.core.common import *
+from spin_dynamics.core.von_neumann import *
+from spin_dynamics.core.schrodinger import *
+from spin_dynamics.core.quantum_master import *
+from spin_dynamics.core.effective_basis import * 
+from spin_dynamics.core.liouville import *
+from spin_dynamics.core.pulse import get_Bt
+from spin_dynamics.core.hdf5 import get_rho_from_hdf5
 
 
 
@@ -80,7 +80,7 @@ if __name__ == "__main__":
 
     # Solve the eigenvalue problem
 
-    eigen = eigen_spin_hamiltonian(h_ex + h_ani + h_zee)
+    eigen = eigen_handy(h_ex + h_ani + h_zee)
 
 
 
@@ -143,7 +143,7 @@ if __name__ == "__main__":
 
     # Eigenvalues and eigenvectors of the effective Hamiltonian
 
-    #eigen0_eff = eigen_spin_hamiltonian(h0_eff)
+    #eigen0_eff = eigen_handy(h0_eff)
 
     #save_eigenvalues(eigen0_eff, offset=True)
     #save_eigenvectors(eigen0_eff)
@@ -160,7 +160,7 @@ if __name__ == "__main__":
     # State composition
 
     h_eff = h_t0_eff + get_h_Zeeman_Mv_tot(Mv_eff, [0,0,6.4134], 'cartesian') # 2.5, 3.731
-    eigen_eff = eigen_spin_hamiltonian(h_eff)
+    eigen_eff = eigen_handy(h_eff)
     save_projections(eigen_eff, 15/2)
 
 

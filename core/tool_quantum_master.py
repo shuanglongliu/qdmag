@@ -2,11 +2,11 @@ import os
 import sys
 import time
 from os import environ
-from spin_dynamics.dynamics.common import *
-from spin_dynamics.dynamics.pulse import *
-from spin_dynamics.dynamics.von_neumann import *
-from spin_dynamics.dynamics.schrodinger import *
-from spin_dynamics.dynamics.quantum_master import *
+from spin_dynamics.core.common import *
+from spin_dynamics.core.pulse import *
+from spin_dynamics.core.von_neumann import *
+from spin_dynamics.core.schrodinger import *
+from spin_dynamics.core.quantum_master import *
 
 environ['OMP_NUM_THREADS'] = '2'
 
@@ -59,7 +59,7 @@ if __name__ == "__main__":
 
     # Eigenvalues and eigenvectors of the initial Hamiltonian
 
-    eigen0 = eigen_spin_hamiltonian(h0)
+    eigen0 = eigen_handy(h0)
 
 
 

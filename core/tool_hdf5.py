@@ -1,4 +1,3 @@
-
 import h5py
 
 def test_hdf5():
@@ -21,26 +20,6 @@ def test_hdf5():
 
 
 if __name__ == "__main__":
+
     test_hdf5()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

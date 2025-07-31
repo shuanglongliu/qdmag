@@ -1,14 +1,14 @@
 import os
 import sys
 import time
-from os import environ
-from spin_dynamics.dynamics.common import *
-from spin_dynamics.dynamics.von_neumann import *
-from spin_dynamics.dynamics.schrodinger import *
-from spin_dynamics.dynamics.quantum_master import *
-from spin_dynamics.dynamics.effective_basis import * 
-from spin_dynamics.dynamics.super_quantum_master import *
-from spin_dynamics.dynamics.pulse import *
+from spin_dynamics.core.common import *
+from spin_dynamics.core.von_neumann import *
+from spin_dynamics.core.schrodinger import *
+from spin_dynamics.core.quantum_master import *
+from spin_dynamics.core.effective_basis import * 
+from spin_dynamics.core.liouville import *
+from spin_dynamics.core.pulse import get_Bt
+from spin_dynamics.core.classical_rate import get_Pe, evolve_P_stairs
 
 
 
@@ -69,6 +69,8 @@ if __name__ == "__main__":
 
 
     # Basis transformation
+    # The basis functions are the common eigenstates of the isotropic exchange interaction and the Sz_tot operator
+    # A perturbation is added to the isotropic exchange interaction to void mixing of different Sz states
 
     h_ex_iso = get_h_exchange_iso(spins, exchange, -2)
     eigen_p = get_perturbed_basis(h_ex_iso, spins, [0,0,1e-4])
@@ -88,16 +90,27 @@ if __name__ == "__main__":
 
 
 
-    # Set up the double super quantum master equation
+    # Initial distribution probabilities
 
-    D0_eff, D_eff, Rhbar_eff, C_eff, CST_eff, dims, dimds = set_up_double_super_qme(h_t0_eff, h_tmin_eff, X_eff, dim, I0, T, lambdaa)
+    ## Construct the initial density matrix
+
+    eigen_tmin_eff = eigen_simple(h_tmin_eff)
+
+    ### Construct the initial density matrix on the eigenbasis of h_tmin_eff
+    P0_eff = get_Pe(eigen_tmin_eff.eigenvalues, T)
 
 
+    # Time evolution
 
-    # Examine the biggest element of the time evolution operator
+    start = time.time()
 
-    Bs = np.linspace(0, 50, 1001, endpoint=True)
-    deltats = [1e-3, 1e-2, 1e-1, 1., 10., 20., 30., 40., 50., 60., 70., 80., 90., 100., 1e3, 1e4, 1e5, 1e6 ]
-    examine_D_max_and_expDdeltat_max(Bs, deltats, "0-50T", D_eff, D0_eff, h_t0_eff, h_tmin_eff, Mz_eff, C_eff, CST_eff, X_eff, Rhbar_eff, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+    # Evolve the double super density matrix
+    nu0 = 1e3  # Hz
+    symmetric = True  # Symmetric evolution
+    nt_save = 1
+    tmax, P_eff = evolve_P_stairs(P0_eff, nu0, symmetric, tmin, tmax, deltat, Bt_params, T, h_t0_eff, Mz_eff, nt_save, dim)
 
+    end   = time.time()
     
+    print("Time used for evolution: {:8.3f} s\n".format(end - start) )
+

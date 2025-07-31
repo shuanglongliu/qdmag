@@ -1,7 +1,7 @@
 import os
 import sys
 import time
-from spin_dynamics.dynamics.common import *
+from spin_dynamics.core.common import *
 
 
 

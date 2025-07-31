@@ -1,11 +1,11 @@
 import os
 from timeit import default_timer as timer
-from spin_dynamics.dynamics.common import *
-from spin_dynamics.dynamics.pulse import *
-from spin_dynamics.dynamics.von_neumann import *
-from spin_dynamics.dynamics.schrodinger import *
-from spin_dynamics.dynamics.quantum_master import *
-from spin_dynamics.dynamics.effective_basis import * 
+from spin_dynamics.core.common import *
+from spin_dynamics.core.pulse import *
+from spin_dynamics.core.von_neumann import *
+from spin_dynamics.core.schrodinger import *
+from spin_dynamics.core.quantum_master import *
+from spin_dynamics.core.effective_basis import * 
 
 
 
@@ -94,7 +94,7 @@ if __name__ == "__main__":
 
     # Eigenvalues and eigenvectors of the effective Hamiltonian
 
-    # eigen_eff = eigen_spin_hamiltonian(h_eff)
+    # eigen_eff = eigen_handy(h_eff)
 
     # save_eigenvalues(eigen_eff, offset=True, suffix="eff")
     # save_eigenvectors(eigen_eff, suffix="eff")
@@ -109,7 +109,7 @@ if __name__ == "__main__":
 
     # Initial density matrix
     # h0_eff = h_eff
-    # eigen0_eff = eigen_spin_hamiltonian(h0_eff)
+    # eigen0_eff = eigen_handy(h0_eff)
     # rho0_eff = get_rho0(eigen0_eff, T)
 
     # rho0_eff = np.zeros(h0_eff.shape, dtype = np.complex128)

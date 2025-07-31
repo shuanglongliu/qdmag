@@ -44,7 +44,7 @@ if __name__ == "__main__":
 
     # Solve the eigenvalue problem
 
-    #eigen = eigen_spin_hamiltonian(h_ex)
+    #eigen = eigen_handy(h_ex)
 
 
 
@@ -61,7 +61,7 @@ if __name__ == "__main__":
 
     # Eigenvalues and eigenvectors of the initial Hamiltonian
 
-    eigen0 = eigen_spin_hamiltonian(h_ex)
+    eigen0 = eigen_handy(h_ex)
 
     # Initial density matrix
 
@@ -91,7 +91,7 @@ if __name__ == "__main__":
 
     # Final magnetic moment if the system is in equilibrium
 
-    #M = get_M_at_BET_plain((spins, h_ex, h_ani, Bs2[-1], theta_B, phi_B, 0, 0, 0, T))
+    #M = get_M_at_BET_plain((spins, h_ex, h_ani, Bs2[-1], theta_B, phi_B, T))
     #print("  Final M = {:12.4E} {:12.4E} {:12.4E} mu_B (if in equilibrium)".format(*M))
 
 

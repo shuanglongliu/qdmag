@@ -1,6 +1,6 @@
 import sys
 import numpy as np
-from spin_dynamics.dynamics.data import input
+from spin_dynamics.core.data import input
 
 def get_input(*args):
     T, lambdaa, I0, \

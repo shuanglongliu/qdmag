@@ -5,10 +5,10 @@ import subprocess
 import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation as R
-from spin_dynamics.dynamics.common import print_emat_array
-from spin_dynamics.dynamics.data import input_powder
-from spin_dynamics.dynamics.data import job_script
-from spin_dynamics.dynamics.data import job_array
+from spin_dynamics.core.common import print_emat_array
+from spin_dynamics.core.data import input_powder
+from spin_dynamics.core.data import job_script
+from spin_dynamics.core.data import job_array
 
 source_dir = "/home/shuan.liu.neu/git/spin_dynamics/"
 root_dir = os.path.dirname(os.path.abspath(__file__)) + '/'

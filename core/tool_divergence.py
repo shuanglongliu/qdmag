@@ -1,14 +1,14 @@
 import os
 import sys
 import time
-from spin_dynamics.dynamics.common import *
-from spin_dynamics.dynamics.von_neumann import *
-from spin_dynamics.dynamics.schrodinger import *
-from spin_dynamics.dynamics.quantum_master import *
-from spin_dynamics.dynamics.effective_basis import * 
-from spin_dynamics.dynamics.super_quantum_master import *
-from spin_dynamics.dynamics.pulse import get_Bt
-from spin_dynamics.dynamics.hdf5_functions import get_rho_from_hdf5
+from os import environ
+from spin_dynamics.core.common import *
+from spin_dynamics.core.von_neumann import *
+from spin_dynamics.core.schrodinger import *
+from spin_dynamics.core.quantum_master import *
+from spin_dynamics.core.effective_basis import * 
+from spin_dynamics.core.liouville import *
+from spin_dynamics.core.pulse import *
 
 
 
@@ -69,8 +69,6 @@ if __name__ == "__main__":
 
 
     # Basis transformation
-    # The basis functions are the common eigenstates of the isotropic exchange interaction and the Sz_tot operator
-    # A perturbation is added to the isotropic exchange interaction to void mixing of different Sz states
 
     h_ex_iso = get_h_exchange_iso(spins, exchange, -2)
     eigen_p = get_perturbed_basis(h_ex_iso, spins, [0,0,1e-4])
@@ -96,36 +94,10 @@ if __name__ == "__main__":
 
 
 
-    # Initial density matrix
+    # Examine the biggest element of the time evolution operator
 
-    ## Construct the initial density matrix
+    Bs = np.linspace(0, 50, 1001, endpoint=True)
+    deltats = [1e-3, 1e-2, 1e-1, 1., 10., 20., 30., 40., 50., 60., 70., 80., 90., 100., 1e3, 1e4, 1e5, 1e6 ]
+    examine_D_max_and_expDdeltat_max(Bs, deltats, "0-50T", D_eff, D0_eff, h_t0_eff, h_tmin_eff, Mz_eff, C_eff, CST_eff, X_eff, Rhbar_eff, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
 
-    eigen_tmin_eff = eigen_spin_hamiltonian(h_tmin_eff)
-
-    ### Construct the initial density matrix on the eigenbasis of h_tmin_eff
-    rho0_eff = get_rhoe(eigen_tmin_eff.eigenvalues, T)
-
-    ### Transform the density matrix from the eigenbasis of h_tmin_eff to the common eigenbasis (the perturbed basis)
-    rho0_eff = back_transform_O(rho0_eff, eigen_tmin_eff)
-
-    #### Convert the density matrix to the double super density matrix
-    double_super_rho0_eff = convert_rho_to_dsrho(rho0_eff)
-
-    ## Read the initial density matrix from a file
-
-    # fname = "/blue/m2qm-efrc/shuan.liu.neu/projects/spin_dynamics/output/double_super_rho_0.000-10.000_step0.001ps.hdf5"
-    # double_super_rho0_eff = get_rho_from_hdf5(fname, tmin, dimds)
-
-
-
-    # Time evolution
-
-    start = time.time()
-
-    # Evolve the double super density matrix
-    tmax, double_super_rho_eff = evolve_rho_dsqme_stairs(tmin, tmax, deltat, Bt_params, double_super_rho0_eff, D_eff, D0_eff, h_t0_eff, Mz_eff, C_eff, CST_eff, X_eff, Rhbar_eff, lambdaa, I0, T, dim, dims, dimds, save_mag, nt_mag, save_rho, nt_rho)
-
-    end   = time.time()
     
-    print("Time used for evolution: {:8.3f} s\n".format(end - start) )
-

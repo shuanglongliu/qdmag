@@ -1,5 +1,5 @@
 import os
-from spin_dynamics.dynamics.common import *
+from spin_dynamics.core.common import *
 
 if __name__ == "__main__":
 
