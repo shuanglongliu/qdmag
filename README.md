@@ -6,3 +6,8 @@ Set the variable "\_\_file\_\_" in \_\_init\_\_.py to "path/to/spin\_dynamics/" 
 
 The exchange term and the Zeeman term commute if the exchange couplings are isotropic and the g tensors are isotropic and identical. When the exchange term and the Zeeman term commute, we adopt the eigenstates of h\_ex + h\_zee(Bz = 1e-4 T) as basis functions, which are referred to as the perturbed basis. On the perturbed basis, both h\_ex and h\_zee (or Mz\_tot) is diagonal and real. 
 
+# Tools
+
+## tool_staircare.py
+
+An example code for solving the Liouville-form quantum master equation using the staircase approximation.
