@@ -102,7 +102,7 @@ if __name__ == "__main__":
 
     # Set up the double super quantum master equation
 
-    D0_eff, Mz_eff_diag, dim, dims, dimds = set_up_double_super_qme(h0_eff, Mv_eff[2], X_eff, Rhbar_eff, lambdaa)
+    D0_eff, Mz_eff_diag, dim, dims, dimds = set_up_liouville(h0_eff, Mv_eff[2], X_eff, Rhbar_eff, lambdaa)
 
     #spy_double_super_system(D0_eff, "D0_eff", dimds); exit()
 
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     rho0_eff = np.zeros((dim, dim))
     rho0_eff[0, 0] = 1.0
 
-    double_super_rho0_eff = convert_rho_to_dsrho(rho0_eff)
+    vrhos0_eff = convert_rho_to_vrhos(rho0_eff)
 
 
 
@@ -137,9 +137,9 @@ if __name__ == "__main__":
 
     start = time.time()
 
-    double_super_rho_eff = evolve_rho_dsqme(D0_eff, Mz_eff_diag, double_super_rho0_eff, nt, deltat, Bs2, dim, dims)
+    vrhos_eff = evolve_rho_dsqme(D0_eff, Mz_eff_diag, vrhos0_eff, nt, deltat, Bs2, dim, dims)
 
-    rho_eff = convert_dsrho_to_rho(double_super_rho_eff, dim, dims, dimds)
+    rho_eff = convert_vrhos_to_rho(vrhos_eff, dim, dims, dimds)
 
     end   = time.time()
 

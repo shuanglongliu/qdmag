@@ -6,7 +6,7 @@ from spin_dynamics.core.common import get_h_exchange, get_h_anisotropy, get_h_Ze
 from spin_dynamics.core.common import get_perturbed_basis, transform_O, back_transform_O, transform_Mv_tot
 from spin_dynamics.core.von_neumann import get_rhoe
 from spin_dynamics.core.effective_basis import set_up_the_effective_system
-from spin_dynamics.core.liouville import convert_rho_to_dsrho, set_up_double_super_qme, evolve_rho_dsqme_stairs
+from spin_dynamics.core.liouville import convert_rho_to_vrhos, set_up_liouville, evolve_rho_dsqme_stairs
 from spin_dynamics.core.pulse import get_Bt
 from spin_dynamics.core.hdf5 import get_rho_from_hdf5
 
@@ -24,7 +24,6 @@ if __name__ == "__main__":
 
 
     # Control parameters for time evolution
-
     T             = dynamics[0]['T']             # Temperature in K
     lambdaa       = dynamics[0]['lambdaa']       # Spin phonon coupling constant in cm-1
     I0            = dynamics[0]['I0']            # Prefactor for the phonon density of states
@@ -89,7 +88,7 @@ if __name__ == "__main__":
 
     # Set up the double super quantum master equation
 
-    D0_eff, D_eff, Rhbar_eff, C_eff, CST_eff, dims, dimds = set_up_double_super_qme(h_t0_eff, h_tmin_eff, X_eff, dim, I0, T, lambdaa)
+    L0_eff, L_eff, Rhbar_eff, C_eff, CST_eff, dims, dimds = set_up_liouville(h_t0_eff, h_tmin_eff, X_eff, dim, I0, T, lambdaa)
 
 
 
@@ -107,12 +106,12 @@ if __name__ == "__main__":
     rho0_eff = back_transform_O(rho0_eff, eigen_tmin_eff)
 
     #### Convert the density matrix to the double super density matrix
-    double_super_rho0_eff = convert_rho_to_dsrho(rho0_eff)
+    vrhos0_eff = convert_rho_to_vrhos(rho0_eff)
 
     ## Read the initial density matrix from a file
 
-    # fname = "/blue/m2qm-efrc/shuan.liu.neu/projects/spin_dynamics/output/double_super_rho_0.000-10.000_step0.001ps.hdf5"
-    # double_super_rho0_eff = get_rho_from_hdf5(fname, tmin, dimds)
+    # fname = "/blue/m2qm-efrc/shuan.liu.neu/projects/spin_dynamics/output/vrhos_0.000-10.000_step0.001ps.hdf5"
+    # vrhos0_eff = get_rho_from_hdf5(fname, tmin, dimds)
 
 
 
@@ -121,7 +120,7 @@ if __name__ == "__main__":
     start = time.time()
 
     # Evolve the double super density matrix
-    tmax, double_super_rho_eff = evolve_rho_dsqme_stairs(tmin, tmax, deltat, Bt_params, double_super_rho0_eff, D_eff, D0_eff, h_t0_eff, Mz_eff, C_eff, CST_eff, X_eff, Rhbar_eff, lambdaa, I0, T, dim, dims, dimds, save_mag, nt_mag, save_rho, nt_rho)
+    tmax, vrhos_eff = evolve_rho_dsqme_stairs(tmin, tmax, deltat, Bt_params, vrhos0_eff, L_eff, L0_eff, h_t0_eff, Mz_eff, C_eff, CST_eff, X_eff, Rhbar_eff, lambdaa, I0, T, dim, dims, dimds, save_mag, nt_mag, save_rho, nt_rho)
 
     end   = time.time()
     

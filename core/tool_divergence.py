@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
     # Set up the double super quantum master equation
 
-    D0_eff, D_eff, Rhbar_eff, C_eff, CST_eff, dims, dimds = set_up_double_super_qme(h_t0_eff, h_tmin_eff, X_eff, dim, I0, T, lambdaa)
+    D0_eff, D_eff, Rhbar_eff, C_eff, CST_eff, dims, dimds = set_up_liouville(h_t0_eff, h_tmin_eff, X_eff, dim, I0, T, lambdaa)
 
 
 

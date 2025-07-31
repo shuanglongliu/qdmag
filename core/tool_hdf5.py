@@ -1,8 +1,8 @@
 import h5py
 
 def test_hdf5():
-    fname = "/home/shuan.liu.neu/git/spin_dynamics/output/double_super_rho_0.000-10.000.hdf5"
-    fname = "/home/shuan.liu.neu/git/spin_dynamics/output/double_super_rho_0.000-10000.000.hdf5"
+    fname = "/home/shuan.liu.neu/git/spin_dynamics/output/vrhos_0.000-10.000.hdf5"
+    fname = "/home/shuan.liu.neu/git/spin_dynamics/output/vrhos_0.000-10000.000.hdf5"
     fname = "/home/shuan.liu.neu/git/spin_dynamics/output/double_super_U.hdf5"
     with h5py.File(fname, "r") as f1:
         h5keys = list ( f1.keys() )

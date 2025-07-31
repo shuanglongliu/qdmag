@@ -24,12 +24,12 @@ Liouville superoperator can be written as a matrix, which allows the appl-
 ication of the analytical solution on each step of the stairs.
 
 The quantum master equation reads (in the units given later)
-    d (rhore, rhoim)^T / d t = np.array([[D11, D12], [D21, D22]]) (rhore, rhoim)^T
+    d (rhore, rhoim)^T / d t = np.array([[L11, L12], [L21, L22]]) (rhore, rhoim)^T
 
-    D11 =  const1 * Aim - lambdaa**2 pi const1**2 (Cre + CSTre)
-    D12 =  const1 * Are + lambdaa**2 pi const1**2 (Cim + CSTim)
-    D21 = -const1 * Are - lambdaa**2 pi const1**2 (Cim - CSTim)
-    D22 =  const1 * Aim - lambdaa**2 pi const1**2 (Cre - CSTre)
+    L11 =  const1 * Aim - lambdaa**2 pi const1**2 (Cre + CSTre)
+    L12 =  const1 * Are + lambdaa**2 pi const1**2 (Cim + CSTim)
+    L21 = -const1 * Are - lambdaa**2 pi const1**2 (Cim - CSTim)
+    L22 =  const1 * Aim - lambdaa**2 pi const1**2 (Cre - CSTre)
  
 Units: 
     cm-1 for energy
@@ -50,24 +50,24 @@ Dimensions:
 # Functions for formatting the density matrix.
 # ============================================================================ #
 
-def convert_rho_to_dsrho(rho):
+def convert_rho_to_vrhos(rho):
     """
     Convert density matrix to double super density matrix.
     """
-    super_rho = rho.flatten()
-    super_rho_re = np.real(super_rho)
-    super_rho_im = np.imag(super_rho)
-    dsrho = np.concatenate((super_rho_re, super_rho_im))
-    return dsrho
+    vrho = rho.flatten()
+    vrho_re = np.real(vrho)
+    vrho_im = np.imag(vrho)
+    vrhos = np.concatenate((vrho_re, vrho_im))
+    return vrhos
 
-def convert_dsrho_to_rho(dsrho, dim, dims, dimds):
+def convert_vrhos_to_rho(vrhos, dim, dims, dimds):
     """
     Convert double super density matrix to density matrix.
     """
-    super_rho_re = dsrho[0:dims]
-    super_rho_im = dsrho[dims:dimds]
-    super_rho = super_rho_re + 1j * super_rho_im
-    rho = super_rho.reshape((dim, dim))
+    vrho_re = vrhos[0:dims]
+    vrho_im = vrhos[dims:dimds]
+    vrho = vrho_re + 1j * vrho_im
+    rho = vrho.reshape((dim, dim))
     return rho
 
 
@@ -76,17 +76,17 @@ def convert_dsrho_to_rho(dsrho, dim, dims, dimds):
 # Functions for calculating magnetic moment. 
 # ============================================================================ #
 
-def get_Mv_from_dsrho(dsrho, Mv, dim, dims, dimds):
+def get_Mv_from_vrhos(vrhos, Mv, dim, dims, dimds):
 
-    rho = convert_dsrho_to_rho(dsrho, dim, dims, dimds)
+    rho = convert_vrhos_to_rho(vrhos, dim, dims, dimds)
 
     M = get_Mv_from_rho(rho, Mv)
 
     return M
 
-def get_Mz_from_dsrho(dsrho, Mz, dim, dims, dimds):
+def get_Mz_from_vrhos(vrhos, Mz, dim, dims, dimds):
 
-    rho = convert_dsrho_to_rho(dsrho, dim, dims, dimds)
+    rho = convert_vrhos_to_rho(vrhos, dim, dims, dimds)
 
     return get_Mz_from_rho(rho, Mz)
 
@@ -113,14 +113,14 @@ def get_chimz_from_rho(h, Bt, t, Mz_tot, rho, X, Rhbar, lambdaa, dt=1e+3):
     # print("    chimz = {:15.6e}".format(chimz))
     return chimz
 
-def get_chimz_from_dsrho(h, h_t0, Bt, t, Mz, dsrho, X, Rhbar, lambdaa, I0, T, dim, dims, dimds):
+def get_chimz_from_vrhos(h, h_t0, Bt, t, Mz, vrhos, X, Rhbar, lambdaa, I0, T, dim, dims, dimds):
     """
     Wrapper for get_chimz_from_rho
     h_t0: Hamiltonian at time t=0 ps
     Bt: Magnetic field as a function of time t
     t: Time
     Mz: z component of the total magnetic moment operator
-    dsrho: Double super density matrix
+    vrhos: vectorized density matrix with the real and imaginary parts separated (double super density matrix)
     X: Spin transition matrix
     Rhbar: Spin-phonon coupling superoperator
     lambdaa: Spin-phonon coupling constant
@@ -135,8 +135,8 @@ def get_chimz_from_dsrho(h, h_t0, Bt, t, Mz, dsrho, X, Rhbar, lambdaa, I0, T, di
     # Rhbar at time t
     Rhbar = update_Rhbar(Rhbar, h, X, I0, T)
 
-    # Get the density matrix rho from the double super density matrix dsrho
-    rho = convert_dsrho_to_rho(dsrho, dim, dims, dimds)
+    # Get the density matrix rho from the double super density matrix vrhos
+    rho = convert_vrhos_to_rho(vrhos, dim, dims, dimds)
 
     # Call get_chimz_from_rho
     chimz = get_chimz_from_rho(h, Bt, t, Mz, rho, X, Rhbar, lambdaa)
@@ -144,18 +144,18 @@ def get_chimz_from_dsrho(h, h_t0, Bt, t, Mz, dsrho, X, Rhbar, lambdaa, I0, T, di
     return chimz
 
 
-def get_chimz_finite_diff(dsrho, t1, dt, Bt, D, D0, h, h_t0, Mz_op, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds):
+def get_chimz_finite_diff(vrhos, t1, dt, Bt, L, L0, h, h_t0, Mz_op, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds):
     """
-    dsrho: Double super density matrix at time t1
+    vrhos: Double super density matrix at time t1
     """
 
     B1 = Bt(t1)
     B2 = Bt(t1 + dt)
 
-    M1 = get_Mz_from_dsrho(dsrho, Mz_op, dim, dims, dimds)
+    M1 = get_Mz_from_vrhos(vrhos, Mz_op, dim, dims, dimds)
 
-    dsrho2 = evolve_rho_dsqme_onestair(dsrho, dt, D, D0, h, h_t0, Mz_op, B1, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
-    M2 = get_Mz_from_dsrho(dsrho2, Mz_op, dim, dims, dimds)
+    vrhos2 = evolve_rho_dsqme_onestair(vrhos, dt, L, L0, h, h_t0, Mz_op, B1, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+    M2 = get_Mz_from_vrhos(vrhos2, Mz_op, dim, dims, dimds)
 
     chimz = (M2 - M1) / (B2 - B1)
 
@@ -319,22 +319,22 @@ def construct_CST(C, dim, dims):
 
     return CST
 
-def construct_D(A, C, dim, dims, lambdaa):
+def construct_L(A, C, dim, dims, lambdaa):
     """
     The quantum master equation reads (in the units given at the beginning of this file)
-        d (rhore, rhoim)^T / d t = np.array([[D11, D12], [D21, D22]]) (rhore, rhoim)^T
+        d (rhore, rhoim)^T / d t = np.array([[L11, L12], [L21, L22]]) (rhore, rhoim)^T
     
-        D11 =  const1 * Aim - lambdaa**2 pi const1**2 (Cre + CSTre)
-        D12 =  const1 * Are + lambdaa**2 pi const1**2 (Cim + CSTim)
-        D21 = -const1 * Are - lambdaa**2 pi const1**2 (Cim - CSTim)
-        D22 =  const1 * Aim - lambdaa**2 pi const1**2 (Cre - CSTre)
+        L11 =  const1 * Aim - lambdaa**2 pi const1**2 (Cre + CSTre)
+        L12 =  const1 * Are + lambdaa**2 pi const1**2 (Cim + CSTim)
+        L21 = -const1 * Are - lambdaa**2 pi const1**2 (Cim - CSTim)
+        L22 =  const1 * Aim - lambdaa**2 pi const1**2 (Cre - CSTre)
 
     A: Superoperator for coherent evolution. See the function construct_A.
     C: Superoperator for spin-phonon coupling (incoherent evolution). See the function construct_C.
     dim: Dimension of the effective Hamiltonian
     dims: Dimension of superoperators
     lambdaa: spin-phonon coupling constant
-    only_from_A: If True, then only the contribution from A are included in D.
+    only_from_A: If True, then only the contribution from A are included in L.
 
     Note:
         A is real if H is diagonal (and thus real).
@@ -344,37 +344,37 @@ def construct_D(A, C, dim, dims, lambdaa):
     Aim = np.imag(A)
 
     if C is None:
-        # Construct D from A only
-        D11 =  const1 * Aim
-        D12 =  const1 * Are
-        D21 = -const1 * Are
-        D22 =  const1 * Aim
+        # Construct L from A only
+        L11 =  const1 * Aim
+        L12 =  const1 * Are
+        L21 = -const1 * Are
+        L22 =  const1 * Aim
     else:
         CST = construct_CST(C, dim, dims)
         Cre = np.real(C)
         Cim = np.imag(C)
         CSTre = np.real(CST)
         CSTim = np.imag(CST)
-        D11 =  const1 * Aim - lambdaa**2 * np.pi * const1**2 * (Cre + CSTre)
-        D12 =  const1 * Are + lambdaa**2 * np.pi * const1**2 * (Cim + CSTim)
-        D21 = -const1 * Are - lambdaa**2 * np.pi * const1**2 * (Cim - CSTim)
-        D22 =  const1 * Aim - lambdaa**2 * np.pi * const1**2 * (Cre - CSTre)
+        L11 =  const1 * Aim - lambdaa**2 * np.pi * const1**2 * (Cre + CSTre)
+        L12 =  const1 * Are + lambdaa**2 * np.pi * const1**2 * (Cim + CSTim)
+        L21 = -const1 * Are - lambdaa**2 * np.pi * const1**2 * (Cim - CSTim)
+        L22 =  const1 * Aim - lambdaa**2 * np.pi * const1**2 * (Cre - CSTre)
         
-    D1 = np.hstack((D11, D12))
-    D2 = np.hstack((D21, D22))
-    D  = np.vstack((D1 , D2 ))
+    L1 = np.hstack((L11, L12))
+    L2 = np.hstack((L21, L22))
+    L  = np.vstack((L1 , L2 ))
 
-    return D
+    return L
 
-def construct_D_from_A_diag(A_diag, dims):
+def construct_L_from_A_diag(A_diag, dims):
     """
     The quantum master equation reads (in the units given at the beginning of this file)
-        d (rhore, rhoim)^T / d t = np.array([[D11, D12], [D21, D22]]) (rhore, rhoim)^T
+        d (rhore, rhoim)^T / d t = np.array([[L11, L12], [L21, L22]]) (rhore, rhoim)^T
     
-        D11 =  const1 * Aim - lambdaa**2 pi const1**2 (Cre + CSTre)
-        D12 =  const1 * Are + lambdaa**2 pi const1**2 (Cim + CSTim)
-        D21 = -const1 * Are - lambdaa**2 pi const1**2 (Cim - CSTim)
-        D22 =  const1 * Aim - lambdaa**2 pi const1**2 (Cre - CSTre)
+        L11 =  const1 * Aim - lambdaa**2 pi const1**2 (Cre + CSTre)
+        L12 =  const1 * Are + lambdaa**2 pi const1**2 (Cim + CSTim)
+        L21 = -const1 * Are - lambdaa**2 pi const1**2 (Cim - CSTim)
+        L22 =  const1 * Aim - lambdaa**2 pi const1**2 (Cre - CSTre)
 
     A_diag = A.diagonal()
 
@@ -383,31 +383,31 @@ def construct_D_from_A_diag(A_diag, dims):
     dims: dimension of a super operator. dims = dim**2, where dim is the dimenion of the Hilbert space.
     """
 
-    D11 = np.zeros((dims, dims), dtype=np.float64)
-    D12 = np.zeros((dims, dims), dtype=np.float64)
-    D21 = np.zeros((dims, dims), dtype=np.float64)
-    D22 = np.zeros((dims, dims), dtype=np.float64)
+    L11 = np.zeros((dims, dims), dtype=np.float64)
+    L12 = np.zeros((dims, dims), dtype=np.float64)
+    L21 = np.zeros((dims, dims), dtype=np.float64)
+    L22 = np.zeros((dims, dims), dtype=np.float64)
 
     c1A_diag = const1 * A_diag
     for i in range(dims):
-        D12[i, i] =   c1A_diag[i]
-        D21[i, i] = - c1A_diag[i]
+        L12[i, i] =   c1A_diag[i]
+        L21[i, i] = - c1A_diag[i]
 
-    D1 = np.hstack((D11, D12))
-    D2 = np.hstack((D21, D22))
-    D  = np.vstack((D1 , D2 ))
+    L1 = np.hstack((L11, L12))
+    L2 = np.hstack((L21, L22))
+    L  = np.vstack((L1 , L2 ))
 
-    #D = csr_array(D)
+    #L = csr_array(L)
 
-    return D
+    return L
 
-def set_up_double_super_qme(h_t0_eff, h_tmin_eff, X_eff, dim, I0, T, lambdaa):
+def set_up_liouville(h_t0_eff, h_tmin_eff, X_eff, dim, I0, T, lambdaa):
     """
     h_t0: Hamiltonian at t = 0
     h_tmin: Hamiltonian at t = tmin
 
-    D0_eff: D matrix at t = 0 ps without spin-phonon coupling
-    D_eff: D matrix at t = tmin ps with spin-phonon coupling
+    L0_eff: L matrix at t = 0 ps without spin-phonon coupling
+    L_eff: L matrix at t = tmin ps with spin-phonon coupling
 
     dim: dimension of the effective Hilbert space.
     """
@@ -421,9 +421,9 @@ def set_up_double_super_qme(h_t0_eff, h_tmin_eff, X_eff, dim, I0, T, lambdaa):
     print("Dimension of superoperators: {:6d}".format(dims))
     print("Dimension of double superoperators: {:6d}\n".format(dimds))
 
-    # Construct the superoperator D_t0_eff at t = 0 ps without spin-phonon coupling
+    # Construct the superoperator L_t0_eff at t = 0 ps without spin-phonon coupling
     A_t0_eff = construct_A(h_t0_eff, dim, dims, diagonal_H=False, dtype=np.complex128)
-    D_t0_eff = construct_D(A_t0_eff, None, dim, dims, lambdaa)
+    L_t0_eff = construct_L(A_t0_eff, None, dim, dims, lambdaa)
 
     # Construct the superoperator A_tmin_eff at t = tmin ps
     A_tmin_eff = construct_A(h_tmin_eff, dim, dims, diagonal_H=False, dtype=np.complex128)
@@ -439,10 +439,10 @@ def set_up_double_super_qme(h_t0_eff, h_tmin_eff, X_eff, dim, I0, T, lambdaa):
     C_eff = construct_C(X_eff, Rhbar_eff, dim, dims)
     CST_eff = construct_CST(C_eff, dim, dims)
 
-    # Construct the superoperator D_tmin_eff at t = tmin ps with spin-phonon coupling
-    D_tmin_eff = construct_D(A_tmin_eff, C_eff, dim, dims, lambdaa)
+    # Construct the superoperator L_tmin_eff at t = tmin ps with spin-phonon coupling
+    L_tmin_eff = construct_L(A_tmin_eff, C_eff, dim, dims, lambdaa)
 
-    return (D_t0_eff, D_tmin_eff, Rhbar_eff, C_eff, CST_eff, dims, dimds)
+    return (L_t0_eff, L_tmin_eff, Rhbar_eff, C_eff, CST_eff, dims, dimds)
 
 # ============================================================================ #
 # Functions for updating the Liouville superoperator.
@@ -469,10 +469,10 @@ def update_C_and_CST(C, CST, X, Rhbar, dim, n_nzC, indices_nzC):
 
     return (C, CST)
 
-def update_D_under_magnetic_field(D, D0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds):
+def update_L_under_magnetic_field(L, L0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds):
     r"""
-    D: D matrix to be updated.
-    D0: D matrix at t = 0 ps.
+    L: L matrix to be updated.
+    L0: L matrix at t = 0 ps.
     h: Hamiltonian at t = t ps
       h is recalculated at each time step.
       save memory by avoiding memory allocation for h.
@@ -502,17 +502,17 @@ def update_D_under_magnetic_field(D, D0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_
     dimds = 2*dim^2: Dimension of double superoperators
     """
 
-    # In general, the D operator is as follows
-    # D11 =  const1 * Aim - lambdaa**2 * np.pi * const1**2 * (Cre + CSTre)
-    # D12 =  const1 * Are + lambdaa**2 * np.pi * const1**2 * (Cim + CSTim)
-    # D21 = -const1 * Are - lambdaa**2 * np.pi * const1**2 * (Cim - CSTim)
-    # D22 =  const1 * Aim - lambdaa**2 * np.pi * const1**2 * (Cre - CSTre)
+    # In general, the L operator is as follows
+    # L11 =  const1 * Aim - lambdaa**2 * np.pi * const1**2 * (Cre + CSTre)
+    # L12 =  const1 * Are + lambdaa**2 * np.pi * const1**2 * (Cim + CSTim)
+    # L21 = -const1 * Are - lambdaa**2 * np.pi * const1**2 * (Cim - CSTim)
+    # L22 =  const1 * Aim - lambdaa**2 * np.pi * const1**2 * (Cre - CSTre)
 
     # If Azee is diagonal and real, which is true when the g tensors are isotropic, 
     # only the following update is needed. (used in early versions of the code)
-    # D = [[D11, D12], [D21, D22]]
-    #       D12 = D012 + const1 * Azee
-    #       D21 = D021 - const1 * Azee
+    # L = [[L11, L12], [L21, L22]]
+    #       L12 = L012 + const1 * Azee
+    #       L21 = L021 - const1 * Azee
 
     # Calculate the A operator corresponding to the Zeeman interaction
 
@@ -535,39 +535,39 @@ def update_D_under_magnetic_field(D, D0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_
     factorCSTre = np.real(factorCST)
     factorCSTim = np.imag(factorCST)
 
-    # Add the Zeeman interaction and the spin-phonon coupling to the D matrix
-    D[   0:dims,     0: dims] = D0[   0:dims,     0: dims] + c1Azeeim - (factorCre + factorCSTre)
-    D[   0:dims,  dims:dimds] = D0[   0:dims,  dims:dimds] + c1Azeere + (factorCim + factorCSTim)
-    D[dims:dimds,    0: dims] = D0[dims:dimds,    0: dims] - c1Azeere - (factorCim - factorCSTim)
-    D[dims:dimds, dims:dimds] = D0[dims:dimds, dims:dimds] + c1Azeeim - (factorCre - factorCSTre)
+    # Add the Zeeman interaction and the spin-phonon coupling to the L matrix
+    L[   0:dims,     0: dims] = L0[   0:dims,     0: dims] + c1Azeeim - (factorCre + factorCSTre)
+    L[   0:dims,  dims:dimds] = L0[   0:dims,  dims:dimds] + c1Azeere + (factorCim + factorCSTim)
+    L[dims:dimds,    0: dims] = L0[dims:dimds,    0: dims] - c1Azeere - (factorCim - factorCSTim)
+    L[dims:dimds, dims:dimds] = L0[dims:dimds, dims:dimds] + c1Azeeim - (factorCre - factorCSTre)
 
-    return (D, h, Rhbar)
+    return (L, h, Rhbar)
 
 # ====================================================================================================== #
-# Functions for examining the maximum of the absolute values of the elements of D and exp(D * deltat).
+# Functions for examining the maximum of the absolute values of the elements of L and exp(L * deltat).
 # ====================================================================================================== #
 
-def get_D_max_and_expDdeltat_max(D, D0, deltat, h_t0, h, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds):
-    D, h, Rhbar = update_D_under_magnetic_field(D, D0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
-    D_max, expDdeltat_max = np.max(np.abs(D)), np.max(np.abs(expm(D*deltat)))
-    # print("B = {:15.6f} T, deltat = {:15.3f}  ps, max(|D|) = {:12.6f}, max(|exp(D * deltat)|) = {:12.6f}\n".format(B, deltat, D_max, expDdeltat_max))
-    return (D_max, expDdeltat_max)
+def get_L_max_and_expLdeltat_max(L, L0, deltat, h_t0, h, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds):
+    L, h, Rhbar = update_L_under_magnetic_field(L, L0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+    L_max, expLdeltat_max = np.max(np.abs(L)), np.max(np.abs(expm(L*deltat)))
+    # print("B = {:15.6f} T, deltat = {:15.3f}  ps, max(|L|) = {:12.6f}, max(|exp(L * deltat)|) = {:12.6f}\n".format(B, deltat, L_max, expLdeltat_max))
+    return (L_max, expLdeltat_max)
     
-def examine_D_max_and_expDdeltat_max(Bs, deltats, tag, D, D0, h_t0, h, Mz_op, C, CST, X, Rhbar, lambdaa, I0, T, dim, dims, dimds):
+def examine_L_max_and_expLdeltat_max(Bs, deltats, tag, L, L0, h_t0, h, Mz_op, C, CST, X, Rhbar, lambdaa, I0, T, dim, dims, dimds):
     """
-    Examine the maximum of the absolute values of the elements of D and exp(D * deltat)
+    Examine the maximum of the absolute values of the elements of L and exp(L * deltat)
     at various B fields and time steps.
     Bs: list of magnetic fields in Tesla.
     deltats: list of time steps in ps.
     """
 
     # Create an array of zeros of dimension m x n, where m is the number of B fields and n is the number of time steps. 
-    # The array will be filled with the maximum of the absolute values of the elements of D and exp(D * deltat).
+    # The array will be filled with the maximum of the absolute values of the elements of L and exp(L * deltat).
 
     m = len(Bs)
     n = len(deltats)
-    D_max = np.zeros((m, n))
-    expDdeltat_max = np.zeros((m, n))
+    L_max = np.zeros((m, n))
+    expLdeltat_max = np.zeros((m, n))
 
     # Which elements of C are nonzero?
     n_nzC, indices_nzC = get_indices_nzC(X, dim)
@@ -581,15 +581,15 @@ def examine_D_max_and_expDdeltat_max(Bs, deltats, tag, D, D0, h_t0, h, Mz_op, C,
             # Print the magnetic field and the time step
             print("B = {:15.6f} T, deltat = {:15.3f}  ps".format(B, deltat))
 
-            # Get the maximum of the absolute values of the elements of D and exp(D * deltat)
-            D_max[i, j], expDdeltat_max[i, j] = get_D_max_and_expDdeltat_max(D, D0, deltat, h_t0, h, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+            # Get the maximum of the absolute values of the elements of L and exp(L * deltat)
+            L_max[i, j], expLdeltat_max[i, j] = get_L_max_and_expLdeltat_max(L, L0, deltat, h_t0, h, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
 
     if not os.path.exists("./output"):
         os.makedirs("./output")
 
-    # Save D_max in the file D_max.dat, the first column is the magnetic field, and the first row is the time step.
+    # Save L_max in the file L_max.dat, the first column is the magnetic field, and the first row is the time step.
     # Ths first row should be a comment line starting with #.
-    with open("./output/D_max_" + tag + ".dat", "w") as f:
+    with open("./output/L_max_" + tag + ".dat", "w") as f:
         f.write("# ")
         for j in range(n):
             f.write("{:15.3f}".format(deltats[j]))
@@ -597,12 +597,12 @@ def examine_D_max_and_expDdeltat_max(Bs, deltats, tag, D, D0, h_t0, h, Mz_op, C,
         for i in range(m):
             f.write("{:15.6f}".format(Bs[i]))
             for j in range(n):
-                f.write(" {:15.6f}".format(D_max[i, j]))
+                f.write(" {:15.6f}".format(L_max[i, j]))
             f.write("\n")
 
-    # Save expDdeltat_max in the file expDdeltat_max.dat, the first column is the magnetic field, and the first row is the time step.
+    # Save expLdeltat_max in the file expLdeltat_max.dat, the first column is the magnetic field, and the first row is the time step.
     # Ths first row should be a comment line starting with #. 
-    with open("./output/expDdeltat_max_" + tag + ".dat", "w") as f:
+    with open("./output/expLdeltat_max_" + tag + ".dat", "w") as f:
         f.write("# ")
         for j in range(n):
             f.write("{:15.3f}".format(deltats[j]))
@@ -610,7 +610,7 @@ def examine_D_max_and_expDdeltat_max(Bs, deltats, tag, D, D0, h_t0, h, Mz_op, C,
         for i in range(m):
             f.write("{:15.6f}".format(Bs[i]))
             for j in range(n):
-                f.write(" {:15.6f}".format(expDdeltat_max[i, j]))
+                f.write(" {:15.6f}".format(expLdeltat_max[i, j]))
             f.write("\n")
 
     return
@@ -621,10 +621,10 @@ def examine_D_max_and_expDdeltat_max(Bs, deltats, tag, D, D0, h_t0, h, Mz_op, C,
 # Functions for calculating the long-time evolution operator.
 # ============================================================================ #
 
-def get_U_dsqe_longtime(t0, t1, deltat, D, D0, h, h_t0, Mz_op, Bt, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds):
+def get_U_dsqe_longtime(t0, t1, deltat, L, L0, h, h_t0, Mz_op, Bt, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds):
     r"""
-    Get the long-time evolution operator \Pi_i U = exp(D_i * deltat), where \Pi is the product operator.
-    The operators exp(D_i * deltat) are time-ordered such that later times are to the left of earlier times.
+    Get the long-time evolution operator \Pi_i U = exp(L_i * deltat), where \Pi is the product operator.
+    The operators exp(L_i * deltat) are time-ordered such that later times are to the left of earlier times.
     """
 
     half_deltat = deltat/2
@@ -640,8 +640,8 @@ def get_U_dsqe_longtime(t0, t1, deltat, D, D0, h, h_t0, Mz_op, Bt, C, CST, X, Rh
         B = Bt(t)
         # Print t and B for debugging
         # print("it = {:6d}, t = {:18.3f}, B = {:15.3e}".format(it, t, B))
-        D, h, Rhbar = update_D_under_magnetic_field(D, D0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
-        U = np.matmul(expm(D*deltat), U)
+        L, h, Rhbar = update_L_under_magnetic_field(L, L0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+        U = np.matmul(expm(L*deltat), U)
 
     if not os.path.exists("./output"):
         os.makedirs("./output")
@@ -672,11 +672,11 @@ def get_U_dsqe_longtime(t0, t1, deltat, D, D0, h, h_t0, Mz_op, Bt, C, CST, X, Rh
 # Functions for solving the quantum master equation.
 # ============================================================================ #
 
-def get_Dabc(Bs2_wavenumber, it, h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nzC):
+def get_Labc(Bs2_wavenumber, it, h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, L0, indices_nzC):
     """
-    Obtain Da = D(ts[it])
-           Db = D(ts[it] + deltat/2)
-           Dc = D(ts[it] + deltat)
+    Obtain La = L(ts[it])
+           Lb = L(ts[it] + deltat/2)
+           Lc = L(ts[it] + deltat)
 
     Bs2_wavenumber are the fields on the time grid with a time step of helf deltat.
 
@@ -684,17 +684,17 @@ def get_Dabc(Bs2_wavenumber, it, h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, 
     dims: dimension of a super operator. dims = dim**2.
     """
 
-    Da = get_D_at_Bfield(Bs2_wavenumber[2*it  ], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nzC)
-    Db = get_D_at_Bfield(Bs2_wavenumber[2*it+1], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nzC)
-    Dc = get_D_at_Bfield(Bs2_wavenumber[2*it+2], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nzC)
+    La = get_L_at_Bfield(Bs2_wavenumber[2*it  ], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, L0, indices_nzC)
+    Lb = get_L_at_Bfield(Bs2_wavenumber[2*it+1], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, L0, indices_nzC)
+    Lc = get_L_at_Bfield(Bs2_wavenumber[2*it+2], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, L0, indices_nzC)
 
-    return (Da, Db, Dc)
+    return (La, Lb, Lc)
 
-def get_Dabc_reuse_Da(Bs2_wavenumber, it, h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nzC, Da, Db, Dc):
+def get_Labc_reuse_La(Bs2_wavenumber, it, h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, L0, indices_nzC, La, Lb, Lc):
     """
-    Obtain Da = D(ts[it])
-           Db = D(ts[it] + deltat/2)
-           Dc = D(ts[it] + deltat)
+    Obtain La = L(ts[it])
+           Lb = L(ts[it] + deltat/2)
+           Lc = L(ts[it] + deltat)
 
     Bs2_wavenumber are the fields on the time grid with a time step of helf deltat.
 
@@ -702,44 +702,44 @@ def get_Dabc_reuse_Da(Bs2_wavenumber, it, h0_diag, minus_Mz_tot_diag, X, lambdaa
     dims: dimension of a super operator. dims = dim**2.
     """
 
-    Db = get_D_at_Bfield(Bs2_wavenumber[2*it+1], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nzC)
-    Dc = get_D_at_Bfield(Bs2_wavenumber[2*it+2], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, D0, indices_nzC)
+    Lb = get_L_at_Bfield(Bs2_wavenumber[2*it+1], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, L0, indices_nzC)
+    Lc = get_L_at_Bfield(Bs2_wavenumber[2*it+2], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, L0, indices_nzC)
 
-    return (Da, Db, Dc)
+    return (La, Lb, Lc)
 
-def evolve_deltat_dsqme(Da, Db, Dc, rho, deltat):
+def evolve_deltat_dsqme(La, Lb, Lc, rho, deltat):
     """
     Evolve rho by deltat using the Runge-Kutta method according to the quantum master equation
-        d rho / d t = D rho
+        d rho / d t = L rho
         rho = np.vstack(rhore, rhoim)
 
     Input: 
-      Da: D(t), the Liouville superoperator at time t. Unit: cm-1.
-      Db: D(t+deltat/2)
-      Dc: D(t+deltat). ha, hb, and hc are written on the basis of the eigenvectors of h0, i.e. the zero-field spin Hamiltonian.
+      La: L(t), the Liouville superoperator at time t. Unit: cm-1.
+      Lb: L(t+deltat/2)
+      Lc: L(t+deltat). ha, hb, and hc are written on the basis of the eigenvectors of h0, i.e. the zero-field spin Hamiltonian.
       rho: vectorized density matrix at time t rho(t) on the basis of the eigenvectors of h0.
       deltat: time step in ps.
     """
 
-    k1 = Da @ rho                   # np.matmul(Da, rho)
-    k2 = Db @ (rho + 0.5*deltat*k1) # np.matmul(Db, rho + 0.5*deltat*k1)
-    k3 = Db @ (rho + 0.5*deltat*k2) # np.matmul(Db, rho + 0.5*deltat*k2)
-    k4 = Dc @ (rho +     deltat*k3) # np.matmul(Dc, rho +     deltat*k3)
+    k1 = La @ rho                   # np.matmul(La, rho)
+    k2 = Lb @ (rho + 0.5*deltat*k1) # np.matmul(Lb, rho + 0.5*deltat*k1)
+    k3 = Lb @ (rho + 0.5*deltat*k2) # np.matmul(Lb, rho + 0.5*deltat*k2)
+    k4 = Lc @ (rho +     deltat*k3) # np.matmul(Lc, rho +     deltat*k3)
 
     rho_new = rho + deltat * (k1 + 2*k2 + 2*k3 + k4) / 6
 
     return rho_new
 
-def evolve_rho_dsqme(D0, Mz_tot_diag, dsrho, nt, deltat, Bs2, dim, dims):
+def evolve_rho_dsqme(L0, Mz_tot_diag, vrhos, nt, deltat, Bs2, dim, dims):
     """
     Evolve the density matrix using the Runge-Kutta method according to the quantum master equation.
 
     h0 and Mv_tot are written on the basis of the eigenvectors of h0.
 
     Input:
-      D0: double superoperator at t0 = ts[0]
+      L0: double superoperator at t0 = ts[0]
       Mz_tot_diag: diagnal matrix elements of the z component of the magnetization operators
-      dsrho: initial double super density matrix at t0.
+      vrhos: initial double super density matrix at t0.
       nt: number of time steps.
       delta: time step in unit of ps.
       Bs2: list of magnetic field on the double grid.
@@ -760,29 +760,29 @@ def evolve_rho_dsqme(D0, Mz_tot_diag, dsrho, nt, deltat, Bs2, dim, dims):
     minus_Mz_tot_diag = -1 * Mz_tot_diag
     Bs2_wavenumber = Bs2 * Tesla2wavenumber 
 
-    Da, Db, Dc = get_Dabc(D0, minus_Mz_tot_diag, 0, deltat, Bs2_wavenumber, dim, dims)
+    La, Lb, Lc = get_Labc(L0, minus_Mz_tot_diag, 0, deltat, Bs2_wavenumber, dim, dims)
 
-    dsrho = evolve_deltat_dsqme(Da, Db, Dc, dsrho, deltat)
-    #print("i = 0, max(dsrho) = ", np.max(np.absolute(dsrho)))
+    vrhos = evolve_deltat_dsqme(La, Lb, Lc, vrhos, deltat)
+    #print("i = 0, max(vrhos) = ", np.max(np.absolute(vrhos)))
 
     for i in range(1, nt):
-        Da, Db, Dc = get_Dabc_reuse_Da(D0, minus_Mz_tot_diag, i, deltat, Bs2_wavenumber, Dc, Da, Db, dim, dims)
-        dsrho = evolve_deltat_dsqme(Da, Db, Dc, dsrho, deltat)
+        La, Lb, Lc = get_Labc_reuse_La(L0, minus_Mz_tot_diag, i, deltat, Bs2_wavenumber, Lc, La, Lb, dim, dims)
+        vrhos = evolve_deltat_dsqme(La, Lb, Lc, vrhos, deltat)
 
-    return dsrho
+    return vrhos
 
-def evolve_rho_dsqme_onestair(dsrho, deltat, D, D0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds):
+def evolve_rho_dsqme_onestair(vrhos, deltat, L, L0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds):
     """
     Evolve rho by deltat of constant Bfield using the analytical solution of the quantum master equation
-        d rho / d t = D rho
+        d rho / d t = L rho
         rho = np.vstack(rhore, rhoim)
-        rho_new = exp(int_t1^t2 D dt) rho = exp(D deltat) rho
+        rho_new = exp(int_t1^t2 L dt) rho = exp(L deltat) rho
 
     Input: 
-        dsrho: double super density matrix
+        vrhos: double super density matrix
         deltat: time period for evolution
-        D: double superoperator
-        D0: double superoperator at zero magnetic field.
+        L: double superoperator
+        L0: double superoperator at zero magnetic field.
         h: Hamiltonian at time t
         h_t0: the initial Hamiltonian on the perturbed basis
         Mz_op: the z component of the magnetization operators
@@ -801,11 +801,11 @@ def evolve_rho_dsqme_onestair(dsrho, deltat, D, D0, h, h_t0, Mz_op, B, C, CST, X
         dims: dimension of superoperators
     """
 
-    D, h, Rhbar = update_D_under_magnetic_field(D, D0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+    L, h, Rhbar = update_L_under_magnetic_field(L, L0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
     
-    dsrho = expm(D * deltat) @ dsrho
+    vrhos = expm(L * deltat) @ vrhos
 
-    return dsrho
+    return vrhos
 
 def get_outdirs(T, I0, lambdaa, Bt_params):
     """
@@ -816,7 +816,7 @@ def get_outdirs(T, I0, lambdaa, Bt_params):
     Bt_params: parameters for the magnetic fields. See pulse.py for details.
     """
     if Bt_params['Bt_type'] == 'linear':
-        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1f}/dsrho'.format(T, I0, lambdaa, Bt_params['sweep_rate'])
+        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1f}/vrhos'.format(T, I0, lambdaa, Bt_params['sweep_rate'])
         outdir_mag = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1f}/magnetometry'.format(T, I0, lambdaa, Bt_params['sweep_rate'])
     elif Bt_params['Bt_type'] == 'pwlinear':
         times = Bt_params['times']
@@ -826,23 +826,23 @@ def get_outdirs(T, I0, lambdaa, Bt_params):
         for i in range(1, len(times)):
             outdir += '_t{:.1e}ps-B{:.1f}T'.format(times[i], fields[i])
         outdir = outdir.replace('+', '')
-        outdir_rho = outdir + '/dsrho'
+        outdir_rho = outdir + '/vrhos'
         outdir_mag = outdir + '/magnetometry'
     elif Bt_params['Bt_type'] == 'pwlinear_by_slope':
         outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_pwlinear_average_sweep_rate_{:.1f}'.format(T, I0, lambdaa, Bt_params['sweep_rate_ave'])
-        outdir_rho = outdir + '/dsrho'
+        outdir_rho = outdir + '/vrhos'
         outdir_mag = outdir + '/magnetometry'
     elif Bt_params['Bt_type'] == 'sin':
-        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_sin_amplitude_{:.1f}_omega_{:.2f}/dsrho'.format(T, I0, lambdaa, Bt_params['amplitude'], Bt_params['omega'])
+        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_sin_amplitude_{:.1f}_omega_{:.2f}/vrhos'.format(T, I0, lambdaa, Bt_params['amplitude'], Bt_params['omega'])
         outdir_mag = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_sin_amplitude_{:.1f}_omega_{:.2f}/magnetometry'.format(T, I0, lambdaa, Bt_params['amplitude'], Bt_params['omega'])
     elif Bt_params['Bt_type'] == 'cs':
-        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_cs/dsrho'.format(T, I0, lambdaa)
+        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_cs/vrhos'.format(T, I0, lambdaa)
         outdir_mag = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_cs/magnetometry'.format(T, I0, lambdaa)
     else:
         raise ValueError("Invalid Bt_type: {}".format(Bt_params['Bt_type']))
     return (outdir_rho, outdir_mag)
 
-def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, dsrho, D, D0, h_t0, Mz_op, C, CST, X, Rhbar, lambdaa, I0, T, dim, dims, dimds, save_mag, nt_mag, save_rho, nt_rho):
+def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, vrhos, L, L0, h_t0, Mz_op, C, CST, X, Rhbar, lambdaa, I0, T, dim, dims, dimds, save_mag, nt_mag, save_rho, nt_rho):
     """
     Evolve the double super density matrix using the staircase method according to the quantum master equation.
     Multiple staircases are used. All stairs have the same width deltat.
@@ -851,9 +851,9 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, dsrho, D, D0, h_t0, Mz_op
     t1: final time
     deltat: time step in ps
     turning_points: turning points of the magnetic field as a function of time. turning_points = [times, fields]
-    dsrho: initial double super density matrix at t0
-    D: The double super operator D at tmin
-    D0: The exchange-only double super operator at tmin
+    vrhos: initial double super density matrix at t0
+    L: The double super operator L at tmin
+    L0: The exchange-only double super operator at tmin
     h_t0: the initial Hamiltonian on the perturbed basis
     Mz_op: The z component of the magnetization operators
     C: The superoperator for spin-phonon coupling
@@ -911,11 +911,11 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, dsrho, D, D0, h_t0, Mz_op
 
         with h5py.File(fname1, 'w') as f1,  open(fname2, 'w') as f2:
             tag = "{:.3f}".format(t0)
-            dset = f1.create_dataset(tag, data=dsrho)
+            dset = f1.create_dataset(tag, data=vrhos)
 
-            Mz = get_Mz_from_dsrho(dsrho, Mz_op, dim, dims, dimds)
-            chimz = get_chimz_from_dsrho(h, h_t0, Bt, t0, Mz_op, dsrho, X, Rhbar, lambdaa, I0, T, dim, dims, dimds)
-            # chimz = get_chimz_finite_diff(dsrho, t0, 1e6, Bt, D, D0, h, h_t0, Mz_op, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+            Mz = get_Mz_from_vrhos(vrhos, Mz_op, dim, dims, dimds)
+            chimz = get_chimz_from_vrhos(h, h_t0, Bt, t0, Mz_op, vrhos, X, Rhbar, lambdaa, I0, T, dim, dims, dimds)
+            # chimz = get_chimz_finite_diff(vrhos, t0, 1e6, Bt, L, L0, h, h_t0, Mz_op, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
             # chimz = np.nan 
             f2.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(t0, Bt(t0), Mz, chimz))
 
@@ -936,15 +936,15 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, dsrho, D, D0, h_t0, Mz_op
                         B = Bt(t)
                         # print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
                         # h and Rhbar are updated at each time step
-                        dsrho = evolve_rho_dsqme_onestair(dsrho, deltat, D, D0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+                        vrhos = evolve_rho_dsqme_onestair(vrhos, deltat, L, L0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
                     # Calculate the magnetic moment
-                    Mz = get_Mz_from_dsrho(dsrho, Mz_op, dim, dims, dimds)
+                    Mz = get_Mz_from_vrhos(vrhos, Mz_op, dim, dims, dimds)
 
                     # Calculate the magnetic susceptibility
                     # Attempt 1 
-                    chimz = get_chimz_from_dsrho(h, h_t0, Bt, t+half_deltat, Mz_op, dsrho, X, Rhbar, lambdaa, I0, T, dim, dims, dimds)
+                    chimz = get_chimz_from_vrhos(h, h_t0, Bt, t+half_deltat, Mz_op, vrhos, X, Rhbar, lambdaa, I0, T, dim, dims, dimds)
                     # Attempt 2
-                    # chimz = get_chimz_finite_diff(dsrho, t0, 1e3, Bt, D, D0, h, h_t0, Mz_op, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+                    # chimz = get_chimz_finite_diff(vrhos, t0, 1e3, Bt, L, L0, h, h_t0, Mz_op, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
                     # Attempt 3
                     # chimz = (Mz - Mz_old) / dB; Mz_old = Mz + 0.0
 
@@ -952,7 +952,7 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, dsrho, D, D0, h_t0, Mz_op
                     f2.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(t+half_deltat, Bt(t+half_deltat), Mz, chimz))
                 # Save the double super density matrix
                 tag = "{:.3f}".format(t + half_deltat)
-                dset = f1.create_dataset(tag, data=dsrho)
+                dset = f1.create_dataset(tag, data=vrhos)
     elif save_rho and (not save_mag):
         # nt should be a multiple of nt_rho
         nround_rho = int( (t1 - t0)//deltat // nt_rho )
@@ -971,7 +971,7 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, dsrho, D, D0, h_t0, Mz_op
 
         with h5py.File(fname1, 'w') as f1:
             tag = "{:.3f}".format(t0)
-            dset = f1.create_dataset(tag, data=dsrho)
+            dset = f1.create_dataset(tag, data=vrhos)
 
             # Loop over the rounds for saving the double super density matrix
             for iround_rho in range(nround_rho):
@@ -981,10 +981,10 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, dsrho, D, D0, h_t0, Mz_op
                     t = t0 + it*deltat + half_deltat
                     B = Bt(t)
                     # print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
-                    dsrho = evolve_rho_dsqme_onestair(dsrho, deltat, D, D0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+                    vrhos = evolve_rho_dsqme_onestair(vrhos, deltat, L, L0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
                 # Save the double super density matrix
                 tag = "{:.3f}".format(t + half_deltat)
-                dset = f1.create_dataset(tag, data=dsrho)
+                dset = f1.create_dataset(tag, data=vrhos)
     elif (not save_rho) and save_mag:
         # nt should be a multiple of nt_mag
         nround_mag = int( (t1 - t0)//deltat // nt_mag )
@@ -1002,8 +1002,8 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, dsrho, D, D0, h_t0, Mz_op
         fname2 = outdir_mag + '/{:.3f}-{:.3f}ps_dt{:.3f}ps.dat'.format(t0, t1, deltat)
 
         with open(fname2, 'w') as f2:
-            Mz = get_Mz_from_dsrho(dsrho, Mz_op, dim, dims, dimds)
-            chimz = get_chimz_from_dsrho(h, h_t0, Bt, t0, Mz_op, dsrho, X, Rhbar, lambdaa, I0, T, dim, dims, dimds)
+            Mz = get_Mz_from_vrhos(vrhos, Mz_op, dim, dims, dimds)
+            chimz = get_chimz_from_vrhos(h, h_t0, Bt, t0, Mz_op, vrhos, X, Rhbar, lambdaa, I0, T, dim, dims, dimds)
             f2.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(t0, Bt(t0), Mz, chimz))
     
             # Loop over the rounds for saving the magnetic moment
@@ -1014,10 +1014,10 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, dsrho, D, D0, h_t0, Mz_op
                     t = t0 + it*deltat + half_deltat
                     B = Bt(t)
                     # print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
-                    dsrho = evolve_rho_dsqme_onestair(dsrho, deltat, D, D0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+                    vrhos = evolve_rho_dsqme_onestair(vrhos, deltat, L, L0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
                 # Save magnetic moment
-                Mz = get_Mz_from_dsrho(dsrho, Mz_op, dim, dims, dimds)
-                chimz = get_chimz_from_dsrho(h, h_t0, Bt, t+half_deltat, Mz_op, dsrho, X, Rhbar, lambdaa, I0, T, dim, dims, dimds)
+                Mz = get_Mz_from_vrhos(vrhos, Mz_op, dim, dims, dimds)
+                chimz = get_chimz_from_vrhos(h, h_t0, Bt, t+half_deltat, Mz_op, vrhos, X, Rhbar, lambdaa, I0, T, dim, dims, dimds)
                 f2.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(t+half_deltat, Bt(t+half_deltat), Mz, chimz))
     else:
         # the time period should be a multiple of deltat
@@ -1031,7 +1031,7 @@ def evolve_rho_dsqme_stairs(t0, t1, deltat, Bt_params, dsrho, D, D0, h_t0, Mz_op
             t = t0 + it*deltat + half_deltat
             B = Bt(t)
             # print("it/nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, nt, t, B))
-            dsrho = evolve_rho_dsqme_onestair(dsrho, deltat, D, D0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+            vrhos = evolve_rho_dsqme_onestair(vrhos, deltat, L, L0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
 
-    return ( t1, dsrho )
+    return ( t1, vrhos )
 
