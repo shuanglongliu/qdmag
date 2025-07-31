@@ -2,7 +2,6 @@ import os
 import sys
 import time
 from common import *
-from fitting import fit_magnetization
 from pulse import *
 from von_neumann import *
 
@@ -14,7 +13,7 @@ if __name__ == "__main__":
 
     # Spin system
 
-    Ss, nS, positions, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, fit_problem = read_input()
+    Ss, nS, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, fit_problem = read_input()
     spins = many_spins(Ss, nS, gfactors)
 
 

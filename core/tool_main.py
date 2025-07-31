@@ -1,6 +1,9 @@
 import os
 import sys
 import time
+from os import environ
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 from spin_dynamics.core.common import *
 from spin_dynamics.core.von_neumann import *
 from spin_dynamics.core.schrodinger import *
@@ -8,7 +11,7 @@ from spin_dynamics.core.quantum_master import *
 from spin_dynamics.core.effective_basis import * 
 from spin_dynamics.core.liouville import *
 from spin_dynamics.core.pulse import get_Bt
-from spin_dynamics.core.classical_rate import get_Pe, evolve_P_stairs
+from spin_dynamics.core.hdf5 import get_rho_from_hdf5
 
 
 
@@ -45,7 +48,7 @@ if __name__ == "__main__":
     multiphonon   = dynamics[4]['multiphonon']   # Include multiphonon processes ?
     imbalance     = dynamics[4]['imbalance']     # Make X unsymmetric ? 
 
-    states        = dynamics[5]['states']        # Chosen basis states for the effective system
+    states        = dynamics[5]['states']        # Make X unsymmetric ? 
 
 
 
@@ -58,13 +61,26 @@ if __name__ == "__main__":
 
     h_ex = get_h_exchange(spins, exchange, -2)
     h_ani = get_h_anisotropy(spins, anisotropy)
-    h_zee_tmin = get_h_Zeeman(spins, [0,0,Bt(tmin)], 'cartesian')
+    h_zee = get_h_Zeeman(spins, [0,0,1e-4], 'cartesian')
 
     # Spin Hamiltonian at t=0
-    h_t0 = h_ex + h_ani 
+    h_t0 = h_ex + h_ani
 
     # Spin Hamiltonian at t=tmin
-    h_tmin = h_ex + h_ani + h_zee_tmin
+    h_tmin = h_ex + h_zee
+
+
+    # Check commutation relation
+
+    # check_commutation(h_ex, h_zee); exit()
+    # check_commutation(h_ex, spins.Sv_tot[2]); exit()
+    # check_commutation(h_ex, spins.S2_tot); exit()
+
+
+
+    # Solve the eigenvalue problem
+
+    eigen = eigen_handy(h_ex + h_ani + h_zee)
 
 
 
@@ -82,34 +98,81 @@ if __name__ == "__main__":
 
 
 
-    # Get the effective system
+    # Save results
+
+    #save_operator(h, "h")
+    #save_operator(spins.Sv_tot[2], "Sz.dat")
+
+    # save_eigenvalues(eigen, offset=True)
+    # save_eigenvectors(eigen_p)
+
+    # save_spins(spins, eigen)
+
+
+
+    # Zeeman diagram for the full system
+
+    # get_Zeeman_energy_levels(spins, h_ex, h_ani, BT_Bgrid)
+
+
+
+    # Magnetization, polarization, magnetic susceptibility, electric susceptibility
+
+    # get_M_vs_B(spins, h_ex, h_ani, BT_Bgrid)
+
+
+
+    # Get the effective Hamiltonian
 
     h_t0_eff, h_tmin_eff, S2_eff, Sz_eff, Mx_eff, My_eff, Mz_eff, Mv_eff, X_eff, dim = \
       set_up_the_effective_system(h_t0_p, h_tmin_p, S2_tot_p, Sz_tot_p, Mv_tot_p, states, multiphonon=multiphonon, imbalance=imbalance)
 
+    # spy_the_effective_system(h0_eff, S2_eff, Sz_eff, Mv_eff, X_eff); exit()
 
 
-    # Initial distribution probabilities
-
-    ## Construct the initial density matrix
-
-    eigen_tmin_eff = eigen_simple(h_tmin_eff)
-
-    ### Construct the initial density matrix on the eigenbasis of h_tmin_eff
-    P0_eff = get_Pe(eigen_tmin_eff.eigenvalues, T)
 
 
-    # Time evolution
 
-    start = time.time()
+    # Eigenvalues and eigenvectors of the effective Hamiltonian
 
-    # Evolve the double super density matrix
-    nu0 = 1e3  # Hz
-    symmetric = True  # Symmetric evolution
-    nt_save = 1
-    tmax, P_eff = evolve_P_stairs(P0_eff, nu0, symmetric, tmin, tmax, deltat, Bt_params, T, h_t0_eff, Mz_eff, nt_save, dim)
+    #eigen0_eff = eigen_handy(h0_eff)
 
-    end   = time.time()
-    
-    print("Time used for evolution: {:8.3f} s\n".format(end - start) )
+    #save_eigenvalues(eigen0_eff, offset=True)
+    #save_eigenvectors(eigen0_eff)
+
+
+
+    # Zeeman diagram for the effective system
+
+    # get_Zeeman_energy_levels_Mv_tot(h_t0_eff, Mv_eff, BT_Bgrid)
+
+
+
+
+    # State composition
+
+    h_eff = h_t0_eff + get_h_Zeeman_Mv_tot(Mv_eff, [0,0,6.4134], 'cartesian') # 2.5, 3.731
+    eigen_eff = eigen_handy(h_eff)
+    save_projections(eigen_eff, 15/2)
+
+
+    # Set up the double super quantum master equation
+
+    # D0_eff, D_eff, h0_eff_diag, h_tmin_eff_diag, Mz_eff_diag, Rhbar_eff, C_eff, CST_eff, dim, dims, dimds = set_up_double_super_qme(h0_eff, h_tmin_eff, Mv_eff[2], X_eff, I0, T, lambdaa)
+
+    #spy_XRhbar(X_eff, Rhbar_eff, Sz_eff); exit()
+
+
+
+    # indices_nonzero_X_eff, indices_nonzero_C_eff = get_indices_nonzero_X_and_C(X_eff, dim)
+
+    #print(indices_nonzero_X_eff); exit()
+
+    # D_eff = update_D_under_magnetic_field(D_eff, D0_eff, minus_Mz_eff_diag, 3.49, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
+
+    # spy_M(D_eff, "D_eff")
+
+
+
+
 

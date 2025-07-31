@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
     # Spin system
 
-    Ss, nS, positions, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, dynamics = read_input()
+    Ss, nS, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, dynamics = read_input()
     spins = many_spins(Ss, nS, gfactors)
 
 

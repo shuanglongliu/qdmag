@@ -21,20 +21,20 @@ anisotropy:
   - site: 1
     ks: [2, 2]
     qs: [0, 2]
-    Bkqs: [0.0, 0.0]
-    reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
+    Bkqs: [0.0556, 0.0400]
+    reference_frame: [  1.000000,   0.000000,   0.000000,   0.000000,   1.000000,   0.000000,   0.000000,   0.000000,   1.000000]
 
   - site: 2
     ks: [2, 2]
     qs: [0, 2]
-    Bkqs: [0.0, 0.0]
-    reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
+    Bkqs: [0.0556, 0.0400]
+    reference_frame: [  1.000000,   0.000000,   0.000000,   0.000000,   1.000000,   0.000000,   0.000000,   0.000000,   1.000000]
 
   - site: 3
     ks: [2, 2]
     qs: [0, 2]
-    Bkqs: [0.0, 0.0]
-    reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
+    Bkqs: [0.0556, 0.0400]
+    reference_frame: [  1.000000,   0.000000,   0.000000,   0.000000,   1.000000,   0.000000,   0.000000,   0.000000,   1.000000]
   
 gfactors:
   - site: 1
@@ -50,9 +50,11 @@ gfactors:
     reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
 
 
+ext_field: [0., 0., 0., 0., 0., 0.] # B, thetaB, phiB, E, thetaE, phiE
+
 BT_Bgrid:
-  - [0., 50., 0.1, 0., 0.] # Bmin, Bmax, Bstep, thetaB, phiB 
-  - [0.2] # [2.0, 10.0, 20.0, 40.0] # T1, T2, ..., Tn
+  - [0., 10.000, 1.000, 0., 0.] # Bmin, Bmax, Bstep, thetaB, phiB 
+  - [0.6] # [2.0, 10.0, 20.0, 40.0] # T1, T2, ..., Tn
 
 BT_Tgrid:
   - [0., 0.5, 1., 0., 0.] # B1, B2, ..., Bn, thetaB, phiB
@@ -60,26 +62,29 @@ BT_Tgrid:
 
 dynamics:
     - T: 0.600          # Temperature in K
-      lambdaa: 10.00   # Spin phonon coupling constant in cm-1, 0.1
-      I0: 1.0e-04     # Prefactor for phonon density of states. 1e-4
+      lambdaa: 10.00   # Spin phonon coupling constant in cm-1
+      I0: 1.0e-14     # Prefactor for phonon density of states. 1e-4
 
     - Bt_type: 'linear'  # Type of the magnetic pulse as a function of time. Options: 'linear', 'pwlinear', 'sin', 'pulse'
-      sweep_rate: 10.0  # Slope of the magnetic field vs time. Unit: T per ms. Used only when Bt = 'linear'.
-      times: [0.0,1.0e+9,10.0e+9] # Turning points of the magnetic field in ps. Used only when Bt = 'pwlinear'.
-      fields: [0.0,10.0,100.0] # Magnetic field at the turning points in T. Used only when Bt = 'pwlinear'.
+      sweep_rate: 50.0  # Slope of the magnetic field vs time. Unit: T per ms. Used only when Bt = 'linear'.
+      times: [0.0, 1.0e+9, 10.0e+9] # Turning points of the magnetic field in ps. Used only when Bt = 'pwlinear'.
+      fields: [0.0, 10.0, 100.0] # Magnetic field at the turning points in T. Used only when Bt = 'pwlinear'.
       omega: 0.20 #  Angular frequency of the sine wave in rad ms^-1. The period is 2 pi / omega ms. Used only when Bt = 'sin'.
       amplitude: 65.0 # Amplitude of the sine wave in T. Used only when Bt = 'sin'.
-      theta_B: 0.0    # Polar angle of the pulsed magnetic field
-      phi_B: 0.0      # Azimuthal angle of the pulsed magnetic field
 
     - tmin: 0.0e+00             # Initial time in ps
-      tmax: 1.0e+07             # Finial time in ps
-      deltat: 1.0e+06      # Time step in ps
+      tmax: 1.0e+06             # Finial time in ps
+      deltat: 1.0e+05      # Time step in ps
 
     - save_mag: true # Calculate and save magnetization during the dynamics ?
-      nt_mag: 1  # Calculate and save magnetization every nt_mag*deltat ps
+      nt_mag: 10  # Calculate and save magnetization every nt_mag*deltat ps
       save_rho: true # Save the density matrix ?
       nt_rho: 10  # Save the density matrix every nt_rho*deltat ps, nt_rho will be adjusted to be a multiple of nt_mag
 
-n_thread: 16 # Number of threads used in the calculation
+    - multiphonon: false # Include multiphonon processes in the dynamics ?
+      imbalance: false # Make X unsymmetrical for single phonon processes ?
+
+    - states: [200,150,88,30,10,0,1,2,3,4,5,17,41,99,173,215] # List of spin states to be included in the dynamics.
+    
+n_thread: 2 # Number of threads used in the calculation
 

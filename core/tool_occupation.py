@@ -1,10 +1,8 @@
 import os
-import sys
-import time
 from spin_dynamics.core.common import read_input, many_spins
 from spin_dynamics.core.common import get_h_exchange, get_h_anisotropy
-from spin_dynamics.core.common import get_M_vs_B, get_M_vs_B_Mv_tot
 from spin_dynamics.core.common import get_perturbed_basis, transform_O, transform_Mv_tot
+from spin_dynamics.core.common import get_equilibrium_occupations
 from spin_dynamics.core.effective_basis import get_effective_O, get_effective_Mv
 
 if __name__ == "__main__":
@@ -22,11 +20,6 @@ if __name__ == "__main__":
     h_ex = get_h_exchange(spins, exchange, -2)
     h_ani = get_h_anisotropy(spins, anisotropy)
 
-    # Magnetization in the full Hilbert space
-    get_M_vs_B(spins, h_ex, h_ani, BT_Bgrid)
-
-
-
     # Chosen basis states for the effective system
     states = dynamics[5]['states']   
 
@@ -39,6 +32,7 @@ if __name__ == "__main__":
     Mv_tot = transform_Mv_tot(spins.Mv_tot, eigen_p)
     Mx_eff, My_eff, Mz_eff, Mv_eff = get_effective_Mv(Mv_tot, states)
 
-    # Magnetization in the effective Hilbert space
-    get_M_vs_B_Mv_tot(h_eff, Mv_eff, BT_Bgrid)
+    # Get the equilibrium occupations
+    get_equilibrium_occupations(h_eff, Mv_eff, BT_Bgrid, 1.0)
+
 
