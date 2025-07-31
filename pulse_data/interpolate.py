@@ -5,47 +5,45 @@ from scipy.interpolate import CubicSpline, PchipInterpolator
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-def get_cs():
+def get_cs(basename="pulse"):
+
+    # File name
+    fname = os.path.join(os.path.dirname(__file__), basename + ".dat")
 
     # Load data from pulse.dat, which is experimentally measured pulse data
-    
-    data = np.loadtxt("pulse.dat")
-
-
+    data = np.loadtxt(fname)
 
     # Convert ms to ps
-
     data[:, 0] = 1e9 * data[:, 0]
     
-    
-    
     # Interpolate
-    
-    #ys = np.interp(xs, data[:, 0], data[:, 1]) # linear
     #cs = CubicSpline(data[:, 0], data[:, 1]) # cubic spline
     cs = PchipInterpolator(data[:, 0], data[:, 1]) # monotone cubic spline
 
-    with open("cs_pulse.pickle", "wb") as f:
+    # Save the interpolated function
+    fname = os.path.join(os.path.dirname(__file__), "cs_" + basename + ".pickle")
+    with open(fname, "wb") as f:
         pickle.dump(cs, f, pickle.HIGHEST_PROTOCOL)
-    
-    return
 
-def load_cs_and_save_file():
-    with open("cs_pulse.pickle", "rb") as f:
+def load_cs_and_save_file(basename="pulse"):
+    fname = os.path.join(os.path.dirname(__file__), "cs_" + basename + ".pickle")
+    with open(fname, "rb") as f:
         cs = pickle.load(f)
 
-    xs = np.linspace(0, 1e10, 101, endpoint=True)
+    nx = 101
+    xs = np.linspace(0, 1e10, nx, endpoint=True)
     ys = cs(xs)
 
-    with open("./pulse_interpolate.dat", "w") as f:
-        for i in range(len(xs)):
+    fname = os.path.join(os.path.dirname(__file__), basename + "_interpolate.dat")
+    with open(fname, "w") as f:
+        for i in range(nx):
             f.write("{:18.6f} {:12.6f}\n".format(xs[i], ys[i]))
-
-    return
 
 if __name__ == "__main__":
 
-    get_cs()
+    # get_cs("pulse1")
 
-    load_cs_and_save_file()
+    # load_cs_and_save_file("pulse1")
+
+    pass
 
