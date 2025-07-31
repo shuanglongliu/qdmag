@@ -8,13 +8,13 @@ from spin_dynamics.core.common import *
 if __name__ == "__main__":
 
     # Read input parameters
-    Ss, nS, positions, exchange, anisotropy, gfactor, dipole, ext_field, BET_Bgrid, BET_Egrid, BET_BEgrid, BET_Tgrid, dynamics, n_thread = read_input()
+    Ss, nS, positions, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, dynamics, n_thread = read_input()
 
     # Set the number of threads
     os.environ['OMP_NUM_THREADS'] = str(n_thread)
 
     # Spin system
-    spins = many_spins(Ss, nS, gfactor, dipole, positions)
+    spins = many_spins(Ss, nS, gfactors)
 
 
 
@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
     # Magnetization, polarization, magnetic susceptibility, electric susceptibility
 
-    get_M_vs_B(spins, h_ex, h_ani, BET_Bgrid)
-    # get_dMdB_vs_B(spins, h_ex, h_ani, BET_Bgrid, dB=0.001)
+    get_M_vs_B(spins, h_ex, h_ani, BT_Bgrid)
+    # get_dMdB_vs_B(spins, h_ex, h_ani, BT_Bgrid, dB=0.001)
 
 

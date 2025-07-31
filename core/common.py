@@ -2,14 +2,11 @@ import os
 import subprocess
 import copy
 import math
-import numpy as np
 import yaml
-import matplotlib as mpl
-import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
-from scipy.constants import N_A, mu_0
-from spin_dynamics.core.constants import meV2wavenumber, Tesla2wavenumber, Kelvin2meV, Kelvin2wavenumber
-from spin_dynamics.core.constants import x_mu_B, mu_B_per_Tesla_2_cm3_per_mol_phi
+import matplotlib.pyplot as plt
+from spin_dynamics.core.constants import Tesla2wavenumber, Kelvin2wavenumber
 from spin_dynamics.core.Operators import Operator
 from spin_dynamics.core.StevensOperators import StevensOpA
 
@@ -46,26 +43,31 @@ class many_spins:
         self.gfactors = gfactors
         self.get_local_spins()
         self.dim = np.prod([self.local_spins[i].dim for i in range(self.nS)])
+        # Zero operator in the whole Hilbert space.
         self.zero = np.zeros((self.dim, self.dim),dtype=complex)
-        ## IDs: unit operators in the local spaces.
+        # IDs: unit operators in the local spaces.
         self.IDs = [self.local_spins[i].ID for i in range(nS)]
-        ## ID: unit operator in the whole space.
+        # ID: unit operator in the whole space.
         self.ID = get_kronecker_product(self.IDs, self.nS)
-        ## get_global_spins depends on self.ID.
+        # get_global_spins depends on self.ID.
         self.get_global_spins()
         self.get_total_spin()
         self.get_global_magmoms()
         self.get_total_magmom()
         
     def get_local_spins(self):
-        ## Get a list of one_local_spin objects.
-        ## All local operators are capsulated in the spins variable except IDs. 
+        """
+        Get a list of one_local_spin objects.
+        All local operators are capsulated in the spins variable except IDs. 
+        """
         self.local_spins = []
         for i in range(self.nS):
             self.local_spins.append(one_local_spin(S=self.Ss[i]))
     
     def get_global_spins(self):
-        ## Local spin operators in the whole Hilbert space.
+        """
+        Local spin operators in the whole Hilbert space.
+        """
         
         ## List of vectors (as lists) of spin operators. 
         self.global_spins = []
@@ -77,6 +79,9 @@ class many_spins:
                 self.global_spins[i].append( get_kronecker_product(ops, self.nS) )
     
     def get_total_spin(self):
+        """
+        Total spin operators in the whole Hilbert space.
+        """
         
         self.Sv_tot = [self.zero for i in range(3)]
         for i in range(3):
@@ -90,7 +95,9 @@ class many_spins:
         return
 
     def get_global_magmoms(self):
-        ## Local magnetic moment operators in the whole Hilbert space.
+        """
+        Local magnetic moment operators in the whole Hilbert space.
+        """
 
         ## List of vectors (as lists) of magnetic moment operators
         self.global_magmoms = []
@@ -122,6 +129,9 @@ class many_spins:
                 self.Mv_tot[i] = self.Mv_tot[i] + self.global_magmoms[j][i]
 
 class eigen_handy:
+    """
+    A handy class for bookkeeping the eigenvalues and eigenvectors of a (spin) Hamiltonian.
+    """
     def __init__(self, hamiltonian):
         ## Unit for eigenvalues: wavenumber
         self.eigenvalues, self.eigenvectors = np.linalg.eigh(hamiltonian) 
@@ -135,10 +145,14 @@ class eigen_handy:
         self.eigenvalues_offset = self.eigenvalues - self.eigenvalues[self.indices[0]]
 
 class eigen_simple:
+    """
+    A simple class for bookkeeping the eigenvalues and eigenvectors of a (spin) Hamiltonian.
+    """
     def __init__(self, hamiltonian):
         ## Unit for eigenvalues: wavenumber
         self.eigenvalues, self.eigenvectors = np.linalg.eigh(hamiltonian) 
         self.eigenvalues = np.real(self.eigenvalues)
+        self.dim = self.eigenvalues.shape[0]
     
 
     
@@ -221,37 +235,6 @@ def check_commutation(O1, O2):
         print("No, they don't commute.\n" + " maxdiff = {:15.10f}.".format(maxdiff))
     return
 
-def check_zero(x, epsilon=1e-9):
-    maxentry = np.max(np.absolute(x))
-    if maxentry < epsilon:
-        print("Yes, it is zero.")
-    else:
-        print("No, it is not zero." + " maxdiff = {:15.10f}.".format(maxentry))
-    return
-
-def check_diagonal(O, epsilon=1e-9, verbose=True):
-    O_abs = np.abs(O)
-    np.fill_diagonal(O_abs, 0)
-    is_diagonal = np.all( O_abs < epsilon )
-    if verbose:
-        if is_diagonal:
-            print("Yes, it is diagonal.")
-        else:
-            print("No, it is not diagonal.")
-    return is_diagonal
-
-def get_Mz_eff_diag(Mz_eff, epsilon=1e-9):
-    r"""
-    This is function is used for cases where the g tensors are isotropic.
-    """
-    is_diagonal = check_diagonal(Mz_eff, epsilon=epsilon, verbose=False)
-    if is_diagonal:
-        print("Mz_eff is diagonal.\n")
-        return np.real( np.diagonal(Mz_eff) )
-    else:
-        print("Mz_eff is not diagonal. Stopping ...")
-        exit()
-
 def check_eigen(O, eigen):
     """
     Check if the given vectors are the eigenvectors of an operator.
@@ -290,118 +273,85 @@ def get_Sprime(A, S):
     
     return Sprime
 
-def convert_cmatrix_to_rmatrix(M, tag):
-    """
-    Return the real part of M if the imaginary part is negligibly small,
-    Stop if the imaginary part is not negligible.
-    """
-
-    zero_imag = np.max( np.absolute( np.imag(M) ) ) < 1.e-12
-
-    if zero_imag:
-        print(tag, "is a real matrix. Using a matrix of real numbers to represent it.")
-    else:
-        print(tag, "is a complex matrix. Please make sure that the matrix elements are real. Stopping ...")
-        exit()
-
-    M_real = np.real(M)
-    M_diag = np.diag(M_real)
-
-    return (M_real, M_diag)
-
 ## =================================================================
 ## Functions for input and output.
 ## =================================================================
 
 def read_input():
+    """
+    Read input options from input.yaml file.
+    """
 
     with open("./input.yaml", "r") as f:
         data = yaml.safe_load(f)
     
     Ss = data['spins']
     nS = len(Ss)
-    positions = data['positions']
     exchange = data['exchange']
     anisotropy = data['anisotropy']
     gfactors = data['gfactors']
-    ext_field = data['ext_field']
-    BET_Bgrid = data['BET_Bgrid']
-    BET_Egrid = data['BET_Egrid']
-    BET_BEgrid = data['BET_BEgrid']
-    BET_Tgrid = data['BET_Tgrid']
+    BT_Bgrid = data['BT_Bgrid']
+    BT_Tgrid = data['BT_Tgrid']
     dynamics = data['dynamics']
     n_thread = data['n_thread']
 
-    return (Ss, nS, positions, exchange, anisotropy, gfactors, ext_field, BET_Bgrid, BET_Egrid, BET_BEgrid, BET_Tgrid, dynamics, n_thread)
+    return (Ss, nS, positions, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, dynamics, n_thread)
 
-def save_eigenvalues(eigen, offset=True, suffix=None):
+def create_outdir():
+    """
+    Create the output directory if it does not exist.
+    """
+    if not os.path.exists("./output"):
+        subprocess.run(["mkdir", "-p", "./output"])
+
+def save_eigenvalues(eigen, offset=True):
+    """
+    Save eigenvalues to a file.
+    """
 
     if offset:
         eigenvalues = eigen.eigenvalues_offset
     else:
         eigenvalues = eigen.eigenvalues
-
-    if not os.path.exists("./output"):
-        subprocess.run(["mkdir", "./output"])
-
-    if suffix is not None:
-        fout = "./output/eigenvalues_" + suffix + ".dat"
-    else:
-        fout = "./output/eigenvalues.dat"
-
-    with open(fout, "w") as f:
+    create_outdir()
+    with open("./output/eigenvalues.dat", "w") as f:
         for i in range(eigen.dim):
             f.write("{:16.12f}\n".format(eigenvalues[i]))
 
-    return
-
-def save_eigenvectors(eigen, suffix=None):
-
-    if not os.path.exists("./output"):
-        subprocess.run(["mkdir", "./output"])
-
-    if suffix is not None:
-        fout = "./output/eigenvectors_" + suffix + ".dat"
-    else:
-        fout = "./output/eigenvectors.dat"
-
-    with open(fout, "w") as f:
+def save_eigenvectors(eigen):
+    """
+    Save eigenvectors to a file.
+    """
+    create_outdir()
+    with open("./output/eigenvectors.dat", "w") as f:
         for i in range(eigen.dim):
             state = eigen.eigenvectors[:, i]
             f.write((eigen.dim*" {:16.12f}" + "\n").format(*state))
-    
-    return
 
 def save_operator(op, base_name):
+    """
+    Save the given operator to a file.
+    """
 
-    Dim = op.shape[0]
+    n = op.shape[0]
 
     o_real = np.real(op)
     o_imag = np.imag(op)
-
-    if not os.path.exists("./output"):
-        subprocess.run(["mkdir", "./output"])
-
-    with open("./output/{:s}.real".format(base_name), "w") as f:
-        for i in range(Dim):
-            for j in range(Dim):
-                f.write("{:12.3e}\n".format( o_real[i, j] ))
-
-    with open("./output/{:s}.imag".format(base_name), "w") as f:
-        for i in range(Dim):
-            for j in range(Dim):
-                f.write("{:12.3e}\n".format( o_imag[i, j] ))
-    return
+    o_mod  = np.sqrt(o_real**2 + o_imag**2)
+    create_outdir()
+    with open("./output/{:s}.txt".format(base_name), "w") as f:
+        f.write("# Matrix elements of {:s} operator\n".format(base_name))
+        f.write("# i, j, real, imag, modulus\n")
+        for i in range(n):
+            for j in range(n):
+                f.write("{:5d} {:5d} {:12.3e} {:12.3e {:12.3e}}\n".format(i, j, o_real[i, j], o_imag[i, j], o_mod[i, j]))
 
 def save_spins(spins, eigen):
-
     """
     Calculate and save expectation of spins for all eigenvectors.
+    To do: this function needs to be improved to deal with the case where there is only one spin.
     """
-
-    if not os.path.exists("./output"):
-        subprocess.run(["mkdir", "./output"])
-
+    create_outdir()
     with open("./output/spins.dat", "w") as f:
         f.write("## s1x, s1y, s1z, s2x, s2y, s2z, ..., snx, sny, snz, sx_tot, sy_tot, sz_tot, s2_tot, s_tot # eigenvalue (cm^-1)\n")
 
@@ -419,6 +369,9 @@ def save_spins(spins, eigen):
             f.write("# {:8.2f}\n".format(eigen.eigenvalues_offset[i]))
 
 def print_emat_array(emat):
+    """
+    Print the emat array in a format suitable for use in a Python script.
+    """
     print("emats_file[0] = [ \\")
     print("        [ {:15.8f}, {:15.8f}, {:15.8f} ], \\".format(*emat[0]))
     print("        [ {:15.8f}, {:15.8f}, {:15.8f} ], \\".format(*emat[1]))
@@ -430,6 +383,9 @@ def print_emat_array(emat):
 ## =================================================================
 
 def get_expectation_of_spins(spins, state):
+    """
+    Driver function to calculate the expectation values of local spins and total spin.
+    """
     
     E_local_spins = []
     for i in range(spins.nS):
@@ -446,29 +402,14 @@ def get_expectation_of_spins(spins, state):
 
     return (E_local_spins, E_Sv_tot, E_S2_tot, E_S_tot)
 
-def get_total_spin_for_all_eigenstates(spins, eigen):
-
-    results = []
-
-    for i in range(eigen.dim):
-        state = eigen.eigenvectors[:, eigen.indices[i]]
-
-        E_S2_tot = np.real(np.dot(np.conjugate(state), np.matmul(spins.S2_tot, state)))
-        E_S_tot = (-1+np.sqrt(4*E_S2_tot+1))/2
-
-        E_Sv_tot = []
-        for i in range(3):
-            E_Sv_tot.append( np.real(np.dot(np.conjugate(state), np.matmul(spins.Sv_tot[i], state))) )
-        
-        results.append([E_S_tot] + E_Sv_tot)
-
-    return results
-
 ## =================================================================
 ## Functions for magnetic exchange interaction.
 ## =================================================================
 
 def get_h_exchange_one_pair(spins, spin_pair, factor):
+    """
+    Get the exchange Hamiltonian for one pair of spins.
+    """
     i, j = spin_pair['pair']
     Si = spins.local_spins[i-1].Sv
     Sj = spins.local_spins[j-1].Sv
@@ -489,6 +430,9 @@ def get_h_exchange_one_pair(spins, spin_pair, factor):
     return factor*h_ex
 
 def get_h_exchange(spins, exchange, factor):
+    """
+    Get the exchange Hamiltonian for all pairs of spins.
+    """
     n_pair = len(exchange)
     h_ex = spins.zero
     for i_pair in range(n_pair):
@@ -496,6 +440,9 @@ def get_h_exchange(spins, exchange, factor):
     return h_ex
 
 def get_h_exchange_iso_one_pair(spins, spin_pair, factor):
+    """
+    Get the isotropic exchange Hamiltonian for one pair of spins.
+    """
     i, j = spin_pair['pair']
     Si = spins.local_spins[i-1].Sv
     Sj = spins.local_spins[j-1].Sv
@@ -510,14 +457,17 @@ def get_h_exchange_iso_one_pair(spins, spin_pair, factor):
     h_ex = spins.zero
     for ii in range(3):
         jj = ii
-        ## Jprime[ii,jj] * Siprime[ii] * Sjprime[jj]
         ops = copy.deepcopy(spins.IDs)
         ops[i-1] = Siprime[ii]
         ops[j-1] = Sjprime[jj]
+        ## Jprime[ii,jj] * Siprime[ii] * Sjprime[jj]
         h_ex = h_ex + Jprime[ii,jj] * get_kronecker_product(ops, spins.nS)
     return factor*h_ex
 
 def get_h_exchange_iso(spins, exchange, factor):
+    """
+    Get the isotropic exchange Hamiltonian for all pairs of spins.
+    """
     n_pair = len(exchange)
     h_ex = spins.zero
     for i_pair in range(n_pair):
@@ -529,6 +479,9 @@ def get_h_exchange_iso(spins, exchange, factor):
 ## =================================================================
 
 def get_h_anisotropy_one_site(spins, site):
+    """
+    Get the zero-field splitting (ZFS) Hamiltonian for one site.
+    """
     i = site['site']
     S = spins.Ss[i-1]
     ks = site['ks']
@@ -547,6 +500,9 @@ def get_h_anisotropy_one_site(spins, site):
     return h_ani
 
 def get_h_anisotropy(spins, anisotropy):
+    """
+    Get the zero-field splitting (ZFS) Hamiltonian for all sites.
+    """
     h_ani = spins.zero
     ## n_site = number of local spins
     for i_site in range(spins.nS):
@@ -554,6 +510,10 @@ def get_h_anisotropy(spins, anisotropy):
     return h_ani
     
 def get_h_anisotropy_one_site_ikq(spins, site, ikq):
+    """
+    Get the zero-field splitting (ZFS) Hamiltonian for one site due to 
+    a specific Stevens' operator or crystal field parameter (CFP).
+    """
     i = site['site']
     S = spins.Ss[i-1]
     ks = site['ks']
@@ -577,6 +537,10 @@ def get_h_anisotropy_one_site_ikq(spins, site, ikq):
     return h_ani
 
 def get_h_anisotropy_ikq(spins, anisotropy, ikq):
+    """
+    Get the zero-field splitting (ZFS) Hamiltonian for all sites due to
+    a specific Stevens' operator or crystal field parameter (CFP).
+    """
     h_ani = spins.zero
     ## n_site = number of local spins
     for i_site in range(spins.nS):
@@ -591,11 +555,8 @@ def get_h_Zeeman(spins, Bv, coord):
     r""" 
     Zeeman term H_Zee = - \vec{\mu} \cdot \vec{B} = \mu_B/\hbar \vec{B}[i] g_s[i,j] \vec{S}[j]
                       = \vec{B}[i] g_s[i,j] \vec{S}[j]
-
     In the last line, B takes unit of energy (cm^-1 per \mu_B), and spin takes unit of \hbar.
-    
     coord: 's*' (for spherical) or else (for cartesian).
-
     Units: Tesla for B, deg for angles.
     """
 
@@ -613,13 +574,9 @@ def get_h_Zeeman(spins, Bv, coord):
 def get_h_Zeeman_Mv_tot(Mv_tot, Bv, coord):
     r""" 
     Zeeman term H_Zee = - \vec{\mu} \cdot \vec{B} 
-
     In the last line, B takes unit of energy (cm^-1 per \mu_B), and mu takes unit of \mu_b.
-    
     coord: 's*' (for spherical) or else (for cartesian).
-
     Units: Tesla for B, deg for angles.
-
     Mv_tot can be given in arbitrary basis. 
     """
 
@@ -642,18 +599,15 @@ def get_h_Zeeman_Mv_tot(Mv_tot, Bv, coord):
 ## Functions for energy levels versus B field
 ## =================================================================
 
-def get_Zeeman_energy_levels(spins, h_ex, h_ani, BET_Bgrid):
-
-    Bmin, Bmax, Bstep, theta_B, phi_B = BET_Bgrid[0]
+def get_Zeeman_energy_levels(spins, h_ex, h_ani, BT_Bgrid):
+    """
+    Calculate the Zeeman energy levels in the full spin space (relative to the space for the effective Hamiltonian).
+    """
+    Bmin, Bmax, Bstep, theta_B, phi_B = BT_Bgrid[0]
     nB = int((Bmax-Bmin)/Bstep) + 1
-
     h0 = h_ex + h_ani
-
     eigen = eigen_handy(h0)
     energy0 = eigen.eigenvalues[eigen.indices[0]]
-
-    print("Calculating the Zeeman energy levels for in the full Hilbert space.")
-
     eigenvalues = np.zeros((nB, eigen.dim))
     for i in range(nB):
         B = Bmin + i*Bstep
@@ -662,27 +616,23 @@ def get_Zeeman_energy_levels(spins, h_ex, h_ani, BET_Bgrid):
         eigen = eigen_handy(h)
         eigenvalues[i] = eigen.eigenvalues[eigen.indices]
     eigenvalues = eigenvalues - energy0
-
-    if not os.path.exists("./output"):
-        subprocess.run(["mkdir", "./output"])
-
+    create_outdir()
     with open("./output/Zeeman.dat", "w") as f:
         for i in range(nB):
             B = Bmin + i*Bstep
             f.write((" {:12.6f}" + eigen.dim*" {:15.9f}" + "\n").format(B, *eigenvalues[i]))
-
     print("The Zeeman energy levels are saved in Zeeman.dat.")
 
-def get_Zeeman_energy_levels_Mv_tot(h0, Mv_tot, BET_Bgrid):
-
-    Bmin, Bmax, Bstep, theta_B, phi_B = BET_Bgrid[0]
+def get_Zeeman_energy_levels_Mv_tot(h0, Mv_tot, BT_Bgrid):
+    """
+    Calculate the Zeeman energy levels in the effective Hilbert space.
+    Assumption: Mv_tot is the total magnetic moment operator in the effective Hilbert space.
+    Note: The effective space can be as big as the full space. 
+    """
+    Bmin, Bmax, Bstep, theta_B, phi_B = BT_Bgrid[0]
     nB = int((Bmax-Bmin)/Bstep) + 1
-
     eigen = eigen_handy(h0)
     energy0 = eigen.eigenvalues[eigen.indices[0]]
-
-    print("Calculating the Zeeman energy levels for in the effective Hilbert space.")
-
     eigenvalues = np.zeros((nB, eigen.dim))
     for i in range(nB):
         B = Bmin + i*Bstep
@@ -691,28 +641,21 @@ def get_Zeeman_energy_levels_Mv_tot(h0, Mv_tot, BET_Bgrid):
         eigen = eigen_handy(h)
         eigenvalues[i] = eigen.eigenvalues[eigen.indices]
     eigenvalues = eigenvalues - energy0
-
-    if not os.path.exists("./output"):
-        subprocess.run(["mkdir", "./output"])
-
+    create_outdir()
     with open("./output/Zeeman_eff.dat", "w") as f:
         for i in range(nB):
             B = Bmin + i*Bstep
             f.write((" {:12.6f}" + eigen.dim*" {:15.9f}" + "\n").format(B, *eigenvalues[i]))
-
     print("The Zeeman energy levels are saved in Zeeman_eff.dat.")
 
 def save_projections(eigen, S):
     """
     A temporary function to save the projections of all eigenstates on the |Ms> basis.
+    To do: this function needs to be improved to deal with arbitrary number of basis states.
     """
-
-    if not os.path.exists("./output"):
-        subprocess.run(["mkdir", "./output"])
-
+    create_outdir()
     state_indices = [i for i in range(eigen.dim+1)]
     projections = 100*np.abs( eigen.eigenvectors )**2
-
     with open("./output/projections.dat", "w") as f:
         f.write(( eigen.dim*"{:>6d}" + "{:>6d}\n").format(*state_indices))
         for i_basis in range(eigen.dim):
@@ -720,7 +663,6 @@ def save_projections(eigen, S):
             for i_state in range(eigen.dim):
                 f.write("{:>6.1f}".format(projections[i_basis, i_state]))
             f.write("\n")
-    return
 
 ## ================================================================
 ## Functions for thermodynamic properties.
@@ -731,24 +673,23 @@ def save_projections(eigen, S):
 ### ================================================================
 
 def get_partition_function(eigen, T):
-
+    """
+    Calculate the partition function Z at temperature T.
+    """
     e_ref = eigen.eigenvalues[eigen.indices[0]]
-
     beta = 1/(Kelvin2wavenumber * T)
-
     Z = 0
     for i in range(eigen.dim):
         eigenvalue = eigen.eigenvalues[eigen.indices[i]] - e_ref
         Z += np.exp(-beta*eigenvalue)
-
     return Z
 
 def get_magnetic_moment(spins, eigen, T, Z):
-
+    """
+    Calculate the magnetic moment <M> at temperature T.
+    """
     e_ref = eigen.eigenvalues[eigen.indices[0]]
-
     beta = 1/(Kelvin2wavenumber * T)
-
     M = np.array([0., 0., 0.])
     for i in range(eigen.dim):
         eigenvalue = eigen.eigenvalues[eigen.indices[i]] - e_ref
@@ -759,11 +700,12 @@ def get_magnetic_moment(spins, eigen, T, Z):
     return M
     
 def get_magnetic_moment_Mv_tot(Mv_tot, eigen, T, Z):
-
+    """
+    Calculate the magnetic moment <M> at temperature T using Mv_tot.
+    This function works for the effective Hilbert space.
+    """
     e_ref = eigen.eigenvalues[eigen.indices[0]]
-
     beta = 1/(Kelvin2wavenumber * T)
-
     M = np.array([0., 0., 0.])
     for i in range(eigen.dim):
         eigenvalue = eigen.eigenvalues[eigen.indices[i]] - e_ref
@@ -774,7 +716,6 @@ def get_magnetic_moment_Mv_tot(Mv_tot, eigen, T, Z):
     return M
     
 def get_chim_tensor_kernel(spins, h_ex, h_ani, B0v_sph, T, dBv_sph, verbose):
-
     r"""
     chim_n = \partial M / \partial B along the e_n direction.
     B0v: B vector in spherical coordinate. Angles in deg.
@@ -806,7 +747,6 @@ def get_chim_tensor_kernel(spins, h_ex, h_ani, B0v_sph, T, dBv_sph, verbose):
     return chim_n
       
 def get_chim_tensor(spins, h_ex, h_ani, B0v_sph, T, dB):
-
     r"""
     chim at certain B field, E field, and temperature T
     chim_tensor_{ij} = \partial M_i / \partial B_j
@@ -830,57 +770,9 @@ def get_chim_tensor(spins, h_ex, h_ani, B0v_sph, T, dB):
 ### at a certain E field and one or more temperatures
 ### =================================================================================
 
-def get_M_at_BET_plain(args):
-
-    """
-    B: Magnitude of B field
-    theta_B: polar angle of B field in deg
-    phi_B: azimuthal angle of B field in deg
-    E: Magnitude of E field in meV/Ang
-    theta_E: polar angle of E field in deg
-    phi_E: azimuthal angle of E field in deg
-    T: temperature
-    """
-
-    spins, h_ex, h_ani, B, theta_B, phi_B, T = args
-
-    h_zee   = get_h_Zeeman(spins, [B, theta_B, phi_B], "spherical")
-    h = h_ex + h_ani + h_zee
-    eigen = eigen_handy(h)
-    Z = get_partition_function(eigen, T)
-    M = get_magnetic_moment(spins, eigen, T, Z)
-
-    return M
-
-
-
-def get_M_at_BET_Mv_tot(args):
-
-    """
-    B: Magnitude of B field
-    theta_B: polar angle of B field in deg
-    phi_B: azimuthal angle of B field in deg
-    E: Magnitude of E field in meV/Ang
-    theta_E: polar angle of E field in deg
-    phi_E: azimuthal angle of E field in deg
-    T: temperature
-    """
-
-    h0, Mv_tot, B, theta_B, phi_B, E, theta_E, phi_E, T = args
-
-    h_zee   = get_h_Zeeman_Mv_tot(Mv_tot, [B, theta_B, phi_B], "spherical")
-    h = h0 + h_zee
-    eigen = eigen_handy(h)
-    Z = get_partition_function(eigen, T)
-    M = get_magnetic_moment_Mv_tot(Mv_tot, eigen, T, Z)
-
-    return M
-
-
-
 def get_M_vs_B_kernel(spins, h_ex, h_ani, Bs, theta_B, phi_B, T):
-
     """
+    Calculate the magnetization <M> versus B field at a certain temperature T in the full Hilbert space.
     Bs: B fields enumerated
     theta_B: polar angle of B field in deg
     phi_B: azimuthal angle of B field in deg
@@ -888,7 +780,6 @@ def get_M_vs_B_kernel(spins, h_ex, h_ani, Bs, theta_B, phi_B, T):
     """
 
     nB = len(Bs)
-
     Ms = []
     for iB in range(nB):
         print("B = {:6.2f}".format(Bs[iB]))
@@ -898,13 +789,32 @@ def get_M_vs_B_kernel(spins, h_ex, h_ani, Bs, theta_B, phi_B, T):
         Z = get_partition_function(eigen, T)
         M = get_magnetic_moment(spins, eigen, T, Z)
         Ms.append(M)
-
     return Ms
 
 
 
-def get_M_vs_B(spins, h_ex, h_ani, BET_Bgrid):
+def get_M_vs_B_Mv_tot_kernel(h0, Mv_tot, Bs, theta_B, phi_B, T):
+    """
+    Calculate the magnetization <M> versus B field at a certain temperature T in the effective Hilbert space.
+    Bs: B fields enumerated
+    theta_B: polar angle of B field in deg
+    phi_B: azimuthal angle of B field in deg
+    T: temperature
+    """
+    nB = len(Bs)
+    Ms = []
+    for iB in range(nB):
+        print("B = {:6.2f}".format(Bs[iB]))
+        h_zee   = get_h_Zeeman_Mv_tot(Mv_tot, [Bs[iB], theta_B, phi_B], "spherical")
+        h = h0 + h_zee
+        eigen = eigen_handy(h)
+        Z = get_partition_function(eigen, T)
+        M = get_magnetic_moment_Mv_tot(Mv_tot, eigen, T, Z)
+        Ms.append(M)
+    return Ms
 
+
+def get_M_vs_B(spins, h_ex, h_ani, BT_Bgrid):
     """
     Bgrid[0]: Bmin
     Bgrid[1]: Bmax
@@ -912,19 +822,13 @@ def get_M_vs_B(spins, h_ex, h_ani, BET_Bgrid):
     Bgrid[3]: theta_B in deg
     Bgrid[4]: phi_B in deg
     Ts: temperatures enumerated
-    M-B_Exxx.dat
-      rows: B field
-      columns: temperatures
     """
-
-    Bgrid = BET_Bgrid[0]
-    Ts = BET_Bgrid[2]
-
+    # Set up the B grid and temperatures
+    Bgrid = BT_Bgrid[0]
+    Ts = BT_Bgrid[1]
     nB = int((Bgrid[1]-Bgrid[0])/Bgrid[2]) + 1
     Bs = np.linspace(Bgrid[0], Bgrid[1], nB, endpoint=True)
-
     nT = len(Ts)
-
     # Store results using a data frame with the columns: B field, Mx, My, Mz, and T
     for iT in range(nT):
         print("T={:6.2f} K\n".format(Ts[iT]))
@@ -936,13 +840,9 @@ def get_M_vs_B(spins, h_ex, h_ani, BET_Bgrid):
             else:
                 # Create a DataFrame from the dictionary 
                 new_row = pd.DataFrame([{"B": Bs[iB], "Mx": Ms[iB][0], "My": Ms[iB][1], "Mz": Ms[iB][2], "T": Ts[iT]}])
-
                 # Append the new data to the existing data frame
                 df = pd.concat([df, new_row], ignore_index=True)
-
-    if not os.path.exists("./output"):
-        subprocess.run(["mkdir", "-p", "./output"])
-
+    create_outdir()
     # Save the data frame to a CSV file
     df.to_csv("./output/M-B.csv", index=False)
 
@@ -950,25 +850,39 @@ def get_M_vs_B(spins, h_ex, h_ani, BET_Bgrid):
 
     return
 
-
-
-## =================================================================
-## Functions for plotting
-## =================================================================
-
-def spy_sparsity(M, tag, precision=1.0e-20, figsize=(20, 20), markersize=1):
+def get_M_vs_B_Mv_tot(h0, Mv_tot, BT_Bgrid):
     """
-    Visualize the sparsity of the matrix M
+    Bgrid[0]: Bmin
+    Bgrid[1]: Bmax
+    Bgrid[2]: Bstep
+    Bgrid[3]: theta_B in deg
+    Bgrid[4]: phi_B in deg
+    Ts: temperatures enumerated
     """
+    # Set up the B grid and temperatures
+    Bgrid = BT_Bgrid[0]
+    Ts = BT_Bgrid[1]
+    nB = int((Bgrid[1]-Bgrid[0])/Bgrid[2]) + 1
+    Bs = np.linspace(Bgrid[0], Bgrid[1], nB, endpoint=True)
+    nT = len(Ts)
+    # Store results using a data frame with the columns: B field, Mx, My, Mz, and T
+    for iT in range(nT):
+        print("T={:6.2f} K\n".format(Ts[iT]))
+        Ms = get_M_vs_B_Mv_tot_kernel(h0, Mv_tot, Bs, Bgrid[3], Bgrid[4], Ts[iT])
+        for iB in range(nB):
+            if iT == 0 and iB == 0:
+                # Create the data frame for the first entry
+                df = pd.DataFrame({"B": [Bs[iB]], "Mx": [Ms[iB][0]], "My": [Ms[iB][1]], "Mz": [Ms[iB][2]], "T": [Ts[iT]]})
+            else:
+                # Create a DataFrame from the dictionary 
+                new_row = pd.DataFrame([{"B": Bs[iB], "Mx": Ms[iB][0], "My": Ms[iB][1], "Mz": Ms[iB][2], "T": Ts[iT]}])
+                # Append the new data to the existing data frame
+                df = pd.concat([df, new_row], ignore_index=True)
+    create_outdir()
+    # Save the data frame to a CSV file
+    df.to_csv("./output/M-B_eff.csv", index=False)
+    print("The magnetization versus B field is saved in M-B_eff.csv.")
 
-    if not os.path.exists("./output"):
-        subprocess.run(["mkdir", "./output"])
-
-    fig, ax = plt.subplots(figsize=figsize)
-    ax.spy(M, precision=precision, markersize=markersize)
-    plt.savefig("./output/sparsity_of_" + tag + ".pdf")
-
-    return
 
 
 ## =======================================================================
@@ -977,83 +891,42 @@ def spy_sparsity(M, tag, precision=1.0e-20, figsize=(20, 20), markersize=1):
 
 def transform_O(O, eigen):
     """
-    Transform an operator from the common basis to a specified basis
-    O and the eigenvectors (of the eigen object) should be in the common basis.
+    Transform an operator from the common basis to a basis defined by the eigen object.
+    O and the eigenvectors (of the eigen object) are on the common basis.
     O_new is on the basis of the eigenvectors of the eigen object.
     """
-
     M = eigen.eigenvectors
     M_dagger = np.conjugate(np.transpose(M))
-
     O_new = np.matmul(M_dagger, np.matmul(O, M))
-
     return O_new
 
 
 def back_transform_O(O, eigen):
     """
-    Transform an operator from a specified basis to the common basis
-    The eigenvectors (of the eigen object) is in the common basis.
+    Transform an operator from the basis defined by the eigen object to the common basis
     O is on the basis of the eigenvectors of the eigen object.
+    The eigenvectors (of the eigen object) written on the common basis.
     O_new is on the common basis after transformation.
     """
-
     M = eigen.eigenvectors
     M_dagger = np.conjugate(np.transpose(M))
-
     O_new = np.matmul(M, np.matmul(O, M_dagger))
-
     return O_new
-
-
-def transform_h0(h0, eigen0):
-    """
-    Basis transformation for h0 on the basis of the eigenvectors of h0.
-    After transformation, h0[i, j] = e_i delta_{ij} where e_i are the eigenvalues of h0.
-    """
-
-    #h0_new = transform_O(h0, eigen0)
-    #print(np.all( np.absolute(h0_new.diagonal() - eigen0.eigenvalues) < 1.e-9 ) ) # True
-
-    h0_new = np.zeros(h0.shape, dtype=np.float64)
-    for i in range(h0.shape[0]):
-        h0_new[i, i] = eigenp.eigenvalues[i]
-
-    return h0_new
-
-
-
-def transform_Sv_tot(Sv_tot, eigen_p):
-    """
-    Basis transformation for Sv_tot
-    """
-
-    Sv_tot_new = []
-
-    for i in range(3):
-        Si = transform_O(Sv_tot[i], eigen_p)
-        Sv_tot_new.append(Si)
-
-    return Sv_tot_new
-
 
 def transform_Mv_tot(Mv_tot, eigen_p):
     """
     Basis transformation for Mv_tot
     """
-
     Mv_tot_new = []
-
     for i in range(3):
         Mi = transform_O(Mv_tot[i], eigen_p)
         Mv_tot_new.append(Mi)
-
     return Mv_tot_new
 
-
-def get_perturbed_basis(h_ex, spins, Bfield):
-    h_zee = get_h_Zeeman(spins, Bfield, 'cartesian')
-    h = h_ex + h_zee
+def get_perturbed_basis(spins, exchange, factor, Bz):
+    h_ex_iso = get_h_exchange_iso(spins, exchange, factor)
+    h_zee = get_h_Zeeman(spins, [0.0, 0.0, Bz], 'cartesian')
+    h = h_ex_iso + h_zee
     eigen = eigen_handy(h)
     return eigen
 
@@ -1171,23 +1044,26 @@ def get_habc_reuse_ha_Mz(h0, Mz_tot, it, deltat, Bs2, ha, hb, hc):
 
 
 # =======================================================================
-# Functions for calculating magnetization
+# Functions for calculating magnetization using the density matrix
 # =======================================================================
 
 def get_Mv_from_rho(rho, Mv_tot):
-
+    """
+    Calculate the magnetization <M> from the density matrix rho.
+    """
     Mv = []
     for i in range(3):
         Mi = np.trace( np.matmul(rho, Mv_tot[i]) )
         Mv.append(Mi)
-
     return Mv
 
-
 def get_Mz_from_rho(rho, Mz_tot):
-
+    """
+    Calculate the magnetization <M_z> from the density matrix rho.
+    """
     return np.real( np.trace( np.matmul(rho, Mz_tot) ) )
 
+# To do: remove this function and save rho using hdf5
 def get_rho_upper(rho, indices_upper):
     rho_upper = rho[indices_upper]
     rho_upper_real = np.real(rho_upper)
@@ -1201,18 +1077,25 @@ def get_rho_upper(rho, indices_upper):
 # Functions for checking a matrix
 # =======================================================================
 
+def spy_sparsity(M, tag, precision=1.0e-20, figsize=(20, 20), markersize=1):
+    """
+    Visualize the sparsity of the matrix M
+    """
+    create_outdir()
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.spy(M, precision=precision, markersize=markersize)
+    plt.savefig("./output/sparsity_of_" + tag + ".pdf")
+
+
 def spy_M(M, tag, width=10, markersize=2, threshold=1e-9):
-
-    if not os.path.exists("./output"):
-        subprocess.run(["mkdir", "./output"])
-
+    """
+    Visualize the sparsity of the matrix M and save it to a file.
+    """
+    create_outdir()
     with open("./output/" + tag + ".dat", "w") as f:
         for i in range(M.shape[0]):
             for j in range(M.shape[1]):
                 if np.abs(M[i, j]) >= threshold:
                     f.write("{:6d} {:6d} {:12.6f} {:12.6f} {:12.6f}\n".format(i+1, j+1, np.real(M[i, j]), np.imag(M[i, j]), np.abs(M[i, j])))
-
     spy_sparsity(M, tag, precision=1.0e-20, figsize=(width, width), markersize=markersize)
-
-    return
 

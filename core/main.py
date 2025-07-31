@@ -18,13 +18,13 @@ from spin_dynamics.core.hdf5 import get_rho_from_hdf5
 if __name__ == "__main__":
 
     # Read input parameters
-    Ss, nS, positions, exchange, anisotropy, gfactor, dipole, ext_field, BET_Bgrid, BET_Egrid, BET_BEgrid, BET_Tgrid, dynamics, n_thread = read_input()
+    Ss, nS, positions, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, dynamics, n_thread = read_input()
 
     # Set the number of threads
     os.environ['OMP_NUM_THREADS'] = str(n_thread)
 
     # Spin system
-    spins = many_spins(Ss, nS, gfactor, dipole, positions)
+    spins = many_spins(Ss, nS, gfactors)
 
 
 
@@ -88,21 +88,13 @@ if __name__ == "__main__":
     # The basis functions are the common eigenstates of the isotropic exchange interaction and the Sz_tot operator
     # A perturbation is added to the isotropic exchange interaction to void mixing of different Sz states
 
-    h_ex_iso = get_h_exchange_iso(spins, exchange, -2)
-    eigen_p = get_perturbed_basis(h_ex_iso, spins, [0,0,1e-4])
+    eigen_p = get_perturbed_basis(spins, exchange, -2, 1e-4)
 
     h_t0_p = transform_O(h_t0, eigen_p)
     h_tmin_p = transform_O(h_tmin, eigen_p)
     S2_tot_p = transform_O(spins.S2_tot, eigen_p)
     Sz_tot_p = transform_O(spins.Sv_tot[2], eigen_p)
     Mv_tot_p = transform_Mv_tot(spins.Mv_tot, eigen_p)
-
-
-
-    # Check if the h_ex_p matrix is diagonal
-    # check_diagonal(h_ex_p, epsilon=1e-12)
-    # check_diagonal(spins.Mv_tot[2], epsilon=1e-12)
-
 
 
 
@@ -120,13 +112,13 @@ if __name__ == "__main__":
 
     # Zeeman diagram for the full system
 
-    # get_Zeeman_energy_levels(spins, h_ex, h_ani, BET_Bgrid)
+    # get_Zeeman_energy_levels(spins, h_ex, h_ani, BT_Bgrid)
 
 
 
     # Magnetization, polarization, magnetic susceptibility, electric susceptibility
 
-    # get_M_vs_B(spins, h_ex, h_ani, BET_Bgrid)
+    # get_M_vs_B(spins, h_ex, h_ani, BT_Bgrid)
 
 
 
@@ -152,7 +144,7 @@ if __name__ == "__main__":
 
     # Zeeman diagram for the effective system
 
-    # get_Zeeman_energy_levels_Mv_tot(h_t0_eff, Mv_eff, BET_Bgrid)
+    # get_Zeeman_energy_levels_Mv_tot(h_t0_eff, Mv_eff, BT_Bgrid)
 
 
 

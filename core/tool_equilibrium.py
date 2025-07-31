@@ -15,13 +15,13 @@ from hdf5_functions import get_rho_from_hdf5
 if __name__ == "__main__":
 
     # Read input parameters
-    Ss, nS, positions, exchange, anisotropy, gfactor, dipole, ext_field, BET_Bgrid, BET_Egrid, BET_BEgrid, BET_Tgrid, dynamics, n_thread = read_input()
+    Ss, nS, positions, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, dynamics, n_thread = read_input()
 
     # Set the number of threads
     os.environ['OMP_NUM_THREADS'] = str(n_thread)
 
     # Spin system
-    spins = many_spins(Ss, nS, gfactor, dipole, positions)
+    spins = many_spins(Ss, nS, gfactors)
 
 
 
@@ -60,7 +60,7 @@ if __name__ == "__main__":
 
     # Basis transformation
 
-    eigen_p = get_perturbed_basis(h_ex, spins, [0,0,1e-4])
+    eigen_p = get_perturbed_basis(spins, exchange, -2, 1e-4)
     h_ex_p = transform_O(h_ex, eigen_p)
     h_tmin_p = transform_O(h_tmin, eigen_p)
     S2_tot_p = transform_O(spins.S2_tot, eigen_p)
@@ -82,7 +82,7 @@ if __name__ == "__main__":
 
 
 
-    Bmin, Bmax, Bstep, theta_B, phi_B = BET_Bgrid[0]
+    Bmin, Bmax, Bstep, theta_B, phi_B = BT_Bgrid[0]
     nB = int((Bmax-Bmin)/Bstep) + 1
 
     Bs = []

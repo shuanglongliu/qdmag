@@ -16,8 +16,8 @@ environ['OMP_NUM_THREADS'] = '16'
 if __name__ == "__main__":
 
     # Spin system
-    Ss, nS, positions, exchange, anisotropy, gfactor, dipole, ext_field, BET_Bgrid, BET_Egrid, BET_BEgrid, BET_Tgrid, dynamics = read_input()
-    spins = many_spins(Ss, nS, gfactor, dipole, positions)
+    Ss, nS, positions, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, dynamics = read_input()
+    spins = many_spins(Ss, nS, gfactors)
 
 
 
@@ -63,7 +63,7 @@ if __name__ == "__main__":
 
 
     # Basis transformation
-    eigen_p = get_perturbed_basis(h_ex, spins, [0,0,1e-4])
+    eigen_p = get_perturbed_basis(spins, exchange, -2, 1e-4)
     h_ex_p = transform_O(h_ex, eigen_p)
     h_tmin_p = transform_O(h_tmin, eigen_p)
     S2_tot_p = transform_O(spins.S2_tot, eigen_p)

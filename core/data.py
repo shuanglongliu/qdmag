@@ -4,11 +4,6 @@ spins:
   - 2.5
   - 2.5
 
-positions:
-  - [0.00000000,     0.00000000,     0.00000000] 
-  - [0.00000000,     0.00000000,     3.00000000] 
-  - [0.00000000,     0.00000000,     6.00000000] 
-
 exchange:
   - pair: [1, 2]
     coupling_matrix: [-2.42,  0.00,  0.00, 0.00,  -2.42,  0.00, 0.00,  0.00,  -2.42]
@@ -41,7 +36,7 @@ anisotropy:
     Bkqs: [0.0, 0.0]
     reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
   
-gfactor:
+gfactors:
   - site: 1
     gs: [2.000,  0.000,  0.000,  0.000,   2.000,  0.000,  0.000,  0.000,   2.000]
     reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
@@ -54,43 +49,12 @@ gfactor:
     gs: [2.000,  0.000,  0.000,  0.000,   2.000,  0.000,  0.000,  0.000,   2.000]
     reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
 
-
-dipole:
-  - pair: [1, 2]
-    alpha: 0.0
-    pi: [0.0, 0.0, 0.0]
-    reference_frame: [1., 0., 0.,  0., 1., 0.,  0., 0., 1.]
-
-  - pair: [2, 3]
-    alpha: 0.0
-    pi: [0.0, 0.0, 0.0]
-    reference_frame: [1., 0., 0.,  0., 1., 0.,  0., 0., 1.]
-
-  - pair: [3, 1]
-    alpha: 0.0
-    pi: [0.0, 0.0, 0.0]
-    reference_frame: [1., 0., 0.,  0., 1., 0.,  0., 0., 1.]
-
-ext_field: [0., 0., 0., 0., 0., 0.] # B, thetaB, phiB, E, thetaE, phiE
-
-BET_Bgrid:
+BT_Bgrid:
   - [0., 50., 0.01, 0., 0.] # Bmin, Bmax, Bstep, thetaB, phiB 
-  - [0., 0., 0.] # E, thetaE, phiE
   - [0.6] # [2.0, 10.0, 20.0, 40.0] # T1, T2, ..., Tn
 
-BET_Egrid:
-  - [0., 0., 0.] # B, thetaB, phiB 
-  - [0., 10., 11., 0., 0.] # Emin, Emax, Estep, thetaE, phiE
-  - [2.0] # T1, T2, ..., Tn
-
-BET_BEgrid:
-  - [0., 200., 0.1, 0., 0.] # Bmin, Bmax, Bstep, thetaB, phiB 
-  - [0., 10., 11., 0., 0.] # Emin, Emax, Estep, thetaE, phiE
-  - [2.0] # T1, T2, ..., Tn
-
-BET_Tgrid:
+BT_Tgrid:
   - [0., 0.5, 1., 0., 0.] # B1, B2, ..., Bn, thetaB, phiB
-  - [0., 1.0, 5., 10., 50., 100., 0., 0.] # E1, E2, ..., En, thetaE, phiE
   - [0.2, 1, 0.2, 2, 10, 2, 20, 300, 20] # Tmin1, Tmax1, Tstep1, Tmin2, Tmax2, Tstep2, ..., Tminn, Tmaxn, Tstepn
 
 dynamics:
@@ -129,11 +93,6 @@ spins:
   - 2.5
   - 2.5
 
-positions:
-  - [0.00000000,     0.00000000,     0.00000000] 
-  - [0.00000000,     0.00000000,     3.00000000] 
-  - [0.00000000,     0.00000000,     6.00000000] 
-
 exchange:
   - pair: [1, 2]
     coupling_matrix: [-2.42,  0.00,  0.00, 0.00,  -2.42,  0.00, 0.00,  0.00,  -2.42]
@@ -166,7 +125,7 @@ anisotropy:
     Bkqs: [0.0556, 0.0400]
     reference_frame: [{exx:10.6f}, {exy:10.6f}, {exz:10.6f}, {eyx:10.6f}, {eyy:10.6f}, {eyz:10.6f}, {ezx:10.6f}, {ezy:10.6f}, {ezz:10.6f}]
   
-gfactor:
+gfactors:
   - site: 1
     gs: [2.000,  0.000,  0.000,  0.000,   2.000,  0.000,  0.000,  0.000,   2.000]
     reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
@@ -179,43 +138,12 @@ gfactor:
     gs: [2.000,  0.000,  0.000,  0.000,   2.000,  0.000,  0.000,  0.000,   2.000]
     reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
 
-
-dipole:
-  - pair: [1, 2]
-    alpha: 0.0
-    pi: [0.0, 0.0, 0.0]
-    reference_frame: [1., 0., 0.,  0., 1., 0.,  0., 0., 1.]
-
-  - pair: [2, 3]
-    alpha: 0.0
-    pi: [0.0, 0.0, 0.0]
-    reference_frame: [1., 0., 0.,  0., 1., 0.,  0., 0., 1.]
-
-  - pair: [3, 1]
-    alpha: 0.0
-    pi: [0.0, 0.0, 0.0]
-    reference_frame: [1., 0., 0.,  0., 1., 0.,  0., 0., 1.]
-
-ext_field: [0., 0., 0., 0., 0., 0.] # B, thetaB, phiB, E, thetaE, phiE
-
-BET_Bgrid:
+BT_Bgrid:
   - [0., {staticB_max:.3f}, {staticB_step:.3f}, 0., 0.] # Bmin, Bmax, Bstep, thetaB, phiB 
-  - [0., 0., 0.] # E, thetaE, phiE
   - [0.6] # [2.0, 10.0, 20.0, 40.0] # T1, T2, ..., Tn
 
-BET_Egrid:
-  - [0., 0., 0.] # B, thetaB, phiB 
-  - [0., 10., 11., 0., 0.] # Emin, Emax, Estep, thetaE, phiE
-  - [2.0] # T1, T2, ..., Tn
-
-BET_BEgrid:
-  - [0., 200., 0.1, 0., 0.] # Bmin, Bmax, Bstep, thetaB, phiB 
-  - [0., 10., 11., 0., 0.] # Emin, Emax, Estep, thetaE, phiE
-  - [2.0] # T1, T2, ..., Tn
-
-BET_Tgrid:
+BT_Tgrid:
   - [0., 0.5, 1., 0., 0.] # B1, B2, ..., Bn, thetaB, phiB
-  - [0., 1.0, 5., 10., 50., 100., 0., 0.] # E1, E2, ..., En, thetaE, phiE
   - [0.2, 1, 0.2, 2, 10, 2, 20, 300, 20] # Tmin1, Tmax1, Tstep1, Tmin2, Tmax2, Tstep2, ..., Tminn, Tmaxn, Tstepn
 
 dynamics:

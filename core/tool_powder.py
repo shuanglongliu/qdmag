@@ -1,5 +1,3 @@
-# This is a standalone utility for calculating the powder avarage of magnetization
-
 import os
 import subprocess
 import numpy as np
@@ -17,7 +15,7 @@ class powder:
     def __init__(self):
         self.load_points_and_weights()
 
-        # Parameters for determining the BET_Egrid in the input file
+        # Parameters for determining the BT_Egrid in the input file
         self.staticB_max = 50.0 # T
         self.staticB_step = 0.1 # T
 

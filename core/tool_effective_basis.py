@@ -12,13 +12,13 @@ from spin_dynamics.core.effective_basis import *
 if __name__ == "__main__":
 
     # Read input parameters
-    Ss, nS, positions, exchange, anisotropy, gfactor, dipole, ext_field, BET_Bgrid, BET_Egrid, BET_BEgrid, BET_Tgrid, dynamics, n_thread = read_input()
+    Ss, nS, positions, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, dynamics, n_thread = read_input()
 
     # Set the number of threads
     os.environ['OMP_NUM_THREADS'] = str(n_thread)
 
     # Spin system
-    spins = many_spins(Ss, nS, gfactor, dipole, positions)
+    spins = many_spins(Ss, nS, gfactors)
 
 
 
@@ -64,8 +64,7 @@ if __name__ == "__main__":
     # The basis functions are the common eigenstates of the isotropic exchange interaction and the Sz_tot operator
     # A perturbation is added to the isotropic exchange interaction to void mixing of different Sz states
 
-    h_ex_iso = get_h_exchange_iso(spins, exchange, -2)
-    eigen_p = get_perturbed_basis(h_ex_iso, spins, [0,0,1e-4])
+    eigen_p = get_perturbed_basis(spins, exchange, -2, 1e-4)
 
     h_p = transform_O(h, eigen_p)
     S2_tot_p = transform_O(spins.S2_tot, eigen_p)
@@ -88,7 +87,7 @@ if __name__ == "__main__":
 
     # Get Zeeman energy levels
 
-    get_Zeeman_energy_levels_Mv_tot(h_eff, Mv_eff, BET_Bgrid)
+    get_Zeeman_energy_levels_Mv_tot(h_eff, Mv_eff, BT_Bgrid)
 
 
 

@@ -45,8 +45,7 @@ def combine_hdf5_files(file1, file2, output_file):
             merge_items(f2, outfile)
 
 def test_hdf5():
-    # fname = "/blue/m2qm-efrc/shuan.liu.neu/projects/spin_dynamics/output/double_super_rho_0.000-10.000_step0.001ps.hdf5"
-    fname = "/blue/m2qm-efrc/shuan.liu.neu/projects/spin_dynamics/output/double_super_rho_0.000-30.000_step0.001ps.hdf5"
+    fname = "/blue/m2qm-efrc/shuan.liu.neu/projects/spin_dynamics/output/double_super_rho_0.000-30.000_step0.001ps.h5"
     with h5py.File(fname, "r") as f1:
         h5keys = list ( f1.keys() )
         print("Keys in the file:", h5keys)

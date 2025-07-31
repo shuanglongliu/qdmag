@@ -14,8 +14,8 @@ if __name__ == "__main__":
 
     # Spin system
 
-    Ss, nS, positions, exchange, anisotropy, gfactor, dipole, ext_field, BET_Bgrid, BET_Egrid, BET_BEgrid, BET_Tgrid, fit_problem = read_input()
-    spins = many_spins(Ss, nS, gfactor, dipole, positions)
+    Ss, nS, positions, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, fit_problem = read_input()
+    spins = many_spins(Ss, nS, gfactors)
 
 
 
@@ -79,10 +79,7 @@ if __name__ == "__main__":
     nt, ts, Bs, deltat = get_pulse_for_TEO(Bt, tmin, tmax, deltat)
     #print("The last magnetic field is {:8.4f} T".format(Bs[-1]))
 
-    # Final magnetic moment if the system is in equilibrium
 
-    #M = get_M_at_BET_plain((spins, h_ex, h_ani, Bs[-1], theta_B, phi_B, T))
-    #print("  Final M = {:12.4E} {:12.4E} {:12.4E} mu_B (if in equilibrium)".format(*M))
 
     # Get time evolution operators
 

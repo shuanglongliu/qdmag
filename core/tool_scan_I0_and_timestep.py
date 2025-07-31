@@ -19,7 +19,7 @@ class scanning:
         self.beta = 0.0
         self.gamma = 0.0
 
-        # Parameters for determining the BET_Egrid in the input file
+        # Parameters for determining the BT_Egrid in the input file
         self.staticB_max = 50.0 # T
         self.staticB_step = 0.1 # T
 
