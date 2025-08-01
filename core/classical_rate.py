@@ -317,8 +317,6 @@ def evolve_P_stairs(P, nu0, symmetric, t0, t1, deltat, Bt_params, T, h_t0, Mz_op
             B = Bt(t)
         # Calculate the magnetic moment
         Mz = get_Mz_from_P(P, h_t0, B, Mz_op)
-        print(P)
-        print(Mz)
         row = get_csv_row(columns, t, B, P, Mz, dim)
         # Append the row to the DataFrame
         df = pd.concat([df, pd.DataFrame(row)], ignore_index=True)
