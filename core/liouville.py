@@ -600,57 +600,6 @@ def examine_L_max_and_expLdeltat_max(Bs, deltats, tag, L, L0, h_t0, h, Mz_op, C,
 
 
 # ============================================================================ #
-# Functions for calculating the long-time evolution operator.
-# ============================================================================ #
-
-def get_U_dsqe_longtime(t0, t1, deltat, L, L0, h, h_t0, Mz_op, Bt, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds):
-    r"""
-    Get the long-time evolution operator \Pi_i U = exp(L_i * deltat), where \Pi is the product operator.
-    The operators exp(L_i * deltat) are time-ordered such that later times are to the left of earlier times.
-    """
-
-    half_deltat = deltat/2
-    nt = int( np.round((t1 - t0)/deltat) )
-    t1 = t0 + nt*deltat
-
-    # Initialize the long-time evolution operator
-    U = np.identity(dimds, dtype=np.float64)
-
-    # Loop over the time steps and multiply the short-time evolution operators to get the long-time evolution operator
-    for it in range(nt):
-        t = t0 + it*deltat + half_deltat
-        B = Bt(t)
-        # Print t and B for debugging
-        # print("it = {:6d}, t = {:18.3f}, B = {:15.3e}".format(it, t, B))
-        L, h, Rhbar = update_L_under_magnetic_field(L, L0, h, h_t0, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
-        U = np.matmul(expm(L*deltat), U)
-
-    if not os.path.exists("./output"):
-        os.makedirs("./output")
-
-    # file name for saving the long-time evolution operator
-    ta = int( t0 / 1e6 // 1 ) # micro second 
-    fname      = './output/U_{:d}-{:d}us.h5'.format(ta, ta+1)
-    fname_lock = './output/U_{:d}-{:d}us.h5.lock'.format(ta, ta+1)
-
-    # Lock the file to prevent other processes from writing to it
-    with FileLock(fname_lock):
-        # The tag is uique and accurate if t < 5e12 ps.
-        tag = "{:.3f}-{:.3f}".format(t0, t1)
-        # Save the long-time evolution operator
-        with h5py.File(fname, "a") as f1:
-            # Write data safely. 
-            if tag in f1:
-                # print("The dataset {} already exists in the file {}. Deleting the dataset ...".format(tag, fname))
-                del f1[tag]
-            # print("Creating the dataset {} in the file {} ...".format(tag, fname))
-            dset = f1.create_dataset("{:.3f}-{:.3f}".format(t0, t1), data=U)
-
-    return (t0, t1, U)
-
-
-
-# ============================================================================ #
 # Functions for solving the quantum master equation.
 # ============================================================================ #
 
