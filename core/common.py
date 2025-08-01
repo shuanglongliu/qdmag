@@ -1001,8 +1001,53 @@ def get_habc_reuse_ha_Mz(h0, Mz_tot, it, deltat, Bs2, ha, hb, hc):
 
 
 # =======================================================================
-# Functions for calculating magnetization using the density matrix
+# Functions related to the density matrix
 # =======================================================================
+
+def get_rho0(eigen0, T):
+    """
+    Get the equilibrium density matrix rho0 based on the eigenalues stored in eigen0.
+    rho0_kk = p_k which is the probability of occupying the state |k>
+    T: Temperature in Kelvin
+    """
+
+    rho0 = np.zeros((eigen0.dim, eigen0.dim), dtype=np.complex128)
+
+    e_ref = eigen0.eigenvalues[eigen0.indices[0]]
+
+    beta = 1/(Kelvin2wavenumber * T)
+
+    for i in range(eigen0.dim):
+        eigenvalue = eigen0.eigenvalues[i] - e_ref
+        rho0[i, i] = np.exp(-beta*eigenvalue)
+
+    rho0 = rho0 / np.trace(rho0)
+
+    return rho0
+
+
+def get_rhoe(energies, T):
+    """
+    Get the equilibrium density matrix based on the given energies.
+    rho0_kk = p_k which is the probability of occupying the state |k>
+    T: Temperature in Kelvin
+    """
+
+    dim = energies.shape[0]
+
+    rhoe = np.zeros((dim, dim), dtype=np.complex128)
+
+    e_ref = np.min(energies)
+
+    beta = 1/(Kelvin2wavenumber * T)
+
+    for i in range(dim):
+        eigenvalue = energies[i] - e_ref
+        rhoe[i, i] = np.exp(-beta*eigenvalue)
+
+    rhoe = rhoe / np.trace(rhoe)
+
+    return rhoe
 
 def get_Mv_from_rho(rho, Mv_tot):
     """

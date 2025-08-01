@@ -4,9 +4,9 @@ import time
 from spin_dynamics.core.common import read_input, many_spins
 from spin_dynamics.core.common import get_h_exchange, get_h_anisotropy, get_h_Zeeman, eigen_handy
 from spin_dynamics.core.common import get_perturbed_basis, transform_O, back_transform_O, transform_Mv_tot
-from spin_dynamics.core.von_neumann import get_rhoe
+from spin_dynamics.core.common import get_rhoe
 from spin_dynamics.core.effective_basis import set_up_the_effective_system
-from spin_dynamics.core.liouville import convert_rho_to_vrhos, set_up_liouville, evolve_rho_dsqme_stairs
+from spin_dynamics.core.liouville import convert_rho_to_risvrho, set_up_liouville, evolve_rho_liouville_stairs
 from spin_dynamics.core.pulse import get_Bt
 from spin_dynamics.core.hdf5 import get_rho_from_hdf5
 
@@ -106,12 +106,12 @@ if __name__ == "__main__":
     rho0_eff = back_transform_O(rho0_eff, eigen_tmin_eff)
 
     #### Convert the density matrix to the double super density matrix
-    vrhos0_eff = convert_rho_to_vrhos(rho0_eff)
+    risvrho0_eff = convert_rho_to_risvrho(rho0_eff)
 
     ## Read the initial density matrix from a file
 
-    # fname = "/blue/m2qm-efrc/shuan.liu.neu/projects/spin_dynamics/output/vrhos_0.000-10.000_step0.001ps.hdf5"
-    # vrhos0_eff = get_rho_from_hdf5(fname, tmin, dimds)
+    # fname = "/blue/m2qm-efrc/shuan.liu.neu/projects/spin_dynamics/output/risvrho_0.000-10.000_step0.001ps.hdf5"
+    # risvrho0_eff = get_rho_from_hdf5(fname, tmin, dimds)
 
 
 
@@ -120,7 +120,7 @@ if __name__ == "__main__":
     start = time.time()
 
     # Evolve the double super density matrix
-    tmax, vrhos_eff = evolve_rho_dsqme_stairs(tmin, tmax, deltat, Bt_params, vrhos0_eff, L_eff, L0_eff, h_t0_eff, Mz_eff, C_eff, CST_eff, X_eff, Rhbar_eff, lambdaa, I0, T, dim, dims, dimds, save_mag, nt_mag, save_rho, nt_rho)
+    tmax, risvrho_eff = evolve_rho_liouville_stairs(tmin, tmax, deltat, Bt_params, risvrho0_eff, L_eff, L0_eff, h_t0_eff, Mz_eff, C_eff, CST_eff, X_eff, Rhbar_eff, lambdaa, I0, T, dim, dims, dimds, save_mag, nt_mag, save_rho, nt_rho)
 
     end   = time.time()
     

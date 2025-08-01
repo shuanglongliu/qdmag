@@ -115,7 +115,7 @@ if __name__ == "__main__":
     rho0_eff = np.zeros((dim, dim))
     rho0_eff[0, 0] = 1.0
 
-    vrhos0_eff = convert_rho_to_vrhos(rho0_eff)
+    risvrho0_eff = convert_rho_to_risvrho(rho0_eff)
 
 
 
@@ -137,9 +137,9 @@ if __name__ == "__main__":
 
     start = time.time()
 
-    vrhos_eff = evolve_rho_dsqme(D0_eff, Mz_eff_diag, vrhos0_eff, nt, deltat, Bs2, dim, dims)
+    risvrho_eff = evolve_rho_liouville(D0_eff, Mz_eff_diag, risvrho0_eff, nt, deltat, Bs2, dim, dims)
 
-    rho_eff = convert_vrhos_to_rho(vrhos_eff, dim, dims, dimds)
+    rho_eff = convert_risvrho_to_rho(risvrho_eff, dim, dims, dimds)
 
     end   = time.time()
 

@@ -122,52 +122,6 @@ def get_DeltaUs(h0, Mv_tot, nt, ts, deltat, Bs, theta_B, phi_B, nperiod):
 
 # rho = deltaU(tn) deltaU(tn-1) ... deltaU(t1) rho0 deltaU_dagger(t1) deltaU_dagger(t2) ... deltaU_dagger(tn)
 
-def get_rho0(eigen0, T):
-    """
-    Get initial density matrix rho0 on the perturbed basis
-    rho0_kk = p_k which is the probability of occupying the state |k>
-    T: Temperature in Kelvin
-    """
-
-    rho0 = np.zeros((eigen0.dim, eigen0.dim), dtype=np.complex128)
-
-    e_ref = eigen0.eigenvalues[eigen0.indices[0]]
-
-    beta = 1/(Kelvin2wavenumber * T)
-
-    for i in range(eigen0.dim):
-        eigenvalue = eigen0.eigenvalues[i] - e_ref
-        rho0[i, i] = np.exp(-beta*eigenvalue)
-
-    rho0 = rho0 / np.trace(rho0)
-
-    return rho0
-
-
-def get_rhoe(energies, T):
-    """
-    Get the density matrix on the perturbed basis for the thermal equilibrium
-    rho0_kk = p_k which is the probability of occupying the state |k>
-    T: Temperature in Kelvin
-    """
-
-    dim = energies.shape[0]
-
-    rhoe = np.zeros((dim, dim), dtype=np.complex128)
-
-    e_ref = np.min(energies)
-
-    beta = 1/(Kelvin2wavenumber * T)
-
-    for i in range(dim):
-        eigenvalue = energies[i] - e_ref
-        rhoe[i, i] = np.exp(-beta*eigenvalue)
-
-    rhoe = rhoe / np.trace(rhoe)
-
-    return rhoe
-
-
 def evolve_Deltat(rho, DeltaU):
     """
     Evolve the density matrix rho by Deltat: rho_new = DeltaU rho DeltaU_dagger.
