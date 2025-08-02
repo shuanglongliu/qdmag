@@ -833,12 +833,12 @@ def get_chim_tensor_kernel(spins, h_ex, h_ani, B0v_sph, T, dBv_sph, verbose):
     h_zee = get_h_Zeeman(spins, B0v_cart + dBv_cart, 'cartesian')
     h = h_ex + h_ani + h_zee
     eigen_plus = eigen_handy(h)
-    Z_plus = get_partition_function(eigen_plus, T)
+    Z_plus, _ = get_partition_function(eigen_plus, T)
     M_plus = get_magnetic_moment(spins, eigen_plus, T, Z_plus)
     h_zee = get_h_Zeeman(spins, B0v_cart - dBv_cart, 'cartesian')
     h = h_ex + h_ani + h_zee
     eigen_minus = eigen_handy(h)
-    Z_minus = get_partition_function(eigen_minus, T)
+    Z_minus, _ = get_partition_function(eigen_minus, T)
     M_minus = get_magnetic_moment(spins, eigen_minus, T, Z_minus)
     chim_n = (M_plus - M_minus) / (2*dBv_sph[0])
     if verbose:
@@ -908,7 +908,7 @@ def get_M_vs_B_kernel(spins, h_ex, h_ani, Bs, theta_B, phi_B, T):
         h_zee   = get_h_Zeeman(spins, [Bs[iB], theta_B, phi_B], "spherical")
         h = h_ex + h_ani + h_zee
         eigen = eigen_handy(h)
-        Z = get_partition_function(eigen, T)
+        Z, _ = get_partition_function(eigen, T)
         M = get_magnetic_moment(spins, eigen, T, Z)
         Ms.append(M)
     return Ms
@@ -928,7 +928,7 @@ def get_M_vs_B_Mv_tot_kernel(h0, Mv_tot, Bs, theta_B, phi_B, T):
         h_zee   = get_h_Zeeman_Mv_tot(Mv_tot, [Bs[iB], theta_B, phi_B], "spherical")
         h = h0 + h_zee
         eigen = eigen_handy(h)
-        Z = get_partition_function(eigen, T)
+        Z, _ = get_partition_function(eigen, T)
         M = get_magnetic_moment_Mv_tot(Mv_tot, eigen, T, Z)
         Ms.append(M)
     return Ms
