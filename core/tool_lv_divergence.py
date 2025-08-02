@@ -1,16 +1,14 @@
 import os
 import sys
 import time
+import numpy as np
 from os import environ
-from spin_dynamics.core.common import *
-from spin_dynamics.core.von_neumann import *
-from spin_dynamics.core.schrodinger import *
-from spin_dynamics.core.quantum_master import *
-from spin_dynamics.core.effective_basis import * 
-from spin_dynamics.core.liouville import *
-from spin_dynamics.core.pulse import *
-
-
+from spin_dynamics.core.common import read_input, many_spins
+from spin_dynamics.core.common import get_h_exchange, get_h_anisotropy, get_h_Zeeman
+from spin_dynamics.core.common import get_perturbed_basis, transform_O, transform_Mv_tot
+from spin_dynamics.core.effective_basis import set_up_the_effective_system
+from spin_dynamics.core.liouville import set_up_liouville, examine_L_max_and_expLdeltat_max
+from spin_dynamics.core.pulse import get_Bt
 
 if __name__ == "__main__":
 
@@ -89,14 +87,16 @@ if __name__ == "__main__":
 
     # Set up the double super quantum master equation
 
-    D0_eff, D_eff, Rhbar_eff, C_eff, CST_eff, dims, dimds = set_up_liouville(h_t0_eff, h_tmin_eff, X_eff, dim, I0, T, lambdaa)
+    L0_eff, L_eff, Rhbar_eff, C_eff, CST_eff, dims, dimds = set_up_liouville(h_t0_eff, h_tmin_eff, X_eff, dim, I0, T, lambdaa)
 
 
 
     # Examine the biggest element of the time evolution operator
 
-    Bs = np.linspace(0, 50, 1001, endpoint=True)
-    deltats = [1e-3, 1e-2, 1e-1, 1., 10., 20., 30., 40., 50., 60., 70., 80., 90., 100., 1e3, 1e4, 1e5, 1e6 ]
-    examine_D_max_and_expDdeltat_max(Bs, deltats, "0-50T", D_eff, D0_eff, h_t0_eff, h_tmin_eff, Mz_eff, C_eff, CST_eff, X_eff, Rhbar_eff, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+    # Bs = np.linspace(0, 50, 1001, endpoint=True)
+    # deltats = [1e-3, 1e-2, 1e-1, 1., 10., 20., 30., 40., 50., 60., 70., 80., 90., 100., 1e3, 1e4, 1e5, 1e6 ]
+    Bs = np.linspace(0, 50, 11, endpoint=True)
+    deltats = [1e3, 1e6 ]
+    examine_L_max_and_expLdeltat_max(Bs, deltats, "0-50T", L_eff, L0_eff, h_t0_eff, h_tmin_eff, Mz_eff, C_eff, CST_eff, X_eff, Rhbar_eff, lambdaa, I0, T, dim, dims, dimds)
 
     

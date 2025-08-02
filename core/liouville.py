@@ -5,8 +5,7 @@ import h5py
 from filelock import FileLock
 from scipy.linalg import expm
 from spin_dynamics.core.constants import const1, Tesla2wavenumber
-from spin_dynamics.core.common import kronecker_delta
-from spin_dynamics.core.common import spy_sparsity
+from spin_dynamics.core.common import kronecker_delta, create_outdir
 from spin_dynamics.core.common import get_Mv_from_rho, get_Mz_from_rho
 from spin_dynamics.core.common import eigen_simple
 from spin_dynamics.core.quantum_master import get_Rhbar, update_Rhbar
@@ -550,52 +549,44 @@ def examine_L_max_and_expLdeltat_max(Bs, deltats, tag, L, L0, h_t0, h, Mz_op, C,
     n = len(deltats)
     L_max = np.zeros((m, n))
     expLdeltat_max = np.zeros((m, n))
-
     # Which elements of C are nonzero?
     n_nzC, indices_nzC = get_indices_nzC(X, dim)
-
     for i in range(m):
         for j in range(n):
             # Get the current magnetic field and time step
             B = Bs[i]
             deltat = deltats[j]
-
             # Print the magnetic field and the time step
             print("B = {:15.6f} T, deltat = {:15.3f}  ps".format(B, deltat))
-
             # Get the maximum of the absolute values of the elements of L and exp(L * deltat)
             L_max[i, j], expLdeltat_max[i, j] = get_L_max_and_expLdeltat_max(L, L0, deltat, h_t0, h, Mz_op, B, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
-
-    if not os.path.exists("./output"):
-        os.makedirs("./output")
-
+    create_outdir()
     # Save L_max in the file L_max.dat, the first column is the magnetic field, and the first row is the time step.
     # Ths first row should be a comment line starting with #.
     with open("./output/L_max_" + tag + ".dat", "w") as f:
-        f.write("# ")
+        f.write("# B (T)")
         for j in range(n):
-            f.write("{:15.3f}".format(deltats[j]))
+            f.write("   dt = {:.3f} ps".format(deltats[j]))
         f.write("\n")
         for i in range(m):
             f.write("{:15.6f}".format(Bs[i]))
             for j in range(n):
                 f.write(" {:15.6f}".format(L_max[i, j]))
             f.write("\n")
-
+    print("L_max saved to ./output/L_max_" + tag + ".dat")
     # Save expLdeltat_max in the file expLdeltat_max.dat, the first column is the magnetic field, and the first row is the time step.
     # Ths first row should be a comment line starting with #. 
     with open("./output/expLdeltat_max_" + tag + ".dat", "w") as f:
-        f.write("# ")
+        f.write("# B (T)")
         for j in range(n):
-            f.write("{:15.3f}".format(deltats[j]))
+            f.write("   dt = {:.3f} ps".format(deltats[j]))
         f.write("\n")
         for i in range(m):
             f.write("{:15.6f}".format(Bs[i]))
             for j in range(n):
                 f.write(" {:15.6f}".format(expLdeltat_max[i, j]))
             f.write("\n")
-
-    return
+    print("expLdeltat_max saved to ./output/expLdeltat_max_" + tag + ".dat")
 
 
 
@@ -896,9 +887,8 @@ def evolve_rho_liouville_stairs(t0, t1, deltat, Bt_params, risvrho, L, L0, h_t0,
         t1 = t0 + nt*deltat
 
         # Output directory
+        create_outdir()
         outdir_rho, outdir_mag = get_outdirs(T, I0, lambdaa, Bt_params)
-        if not os.path.exists(outdir_rho):
-            os.makedirs(outdir_rho)
 
         # Output files
         fname1 = outdir_rho + '/{:.3f}-{:.3f}ps_dt{:.3f}ps.h5'.format(t0, t1, deltat)

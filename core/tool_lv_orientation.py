@@ -125,7 +125,7 @@ python /home/shuan.liu.neu/git/spin_dynamics/tools/tool_magnetization.py
 python /home/shuan.liu.neu/git/spin_dynamics/tools/tool_staircase.py
 """
 
-class sampling:
+class orientation_sampling:
     def __init__(self):
         # Euler angles for determing the molecular orientations
         self.load_euler_angles()
@@ -364,7 +364,7 @@ if __name__ == "__main__":
 
     # print("Root directory: ", root_dir)
 
-    sam = sampling()
+    sam = orientation_sampling()
     # sam.create_directories()
     # sam.get_inputs()
     # sam.submit_job_array()

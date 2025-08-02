@@ -70,16 +70,7 @@ if __name__ == "__main__":
 
 
 
-    #Rhbar_eff = construct_Rhbar(T, X_eff, nonzero_indices_X_eff, np.real(np.diag(h0_eff)), I0)
-    #, Rhbar_eff
-    #with open(root_dir + "output/Rhbar_eff.dat", "w") as f:
-        #for i in range(n):
-            #for j in range(n):
-                #f.write("{:5d} {:5d} {:12.4e}\n".format(i, j, Rhbar_eff[i, j]))
- 
-    #max_Rhbar_eff = np.max(np.absolute(Rhbar_eff))
-    #spy_sparsity(Rhbar_eff, "Rhbar_eff", precision = 0.01*max_Rhbar_eff, figsize=(10, 10), markersize=5)
-
+    Rhbar_eff = construct_Rhbar(T, X_eff, nonzero_indices_X_eff, np.real(np.diag(h0_eff)), I0)
 
     # Construct the superoperator B_eff from X_eff, and Rhbar_eff
 
@@ -116,13 +107,6 @@ if __name__ == "__main__":
     rho0_eff[0, 0] = 1.0
 
     risvrho0_eff = convert_rho_to_risvrho(rho0_eff)
-
-
-
-    # Check commutation relation
-
-    #D1_eff = construct_D_using_Bfield(D0_eff, -1*Mz_eff_diag, 1, dim, dims)
-    #check_commutation(D0_eff, D1_eff); exit()
 
 
 

@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from spin_dynamics.core.common import spy_sparsity
+from spin_dynamics.core.analysis import spy_sparsity
 
 def construct_X_eff(Sz_full, selected_states, multiphonon=False, imbalance=False):
     """

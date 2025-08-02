@@ -2,11 +2,10 @@ import os
 import subprocess
 import numpy as np
 from spin_dynamics.core.constants import const1, Kelvin2wavenumber
-from spin_dynamics.core.common import get_commutation
-from spin_dynamics.core.common import spy_sparsity
 from spin_dynamics.core.common import get_habc_Mv, get_habc_Mz, get_habc_reuse_ha_Mv, get_habc_reuse_ha_Mz
 from spin_dynamics.core.common import get_rho_upper
 from spin_dynamics.core.common import eigen_simple
+from spin_dynamics.core.analysis import spy_sparsity
 from spin_dynamics.core.pulse import get_partial_double_grid, get_partial_double_grid_left
 
 r"""
@@ -211,8 +210,6 @@ def spy_XRhbar(X, Rhbar, Sz_tot):
 
     max_Rhbar = np.max(np.absolute(Rhbar))
     spy_sparsity(Rhbar, "Rhbar", precision = 0.1*max_Rhbar, figsize=(10, 10), markersize=5)
-
-    return
 
 
 def get_Gammarho(rho, X, Rhbar, lambda2):

@@ -5,7 +5,6 @@ import math
 import yaml
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from spin_dynamics.core.constants import Tesla2wavenumber, Kelvin2wavenumber
 from spin_dynamics.core.Operators import Operator
 from spin_dynamics.core.StevensOperators import StevensOpA
@@ -192,57 +191,6 @@ def sph2cart_deg(sph):
     y = sph[0] * math.sin( sph[1] ) * math.sin( sph[2] )
     return np.array( [x, y, z] )
 
-def check_hermitian(op):
-    maxdiff = np.max( np.absolute( np.conjugate(np.transpose(op)) - op ) )
-    if maxdiff < 1.e-9:
-        print("It is Hermitian.")
-    else:
-        print("It is not Hermitian.")
-    return
-
-def check_unitary(op):
-    op_dagger = np.conjugate(np.transpose(op))
-    prod = np.matmul(op_dagger, op)
-    maxdiff = np.max( np.absolute( prod - np.eye(prod.shape[0]) ) )
-    if maxdiff < 1.e-9:
-        print("It is unitary.")
-    else:
-        print("It is not unitary.")
-    return
-
-def get_commutation(O1, O2):
-    return np.matmul(O1, O2) - np.matmul(O2, O1) 
-
-def check_commutation(O1, O2):
-    x = np.matmul(O1, O2) 
-    y = np.matmul(O2, O1) 
-    maxdiff = np.max(np.absolute(x - y))
-    if maxdiff < 1.e-6:
-        print("Yes, they commute.")
-    else:
-        print("No, they don't commute.\n" + " maxdiff = {:15.10f}.".format(maxdiff))
-    return
-
-def check_eigen(O, eigen):
-    """
-    Check if the given vectors are the eigenvectors of an operator.
-    If O |i> = sum_j c_{ij} |j>, then c_{ij} = O_{ji}.
-    If |i> are the eigenvectors, then O_{ji} is diagonal.
-    """
-    O1 = transform_O(O, eigen)
-    O1_abs = np.abs(O1)
-    np.fill_diagonal(O1_abs, 0)
-    is_eigen = np.all( O1_abs < 1e-8 )
-    print( "Are they eigenvectors? {:s}.".format(str(is_eigen)) )
-
-def check_real(O):
-    is_real = np.all( np.imag(O) < 1e-12 )
-    if is_real:
-        print("It is real.")
-    else:
-        print("It is complex.")
-    return
-
 def get_Sprime(A, S):
     # Get spin operators in the local reference frame. 
     # e_x^prime = A[0, :]
@@ -353,26 +301,6 @@ def print_emat_array(emat):
     print("        [ {:15.8f}, {:15.8f}, {:15.8f} ], \\".format(*emat[1]))
     print("        [ {:15.8f}, {:15.8f}, {:15.8f} ], \\".format(*emat[2]))
     print("        ]")
-
-## =================================================================
-## Functions for analyzing results.
-## =================================================================
-
-def get_expectation_of_spins(spins, state):
-    """
-    Driver function to calculate the expectation values of local spins and total spin.
-    """
-    E_local_spins = []
-    for i in range(spins.nS):
-        E_local_spins.append([])
-        for j in range(3):
-            E_local_spins[i].append(np.real(np.dot(np.conjugate(state), np.matmul(spins.global_spins[i][j], state))))
-    E_Sv_tot = []
-    for i in range(3):
-        E_Sv_tot.append( np.real(np.dot(np.conjugate(state), np.matmul(spins.Sv_tot[i], state))) )
-    E_S2_tot = np.real(np.dot(np.conjugate(state), np.matmul(spins.S2_tot, state)))
-    E_S_tot = (-1+np.sqrt(4*E_S2_tot+1))/2
-    return (E_local_spins, E_Sv_tot, E_S2_tot, E_S_tot)
 
 ## =================================================================
 ## Functions for magnetic exchange interaction.
@@ -561,6 +489,50 @@ def get_h_Zeeman_Mv_tot(Mv_tot, Bv, coord):
 
     return h_zee
 
+## =======================================================================
+## Functions for basis transformation
+## =======================================================================
+
+def transform_O(O, eigen):
+    """
+    Transform an operator from the common basis to a basis defined by the eigen object.
+    O and the eigenvectors (of the eigen object) are on the common basis.
+    O_new is on the basis of the eigenvectors of the eigen object.
+    """
+    M = eigen.eigenvectors
+    M_dagger = np.conjugate(np.transpose(M))
+    O_new = np.matmul(M_dagger, np.matmul(O, M))
+    return O_new
+
+def back_transform_O(O, eigen):
+    """
+    Transform an operator from the basis defined by the eigen object to the common basis
+    O is on the basis of the eigenvectors of the eigen object.
+    The eigenvectors (of the eigen object) written on the common basis.
+    O_new is on the common basis after transformation.
+    """
+    M = eigen.eigenvectors
+    M_dagger = np.conjugate(np.transpose(M))
+    O_new = np.matmul(M, np.matmul(O, M_dagger))
+    return O_new
+
+def transform_Mv_tot(Mv_tot, eigen_p):
+    """
+    Basis transformation for Mv_tot
+    """
+    Mv_tot_new = []
+    for i in range(3):
+        Mi = transform_O(Mv_tot[i], eigen_p)
+        Mv_tot_new.append(Mi)
+    return Mv_tot_new
+
+def get_perturbed_basis(spins, exchange, factor, Bz):
+    h_ex_iso = get_h_exchange_iso(spins, exchange, factor)
+    h_zee = get_h_Zeeman(spins, [0.0, 0.0, Bz], 'cartesian')
+    h = h_ex_iso + h_zee
+    eigen = eigen_handy(h)
+    return eigen
+
 ## =================================================================
 ## Functions for energy levels versus B field
 ## =================================================================
@@ -614,6 +586,26 @@ def get_Zeeman_energy_levels_Mv_tot(h0, Mv_tot, BT_Bgrid):
             f.write((" {:12.6f}" + eigen.dim*" {:15.9f}" + "\n").format(B, *eigenvalues[i]))
     print("The Zeeman energy levels are saved in Zeeman_eff.dat.")
 
+## =================================================================
+## Functions for analyzing results.
+## =================================================================
+
+def get_expectation_of_spins(spins, state):
+    """
+    Driver function to calculate the expectation values of local spins and total spin.
+    """
+    E_local_spins = []
+    for i in range(spins.nS):
+        E_local_spins.append([])
+        for j in range(3):
+            E_local_spins[i].append(np.real(np.dot(np.conjugate(state), np.matmul(spins.global_spins[i][j], state))))
+    E_Sv_tot = []
+    for i in range(3):
+        E_Sv_tot.append( np.real(np.dot(np.conjugate(state), np.matmul(spins.Sv_tot[i], state))) )
+    E_S2_tot = np.real(np.dot(np.conjugate(state), np.matmul(spins.S2_tot, state)))
+    E_S_tot = (-1+np.sqrt(4*E_S2_tot+1))/2
+    return (E_local_spins, E_Sv_tot, E_S2_tot, E_S_tot)
+
 def save_projections(eigen, S):
     """
     A temporary function to save the projections of all eigenstates on the |Ms> basis.
@@ -629,6 +621,153 @@ def save_projections(eigen, S):
             for i_state in range(eigen.dim):
                 f.write("{:>6.1f}".format(projections[i_basis, i_state]))
             f.write("\n")
+
+## =======================================================================
+## Functions for obtaining the time-dependent Hamiltonian H(B(t))
+## =======================================================================
+
+def get_h_Mv(h0, Mv_tot, B, theta_B, phi_B):
+    """
+    Both h0 and Mv_tot should be on the basis of eigenvectors of h0.
+    Return h under the magnetic field B.
+    """
+    h_zee = get_h_Zeeman_Mv_tot(Mv_tot, [B, theta_B, phi_B], 'spherical')
+    h = h0 + h_zee
+    return h
+
+def get_h_Mz(h0, Mz_tot, B):
+    """
+    Both h0 and Mz_tot should be on the basis of eigenvectors of h0.
+    Return h under the magnetic field B.
+    Assumptions:
+      The magnetic field is along the z direction.
+    """
+    h_zee = -1 * Tesla2wavenumber * B * Mz_tot
+    h = h0 + h_zee
+    return h
+
+def get_habc_Mv(h0, Mv_tot, it, deltat, Bs2, theta_B, phi_B):
+    """
+    Obtain ha = h(ts[it])
+           hb = h(ts[it] + deltat/2)
+           hc = h(ts[it] + deltat)
+
+    h0 and Mv_tot are on the basis of the eigenvectors of h0.
+
+    ts:  A list of time with a time step of deltat
+    Bs2: A list of B fields with a time step of deltat/2
+         B(t = ts[it]) = Bs2[2*it]
+    """
+    ha = get_h_Mv(h0, Mv_tot, Bs2[2*it  ], theta_B, phi_B)
+    hb = get_h_Mv(h0, Mv_tot, Bs2[2*it+1], theta_B, phi_B)
+    hc = get_h_Mv(h0, Mv_tot, Bs2[2*it+2], theta_B, phi_B)
+    return (ha, hb, hc)
+
+def get_habc_Mz(h0, Mz_tot, it, deltat, Bs2):
+    """
+    Obtain ha = h(ts[it])
+           hb = h(ts[it] + deltat/2)
+           hc = h(ts[it] + deltat)
+    h0 and Mv_tot are on the basis of the eigenvectors of h0.
+    ts:  A list of time with a time step of deltat
+    Bs2: A list of B fields with a time step of deltat/2
+         B(t = ts[it]) = Bs2[2*it]
+    Assumptions:
+      The magnetic field is along the z direction.
+    """
+    ha = get_h_Mz(h0, Mz_tot, Bs2[2*it  ])
+    hb = get_h_Mz(h0, Mz_tot, Bs2[2*it+1])
+    hc = get_h_Mz(h0, Mz_tot, Bs2[2*it+2])
+    return (ha, hb, hc)
+
+def get_habc_reuse_ha_Mv(h0, Mv_tot, it, deltat, Bs2, theta_B, phi_B, ha, hb, hc):
+    """
+    Obtain ha = h(ts[it])
+           hb = h(ts[it] + deltat/2)
+           hc = h(ts[it] + deltat)
+    h0 and Mv_tot are on the basis of the eigenvectors of h0.
+    ts:  A list of time with a time step of deltat
+    Bs2: A list of B fields with a time step of deltat/2
+         B(t = ts[it]) = Bs2[2*it]
+    """
+    hb = get_h_Mv(h0, Mv_tot, Bs2[2*it+1], theta_B, phi_B)
+    hc = get_h_Mv(h0, Mv_tot, Bs2[2*it+2], theta_B, phi_B)
+    return (ha, hb, hc)
+
+def get_habc_reuse_ha_Mz(h0, Mz_tot, it, deltat, Bs2, ha, hb, hc):
+    """
+    Obtain ha = h(ts[it])
+           hb = h(ts[it] + deltat/2)
+           hc = h(ts[it] + deltat)
+    h0 and Mv_tot are on the basis of the eigenvectors of h0.
+    ts:  A list of time with a time step of deltat
+    Bs2: A list of B fields with a time step of deltat/2
+         B(t = ts[it]) = Bs2[2*it]
+    Assumptions:
+      The magnetic field is along the z direction.
+    """
+    hb = get_h_Mz(h0, Mz_tot, Bs2[2*it+1])
+    hc = get_h_Mz(h0, Mz_tot, Bs2[2*it+2])
+    return (ha, hb, hc)
+
+## =======================================================================
+## Functions related to the density matrix
+## =======================================================================
+
+def get_rho0(eigen0, T):
+    """
+    Get the equilibrium density matrix rho0 based on the eigenalues stored in eigen0.
+    rho0_kk = p_k which is the probability of occupying the state |k>
+    T: Temperature in Kelvin
+    """
+    rho0 = np.zeros((eigen0.dim, eigen0.dim), dtype=np.complex128)
+    e_ref = eigen0.eigenvalues[eigen0.indices[0]]
+    beta = 1/(Kelvin2wavenumber * T)
+    for i in range(eigen0.dim):
+        eigenvalue = eigen0.eigenvalues[i] - e_ref
+        rho0[i, i] = np.exp(-beta*eigenvalue)
+    rho0 = rho0 / np.trace(rho0)
+    return rho0
+
+def get_rhoe(energies, T):
+    """
+    Get the equilibrium density matrix based on the given energies.
+    rho0_kk = p_k which is the probability of occupying the state |k>
+    T: Temperature in Kelvin
+    """
+    dim = energies.shape[0]
+    rhoe = np.zeros((dim, dim), dtype=np.complex128)
+    e_ref = np.min(energies)
+    beta = 1/(Kelvin2wavenumber * T)
+    for i in range(dim):
+        eigenvalue = energies[i] - e_ref
+        rhoe[i, i] = np.exp(-beta*eigenvalue)
+    rhoe = rhoe / np.trace(rhoe)
+    return rhoe
+
+def get_Mv_from_rho(rho, Mv_tot):
+    """
+    Calculate the magnetization <M> from the density matrix rho.
+    """
+    Mv = []
+    for i in range(3):
+        Mi = np.trace( np.matmul(rho, Mv_tot[i]) )
+        Mv.append(Mi)
+    return Mv
+
+def get_Mz_from_rho(rho, Mz_tot):
+    """
+    Calculate the magnetization <M_z> from the density matrix rho.
+    """
+    return np.real( np.trace( np.matmul(rho, Mz_tot) ) )
+
+# To do: remove this function and save rho using hdf5
+def get_rho_upper(rho, indices_upper):
+    rho_upper = rho[indices_upper]
+    rho_upper_real = np.real(rho_upper)
+    rho_upper_imag = np.imag(rho_upper)
+    rho_upper = np.hstack((rho_upper_real, rho_upper_imag))
+    return rho_upper
 
 ## ================================================================
 ## Functions for thermodynamic properties.
@@ -750,11 +889,8 @@ def get_equilibrium_occupations(h0, Mv_tot, BT_Bgrid, T):
             f.write(ostring.format(Bs[i], *Ps[i]))
     print("The equilibrium occupations (probability distribution) are saved in ./output/eqocc.dat")
 
-
-
 ### =================================================================================
 ### Magnetization vs B field
-### at a certain E field and one or more temperatures
 ### =================================================================================
 
 def get_M_vs_B_kernel(spins, h_ex, h_ani, Bs, theta_B, phi_B, T):
@@ -865,239 +1001,4 @@ def get_M_vs_B_Mv_tot(h0, Mv_tot, BT_Bgrid):
     print("The magnetization versus B field is saved in M-B_eff.csv.")
 
 
-
-## =======================================================================
-## Functions for basis transformation
-## =======================================================================
-
-def transform_O(O, eigen):
-    """
-    Transform an operator from the common basis to a basis defined by the eigen object.
-    O and the eigenvectors (of the eigen object) are on the common basis.
-    O_new is on the basis of the eigenvectors of the eigen object.
-    """
-    M = eigen.eigenvectors
-    M_dagger = np.conjugate(np.transpose(M))
-    O_new = np.matmul(M_dagger, np.matmul(O, M))
-    return O_new
-
-def back_transform_O(O, eigen):
-    """
-    Transform an operator from the basis defined by the eigen object to the common basis
-    O is on the basis of the eigenvectors of the eigen object.
-    The eigenvectors (of the eigen object) written on the common basis.
-    O_new is on the common basis after transformation.
-    """
-    M = eigen.eigenvectors
-    M_dagger = np.conjugate(np.transpose(M))
-    O_new = np.matmul(M, np.matmul(O, M_dagger))
-    return O_new
-
-def transform_Mv_tot(Mv_tot, eigen_p):
-    """
-    Basis transformation for Mv_tot
-    """
-    Mv_tot_new = []
-    for i in range(3):
-        Mi = transform_O(Mv_tot[i], eigen_p)
-        Mv_tot_new.append(Mi)
-    return Mv_tot_new
-
-def get_perturbed_basis(spins, exchange, factor, Bz):
-    h_ex_iso = get_h_exchange_iso(spins, exchange, factor)
-    h_zee = get_h_Zeeman(spins, [0.0, 0.0, Bz], 'cartesian')
-    h = h_ex_iso + h_zee
-    eigen = eigen_handy(h)
-    return eigen
-
-# =======================================================================
-# Functions for obtaining the time-dependent Hamiltonian H(B(t))
-# =======================================================================
-
-def get_h_Mv(h0, Mv_tot, B, theta_B, phi_B):
-    """
-    Both h0 and Mv_tot should be on the basis of eigenvectors of h0.
-    Return h under the magnetic field B.
-    """
-    h_zee = get_h_Zeeman_Mv_tot(Mv_tot, [B, theta_B, phi_B], 'spherical')
-    h = h0 + h_zee
-    return h
-
-def get_h_Mz(h0, Mz_tot, B):
-    """
-    Both h0 and Mz_tot should be on the basis of eigenvectors of h0.
-    Return h under the magnetic field B.
-    Assumptions:
-      The magnetic field is along the z direction.
-    """
-    h_zee = -1 * Tesla2wavenumber * B * Mz_tot
-    h = h0 + h_zee
-    return h
-
-def get_habc_Mv(h0, Mv_tot, it, deltat, Bs2, theta_B, phi_B):
-    """
-    Obtain ha = h(ts[it])
-           hb = h(ts[it] + deltat/2)
-           hc = h(ts[it] + deltat)
-
-    h0 and Mv_tot are on the basis of the eigenvectors of h0.
-
-    ts:  A list of time with a time step of deltat
-    Bs2: A list of B fields with a time step of deltat/2
-         B(t = ts[it]) = Bs2[2*it]
-    """
-    ha = get_h_Mv(h0, Mv_tot, Bs2[2*it  ], theta_B, phi_B)
-    hb = get_h_Mv(h0, Mv_tot, Bs2[2*it+1], theta_B, phi_B)
-    hc = get_h_Mv(h0, Mv_tot, Bs2[2*it+2], theta_B, phi_B)
-    return (ha, hb, hc)
-
-def get_habc_Mz(h0, Mz_tot, it, deltat, Bs2):
-    """
-    Obtain ha = h(ts[it])
-           hb = h(ts[it] + deltat/2)
-           hc = h(ts[it] + deltat)
-    h0 and Mv_tot are on the basis of the eigenvectors of h0.
-    ts:  A list of time with a time step of deltat
-    Bs2: A list of B fields with a time step of deltat/2
-         B(t = ts[it]) = Bs2[2*it]
-    Assumptions:
-      The magnetic field is along the z direction.
-    """
-    ha = get_h_Mz(h0, Mz_tot, Bs2[2*it  ])
-    hb = get_h_Mz(h0, Mz_tot, Bs2[2*it+1])
-    hc = get_h_Mz(h0, Mz_tot, Bs2[2*it+2])
-    return (ha, hb, hc)
-
-def get_habc_reuse_ha_Mv(h0, Mv_tot, it, deltat, Bs2, theta_B, phi_B, ha, hb, hc):
-    """
-    Obtain ha = h(ts[it])
-           hb = h(ts[it] + deltat/2)
-           hc = h(ts[it] + deltat)
-    h0 and Mv_tot are on the basis of the eigenvectors of h0.
-    ts:  A list of time with a time step of deltat
-    Bs2: A list of B fields with a time step of deltat/2
-         B(t = ts[it]) = Bs2[2*it]
-    """
-    hb = get_h_Mv(h0, Mv_tot, Bs2[2*it+1], theta_B, phi_B)
-    hc = get_h_Mv(h0, Mv_tot, Bs2[2*it+2], theta_B, phi_B)
-    return (ha, hb, hc)
-
-def get_habc_reuse_ha_Mz(h0, Mz_tot, it, deltat, Bs2, ha, hb, hc):
-    """
-    Obtain ha = h(ts[it])
-           hb = h(ts[it] + deltat/2)
-           hc = h(ts[it] + deltat)
-    h0 and Mv_tot are on the basis of the eigenvectors of h0.
-    ts:  A list of time with a time step of deltat
-    Bs2: A list of B fields with a time step of deltat/2
-         B(t = ts[it]) = Bs2[2*it]
-    Assumptions:
-      The magnetic field is along the z direction.
-    """
-    hb = get_h_Mz(h0, Mz_tot, Bs2[2*it+1])
-    hc = get_h_Mz(h0, Mz_tot, Bs2[2*it+2])
-    return (ha, hb, hc)
-
-
-
-# =======================================================================
-# Functions related to the density matrix
-# =======================================================================
-
-def get_rho0(eigen0, T):
-    """
-    Get the equilibrium density matrix rho0 based on the eigenalues stored in eigen0.
-    rho0_kk = p_k which is the probability of occupying the state |k>
-    T: Temperature in Kelvin
-    """
-
-    rho0 = np.zeros((eigen0.dim, eigen0.dim), dtype=np.complex128)
-
-    e_ref = eigen0.eigenvalues[eigen0.indices[0]]
-
-    beta = 1/(Kelvin2wavenumber * T)
-
-    for i in range(eigen0.dim):
-        eigenvalue = eigen0.eigenvalues[i] - e_ref
-        rho0[i, i] = np.exp(-beta*eigenvalue)
-
-    rho0 = rho0 / np.trace(rho0)
-
-    return rho0
-
-
-def get_rhoe(energies, T):
-    """
-    Get the equilibrium density matrix based on the given energies.
-    rho0_kk = p_k which is the probability of occupying the state |k>
-    T: Temperature in Kelvin
-    """
-
-    dim = energies.shape[0]
-
-    rhoe = np.zeros((dim, dim), dtype=np.complex128)
-
-    e_ref = np.min(energies)
-
-    beta = 1/(Kelvin2wavenumber * T)
-
-    for i in range(dim):
-        eigenvalue = energies[i] - e_ref
-        rhoe[i, i] = np.exp(-beta*eigenvalue)
-
-    rhoe = rhoe / np.trace(rhoe)
-
-    return rhoe
-
-def get_Mv_from_rho(rho, Mv_tot):
-    """
-    Calculate the magnetization <M> from the density matrix rho.
-    """
-    Mv = []
-    for i in range(3):
-        Mi = np.trace( np.matmul(rho, Mv_tot[i]) )
-        Mv.append(Mi)
-    return Mv
-
-def get_Mz_from_rho(rho, Mz_tot):
-    """
-    Calculate the magnetization <M_z> from the density matrix rho.
-    """
-    return np.real( np.trace( np.matmul(rho, Mz_tot) ) )
-
-# To do: remove this function and save rho using hdf5
-def get_rho_upper(rho, indices_upper):
-    rho_upper = rho[indices_upper]
-    rho_upper_real = np.real(rho_upper)
-    rho_upper_imag = np.imag(rho_upper)
-    rho_upper = np.hstack((rho_upper_real, rho_upper_imag))
-    return rho_upper
-
-
-
-## =======================================================================
-## Functions for checking a matrix
-## =======================================================================
-
-def spy_sparsity(M, tag, precision=1.0e-20, figsize=(20, 20), markersize=1):
-    """
-    Visualize the sparsity of the matrix M
-    """
-    create_outdir()
-    fig, ax = plt.subplots(figsize=figsize)
-    ax.spy(M, precision=precision, markersize=markersize)
-    plt.savefig("./output/sparsity_of_" + tag + ".pdf")
-
-
-def spy_M(M, tag, width=10, markersize=2, threshold=1e-9):
-    """
-    Visualize the sparsity of the matrix M and save it to a file.
-    """
-    create_outdir()
-    with open("./output/" + tag + ".dat", "w") as f:
-        for i in range(M.shape[0]):
-            for j in range(M.shape[1]):
-                if np.abs(M[i, j]) >= threshold:
-                    f.write("{:6d} {:6d} {:12.6f} {:12.6f} {:12.6f}\n".format(i+1, j+1, np.real(M[i, j]), np.imag(M[i, j]), np.abs(M[i, j])))
-    spy_sparsity(M, tag, precision=1.0e-20, figsize=(width, width), markersize=markersize)
 

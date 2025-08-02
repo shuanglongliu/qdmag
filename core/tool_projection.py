@@ -11,7 +11,6 @@ from spin_dynamics.core.quantum_master import *
 from spin_dynamics.core.effective_basis import * 
 from spin_dynamics.core.liouville import *
 from spin_dynamics.core.pulse import get_Bt
-from spin_dynamics.core.hdf5 import get_rho_from_hdf5
 
 
 
@@ -68,13 +67,6 @@ if __name__ == "__main__":
 
     # Spin Hamiltonian at t=tmin
     h_tmin = h_ex + h_zee
-
-
-    # Check commutation relation
-
-    # check_commutation(h_ex, h_zee); exit()
-    # check_commutation(h_ex, spins.Sv_tot[2]); exit()
-    # check_commutation(h_ex, spins.S2_tot); exit()
 
 
 
@@ -169,10 +161,5 @@ if __name__ == "__main__":
     #print(indices_nonzero_X_eff); exit()
 
     # D_eff = update_D_under_magnetic_field(D_eff, D0_eff, minus_Mz_eff_diag, 3.49, C_eff, CST_eff, X_eff, Rhbar_eff, h0_eff_diag, indices_nonzero_X_eff, indices_nonzero_C_eff, lambdaa, I0, T, dim, dims, dimds)
-
-    # spy_M(D_eff, "D_eff")
-
-
-
 
 
