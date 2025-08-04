@@ -1,11 +1,11 @@
+import os
+import copy
 import numpy as np
 import pandas as pd
 from scipy.linalg import expm
-from constants import Kelvin2wavenumber, Tesla2wavenumber
-from common import eigen_simple, get_Mz_from_rho
-from pulse import get_Bt
-import copy
-import os
+from spin_dynamics.core.constants import Kelvin2wavenumber, Tesla2wavenumber
+from spin_dynamics.core.common import eigen_simple, get_Mz_from_rho
+from spin_dynamics.core.pulse import get_Bt
 
 def get_Pe(energies, T):
     """
@@ -331,6 +331,7 @@ def evolve_P_stairs(P, nu0, symmetric, t0, t1, deltat, Bt_params, T, h_t0, Mz_op
 
     # Save the DataFrame to a CSV file
     df.to_csv(fname, index=False)
+    print("P is saved to {}".format(fname))
 
     return t, P
 

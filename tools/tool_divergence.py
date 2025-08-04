@@ -5,7 +5,7 @@ import numpy as np
 from os import environ
 from spin_dynamics.core.common import read_input, many_spins
 from spin_dynamics.core.common import get_h_exchange, get_h_anisotropy, get_h_Zeeman
-from spin_dynamics.core.common import get_perturbed_basis, transform_O, transform_Mv_tot
+from spin_dynamics.core.common import get_effective_basis, transform_O, transform_Mv_tot
 from spin_dynamics.core.effective_basis import set_up_the_effective_system
 from spin_dynamics.core.liouville import set_up_liouville, examine_L_max_and_expLdeltat_max
 from spin_dynamics.core.pulse import get_Bt
@@ -68,13 +68,13 @@ if __name__ == "__main__":
 
     # Basis transformation
 
-    eigen_p = get_perturbed_basis(spins, exchange, -2, 1e-4)
+    eigen_eff = get_effective_basis(spins, exchange, -2, 1e-4)
 
-    h_t0_p = transform_O(h_t0, eigen_p)
-    h_tmin_p = transform_O(h_tmin, eigen_p)
-    S2_tot_p = transform_O(spins.S2_tot, eigen_p)
-    Sz_tot_p = transform_O(spins.Sv_tot[2], eigen_p)
-    Mv_tot_p = transform_Mv_tot(spins.Mv_tot, eigen_p)
+    h_t0_p = transform_O(h_t0, eigen_eff)
+    h_tmin_p = transform_O(h_tmin, eigen_eff)
+    S2_tot_p = transform_O(spins.S2_tot, eigen_eff)
+    Sz_tot_p = transform_O(spins.Sv_tot[2], eigen_eff)
+    Mv_tot_p = transform_Mv_tot(spins.Mv_tot, eigen_eff)
 
 
 

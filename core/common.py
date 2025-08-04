@@ -516,17 +516,17 @@ def back_transform_O(O, eigen):
     O_new = np.matmul(M, np.matmul(O, M_dagger))
     return O_new
 
-def transform_Mv_tot(Mv_tot, eigen_p):
+def transform_Mv_tot(Mv_tot, eigen_eff):
     """
     Basis transformation for Mv_tot
     """
     Mv_tot_new = []
     for i in range(3):
-        Mi = transform_O(Mv_tot[i], eigen_p)
+        Mi = transform_O(Mv_tot[i], eigen_eff)
         Mv_tot_new.append(Mi)
     return Mv_tot_new
 
-def get_perturbed_basis(spins, exchange, factor, Bz):
+def get_effective_basis(spins, exchange, factor, Bz):
     h_ex_iso = get_h_exchange_iso(spins, exchange, factor)
     h_zee = get_h_Zeeman(spins, [0.0, 0.0, Bz], 'cartesian')
     h = h_ex_iso + h_zee
@@ -606,18 +606,21 @@ def get_expectation_of_spins(spins, state):
     E_S_tot = (-1+np.sqrt(4*E_S2_tot+1))/2
     return (E_local_spins, E_Sv_tot, E_S2_tot, E_S_tot)
 
-def save_projections(eigen, S):
+def get_projections(h, Sz):
     """
-    A temporary function to save the projections of all eigenstates on the |Ms> basis.
-    To do: this function needs to be improved to deal with arbitrary number of basis states.
+    A function to get the projections onto the |Ms> basis.
+    h: hamiltonian on the effeictive basis which are the eigenstates of Sz.
+    Sz: the Sz operator on the effective basis.
     """
-    create_outdir()
-    state_indices = [i for i in range(eigen.dim+1)]
+    Sz = np.real(Sz)
+    eigen = eigen_handy(h)
+    state_indices = [i for i in range(1, eigen.dim+1)]
     projections = 100*np.abs( eigen.eigenvectors )**2
+    create_outdir()
     with open("./output/projections.dat", "w") as f:
-        f.write(( eigen.dim*"{:>6d}" + "{:>6d}\n").format(*state_indices))
+        f.write(( "{:>6s}" + eigen.dim*"{:>6d}" + "\n").format("ms", *state_indices))
         for i_basis in range(eigen.dim):
-            f.write("{:>6.1f}".format(i_basis - S))
+            f.write("{:>6.1f}".format(Sz[i_basis, i_basis]))
             for i_state in range(eigen.dim):
                 f.write("{:>6.1f}".format(projections[i_basis, i_state]))
             f.write("\n")
@@ -761,14 +764,6 @@ def get_Mz_from_rho(rho, Mz_tot):
     """
     return np.real( np.trace( np.matmul(rho, Mz_tot) ) )
 
-# To do: remove this function and save rho using hdf5
-def get_rho_upper(rho, indices_upper):
-    rho_upper = rho[indices_upper]
-    rho_upper_real = np.real(rho_upper)
-    rho_upper_imag = np.imag(rho_upper)
-    rho_upper = np.hstack((rho_upper_real, rho_upper_imag))
-    return rho_upper
-
 ## ================================================================
 ## Functions for thermodynamic properties.
 ## ================================================================
@@ -873,21 +868,37 @@ def get_equilibrium_occupations(h0, Mv_tot, BT_Bgrid, T):
     Ps = np.zeros((nB, h0.shape[0]), dtype=np.float64)
     # Loop over the magnetic fields
     for i in range(nB):
-        B = Bmin + i*Bstep
-        Bs[i] = B
-        h_zee = get_h_Zeeman_Mv_tot(Mv_tot, [0,0,B], 'cartesian')
+        Bs[i] = Bmin + i*Bstep
+        h_zee = get_h_Zeeman_Mv_tot(Mv_tot, [0,0,Bs[i]], 'cartesian')
         eigen = eigen_handy(h0 + h_zee)
-        Z, P = get_partition_function(eigen, T)
-        Ps[i, :] = P
+        Z, Ps[i, :] = get_partition_function(eigen, T)
     # Save the results to a file
     create_outdir()
     ostring = "{:8.3f}" + h0.shape[0]*" {:12.3e}" + "\n"
     with open('./output/eqocc.dat'.format(T), 'w') as f:
         f.write('# T = {:.3f} K\n'.format(T))
-        f.write('# B (Tesla) rho_ii, i=0,1,...,{:d}\n'.format(h0.shape[0]-1))
+        f.write('# B (Tesla) rho_ii, i=1,...,{:d}\n'.format(h0.shape[0]))
         for i in range(nB):
             f.write(ostring.format(Bs[i], *Ps[i]))
     print("The equilibrium occupations (probability distribution) are saved in ./output/eqocc.dat")
+
+def get_equilibrium_occupations_light(h0, Mv_tot, Bz, T):
+    """
+    Calculate the equilibrium occupations (probability distribution) of the eigenstates 
+    of the system under the a magnetic field along z direction.
+    """
+    h_zee = get_h_Zeeman_Mv_tot(Mv_tot, [0,0,Bz], 'cartesian')
+    eigen = eigen_handy(h0 + h_zee)
+    _, P = get_partition_function(eigen, T)
+    # Save the results to a file
+    create_outdir()
+    ostring = "{:>6d} {:>12.3e}\n"
+    with open('./output/P.dat', 'w') as f:
+        f.write('# Equilibrium occupations at Bz = {:.3f} Tesla and T = {:.3f} K\n'.format(Bz, T))
+        f.write('#    i       rho_ii\n')
+        for i in range(eigen.dim):
+            f.write(ostring.format(i+1, P[i]))
+    print("The equilibrium occupations (probability distribution) are saved in ./output/P.dat")
 
 ### =================================================================================
 ### Magnetization vs B field
@@ -964,7 +975,7 @@ def get_M_vs_B(spins, h_ex, h_ani, BT_Bgrid):
     create_outdir()
     # Save the data frame to a CSV file
     df.to_csv("./output/M-B.csv", index=False)
-    print("The magnetization versus B field is saved in M-B.csv.")
+    print("The magnetization versus B field is saved in ./output/M-B.csv.")
     return
 
 def get_M_vs_B_Mv_tot(h0, Mv_tot, BT_Bgrid):
@@ -998,7 +1009,7 @@ def get_M_vs_B_Mv_tot(h0, Mv_tot, BT_Bgrid):
     create_outdir()
     # Save the data frame to a CSV file
     df.to_csv("./output/M-B_eff.csv", index=False)
-    print("The magnetization versus B field is saved in M-B_eff.csv.")
+    print("The magnetization versus B field is saved in ./output/M-B_eff.csv.")
 
 
 

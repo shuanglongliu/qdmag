@@ -19,7 +19,7 @@ def get_hdf5_file_size(t, dt, dimds):
     bitsperfloat64 = 64 # bits per double precision float
     bit2byte = 8 # factor for converting bits to bytes
     byte2Gb = 1024 * 1024 * 1024 # factor for converting bytes to Gb
-    fsize = ( t / dt ) * dimds**2 * byteperfloat64 / bit2byte / byte2Gb
+    fsize = ( t / dt ) * dimds * bitsperfloat64 / bit2byte / byte2Gb
     print("File size of hdf5 file: {:.2f} Gb".format(fsize))
 
 def combine_hdf5_files(file1, file2, output_file):
@@ -59,8 +59,4 @@ def check_hdf5(fname):
         print("First 5 Keys in the file:", h5keys[0:5])
         print("Last 5 Keys in the file:", h5keys[-5:])
         print("Data shape of each entry:", f1[h5keys[0]].shape)
-        print("File-level attributes:")
-        for key, value in f1.attrs.items():
-             print(f"{key}: {value}")
-    return
 

@@ -67,19 +67,15 @@ dynamics:
 
     - Bt_type: 'linear'  # Type of the magnetic pulse as a function of time. Options: 'linear', 'pwlinear', 'sin', 'pulse'
       sweep_rate: 50.0  # Slope of the magnetic field vs time. Unit: T per ms. Used only when Bt = 'linear'.
-      times: [0.0, 1.0e+9, 10.0e+9] # Turning points of the magnetic field in ps. Used only when Bt = 'pwlinear'.
-      fields: [0.0, 10.0, 100.0] # Magnetic field at the turning points in T. Used only when Bt = 'pwlinear'.
-      omega: 0.20 #  Angular frequency of the sine wave in rad ms^-1. The period is 2 pi / omega ms. Used only when Bt = 'sin'.
-      amplitude: 65.0 # Amplitude of the sine wave in T. Used only when Bt = 'sin'.
 
     - tmin: 0.0e+00             # Initial time in ps
-      tmax: 1.0e+06             # Finial time in ps
-      deltat: 1.0e+05      # Time step in ps
+      tmax: 1.0e-02             # Finial time in ps
+      deltat: 1.0e-03           # Time step in ps
 
     - save_mag: true # Calculate and save magnetization during the dynamics ?
-      nt_mag: 10  # Calculate and save magnetization every nt_mag*deltat ps
+      nt_mag: 1  # Calculate and save magnetization every nt_mag*deltat ps
       save_rho: true # Save the density matrix ?
-      nt_rho: 10  # Save the density matrix every nt_rho*deltat ps, nt_rho will be adjusted to be a multiple of nt_mag
+      nt_rho: 1  # Save the density matrix every nt_rho*deltat ps, nt_rho will be adjusted to be a multiple of nt_mag
 
     - multiphonon: false # Include multiphonon processes in the dynamics ?
       imbalance: false # Make X unsymmetrical for single phonon processes ?

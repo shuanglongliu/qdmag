@@ -9,7 +9,7 @@ from spin_dynamics.core.common import kronecker_delta, create_outdir
 from spin_dynamics.core.common import get_Mv_from_rho, get_Mz_from_rho
 from spin_dynamics.core.common import eigen_simple
 from spin_dynamics.core.quantum_master import get_Rhbar, update_Rhbar
-from spin_dynamics.core.pulse import get_Bt
+from spin_dynamics.core.pulse import get_Bt, get_pulse_RK4_double_grid
 
 r"""
 Codes for solving the quantum master equation described in the Eq. 2.7 of
@@ -597,102 +597,246 @@ def examine_L_max_and_expLdeltat_max(Bs, deltats, tag, L, L0, h_t0, h, Mz_op, C,
 # To do: Modify the RK4 codes to deal with the ZFS term
 # To do: Modify the RK4 codes to save the intermediate results
 
-def get_Labc(Bs2_wavenumber, it, h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, L0, indices_nzC):
+def get_Labc(L, L0, h, h_t0, Mz_op, Bs2, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds, it):
     """
     Obtain La = L(ts[it])
            Lb = L(ts[it] + deltat/2)
            Lc = L(ts[it] + deltat)
-
-    Bs2_wavenumber are the fields on the time grid with a time step of helf deltat.
-
-    dim: dimension of the Hilbert space.
-    dims: dimension of superoperators for the vectorized density matrix. dims = dim**2.
     """
-
-    La = get_L_at_Bfield(Bs2_wavenumber[2*it  ], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, L0, indices_nzC)
-    Lb = get_L_at_Bfield(Bs2_wavenumber[2*it+1], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, L0, indices_nzC)
-    Lc = get_L_at_Bfield(Bs2_wavenumber[2*it+2], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, L0, indices_nzC)
-
+    La, _, _ = update_L_under_magnetic_field(L, L0, h, h_t0, Mz_op, Bs2[2*it  ], C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+    Lb, _, _ = update_L_under_magnetic_field(L, L0, h, h_t0, Mz_op, Bs2[2*it+1], C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+    Lc, _, _ = update_L_under_magnetic_field(L, L0, h, h_t0, Mz_op, Bs2[2*it+2], C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
     return (La, Lb, Lc)
 
-def get_Labc_reuse_La(Bs2_wavenumber, it, h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, L0, indices_nzC, La, Lb, Lc):
+def get_Labc_reuse_La(L, L0, h, h_t0, Mz_op, Bs2, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds, it, La, Lb, Lc):
     """
     Obtain La = L(ts[it])
            Lb = L(ts[it] + deltat/2)
            Lc = L(ts[it] + deltat)
-
-    Bs2_wavenumber are the fields on the time grid with a time step of helf deltat.
-
-    dim: dimension of the Hilbert space.
-    dims: dimension of a super operator for the vectorized density matrix. dims = dim**2.
     """
-
-    Lb = get_L_at_Bfield(Bs2_wavenumber[2*it+1], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, L0, indices_nzC)
-    Lc = get_L_at_Bfield(Bs2_wavenumber[2*it+2], h0_diag, minus_Mz_tot_diag, X, lambdaa, I0, T, dim, dims, L0, indices_nzC)
-
+    Lb, _, _ = update_L_under_magnetic_field(L, L0, h, h_t0, Mz_op, Bs2[2*it+1], C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
+    Lc, _, _ = update_L_under_magnetic_field(L, L0, h, h_t0, Mz_op, Bs2[2*it+2], C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
     return (La, Lb, Lc)
 
-def evolve_deltat_liouville(La, Lb, Lc, rho, deltat):
+def evolve_deltat_liouville(La, Lb, Lc, risvrho, deltat):
     """
     Evolve rho by deltat using the Runge-Kutta method according to the quantum master equation
-        d rho / d t = L rho
-        rho = np.vstack(rhore, rhoim)
-
+        d risvrho / d t = L risvrho
+        risvrho = np.vstack(vrhore, vrhoim)
     Input: 
       La: L(t), the Liouville superoperator at time t. Unit: cm-1.
       Lb: L(t+deltat/2)
       Lc: L(t+deltat). ha, hb, and hc are written on the basis of the eigenvectors of h0, i.e. the zero-field spin Hamiltonian.
-      rho: vectorized density matrix at time t rho(t) on the basis of the eigenvectors of h0.
+      risvrho: RI-separated vectorized density matrix at time t rho(t) on the basis of the eigenvectors of h0.
       deltat: time step in ps.
     """
+    k1 = La @ risvrho                   # np.matmul(La, rho)
+    k2 = Lb @ (risvrho + 0.5*deltat*k1) # np.matmul(Lb, rho + 0.5*deltat*k1)
+    k3 = Lb @ (risvrho + 0.5*deltat*k2) # np.matmul(Lb, rho + 0.5*deltat*k2)
+    k4 = Lc @ (risvrho +     deltat*k3) # np.matmul(Lc, rho +     deltat*k3)
+    risvrho_new = risvrho + deltat * (k1 + 2*k2 + 2*k3 + k4) / 6
+    return risvrho_new
 
-    k1 = La @ rho                   # np.matmul(La, rho)
-    k2 = Lb @ (rho + 0.5*deltat*k1) # np.matmul(Lb, rho + 0.5*deltat*k1)
-    k3 = Lb @ (rho + 0.5*deltat*k2) # np.matmul(Lb, rho + 0.5*deltat*k2)
-    k4 = Lc @ (rho +     deltat*k3) # np.matmul(Lc, rho +     deltat*k3)
+def get_outdirs_RK4(T, I0, lambdaa, Bt_params):
+    """
+    Get the output directory for the RI-separated vectorized density matrix and the magnetic moment.
+    T: temperature in Kelvin.
+    I0: prefactor for the phonon density of states.
+    lambdaa: spin-phonon coupling constant in wavenumbers.
+    Bt_params: parameters for the magnetic fields. See pulse.py for details.
+    """
+    if Bt_params['Bt_type'] == 'linear':
+        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1f}/rho_RK4'.format(T, I0, lambdaa, Bt_params['sweep_rate'])
+        outdir_mag = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1f}/magnetometry_RK4'.format(T, I0, lambdaa, Bt_params['sweep_rate'])
+    elif Bt_params['Bt_type'] == 'pwlinear':
+        times = Bt_params['times']
+        fields = Bt_params['fields']
+        outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/'.format(T, I0, lambdaa)
+        outdir += 'Bt_pwlinear_t{:.1e}ps-B{:.1f}T'.format(times[0], fields[0])
+        for i in range(1, len(times)):
+            outdir += '_t{:.1e}ps-B{:.1f}T'.format(times[i], fields[i])
+        outdir = outdir.replace('+', '')
+        outdir_rho = outdir + '/rho'
+        outdir_mag = outdir + '/magnetometry'
+    elif Bt_params['Bt_type'] == 'pwlinear_by_slope':
+        outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_pwlinear_average_sweep_rate_{:.1f}'.format(T, I0, lambdaa, Bt_params['sweep_rate_ave'])
+        outdir_rho = outdir + '/rho'
+        outdir_mag = outdir + '/magnetometry'
+    elif Bt_params['Bt_type'] == 'sin':
+        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_sin_amplitude_{:.1f}_omega_{:.2f}/rho'.format(T, I0, lambdaa, Bt_params['amplitude'], Bt_params['omega'])
+        outdir_mag = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_sin_amplitude_{:.1f}_omega_{:.2f}/magnetometry'.format(T, I0, lambdaa, Bt_params['amplitude'], Bt_params['omega'])
+    elif Bt_params['Bt_type'] == 'cs':
+        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_cs/rho'.format(T, I0, lambdaa)
+        outdir_mag = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_cs/magnetometry'.format(T, I0, lambdaa)
+    else:
+        raise ValueError("Invalid Bt_type: {}".format(Bt_params['Bt_type']))
+    return (outdir_rho, outdir_mag)
 
-    rho_new = rho + deltat * (k1 + 2*k2 + 2*k3 + k4) / 6
-
-    return rho_new
-
-def evolve_rho_liouville(L0, Mz_tot_diag, risvrho, nt, deltat, Bs2, dim, dims):
+def evolve_rho_liouville_RK4(t0, t1, deltat, Bt_params, risvrho, L, L0, h_t0, Mz_op, C, CST, X, Rhbar, lambdaa, I0, T, dim, dims, dimds, save_mag, nt_mag, save_rho, nt_rho):
     """
     Evolve the density matrix using the Runge-Kutta method according to the quantum master equation.
-
-    h0 and Mv_tot are written on the basis of the eigenvectors of h0.
-
-    Input:
-      L0: Liouvillian at t0 = ts[0]
-      Mz_tot_diag: diagnal matrix elements of the z component of the magnetization operators
-      risvrho: initial vertorized RI-separated density matrix at t0.
-      nt: number of time steps.
-      delta: time step in unit of ps.
-      Bs2: list of magnetic field on the double grid.
-      dim: dimension of the Hilbert space.
-      dims: dimension of superoperators for the vectorized density matrix. dims = dim**2.
-
-    Assumptions: 
-      The magnetic field is along the z direction.
-      The exchange couplings are isotropic.
-      The g tensors are isotropic and identical.
-
-    As a result, Mz_tot is real and diagonal.
     """
 
-    # Evolve the density matrix
+    # Make a copy of the hamiltonian h_t0 to store the Hamiltonian at time t
+    # This is to avoid repeated memory allocation for h.
+    h = copy.deepcopy(h_t0)
 
-    ## It is more efficient to use minus_Mz_tot_diag and Bs2_wavenumber. 
-    minus_Mz_tot_diag = -1 * Mz_tot_diag
-    Bs2_wavenumber = Bs2 * Tesla2wavenumber 
+    # Set up the pulsed magnetic field
+    Bt = get_Bt(Bt_params)
 
-    La, Lb, Lc = get_Labc(L0, minus_Mz_tot_diag, 0, deltat, Bs2_wavenumber, dim, dims)
+    # Which elements of the C operator are non-zero ?
+    n_nzC, indices_nzC = get_indices_nzC(X, dim)
 
-    risvrho = evolve_deltat_liouville(La, Lb, Lc, risvrho, deltat)
-    #print("i = 0, max(risvrho) = ", np.max(np.absolute(risvrho)))
+    # Save the magnetization and the density matrix at specified time steps, similar to the codes in evolve_rho_liouville_stairs
+    if save_rho and save_mag:
+        # nt_rho should be a multiple of nt_mag
+        nround_mag = int( max(nt_rho // nt_mag, 1) )
+        nt_rho = nround_mag * nt_mag
+        
+        # nt should be a multiple of nt_rho
+        nround_rho = int( max((t1 - t0)//deltat // nt_rho, 1) )
+        nt = nround_rho * nt_rho
+        
+        # Adjust the final time
+        t1 = t0 + nt*deltat
 
-    for i in range(1, nt):
-        La, Lb, Lc = get_Labc_reuse_La(L0, minus_Mz_tot_diag, i, deltat, Bs2_wavenumber, Lc, La, Lb, dim, dims)
-        risvrho = evolve_deltat_liouville(La, Lb, Lc, risvrho, deltat)
+        # Get the magnetic field pulse for the Runge-Kutta method
+        nt, ts, Bs2, deltat = get_pulse_RK4_double_grid(Bt, t0, t1, deltat)
+
+        # Output directories
+        outdir_rho, outdir_mag = get_outdirs_RK4(T, I0, lambdaa, Bt_params)
+        if not os.path.exists(outdir_rho):
+            os.makedirs(outdir_rho)
+        if not os.path.exists(outdir_mag):
+            os.makedirs(outdir_mag)
+
+        # Output files
+        fname1 = outdir_rho + '/{:.3f}-{:.3f}ps_dt{:.3f}ps.h5'.format(t0, t1, deltat)
+        fname2 = outdir_mag + '/{:.3f}-{:.3f}ps_dt{:.3f}ps.dat'.format(t0, t1, deltat)
+
+        with h5py.File(fname1, 'w') as f1,  open(fname2, 'w') as f2:
+            tag = "{:.3f}".format(t0)
+            dset = f1.create_dataset(tag, data=risvrho)
+            Mz = get_Mz_from_risvrho(risvrho, Mz_op, dim, dims, dimds)
+            chimz = get_chimz_from_risvrho(h, h_t0, Bt, t0, Mz_op, risvrho, X, Rhbar, lambdaa, I0, T, dim, dims, dimds)
+            f2.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(t0, Bt(t0), Mz, chimz))
+
+            # Loop over the rounds for saving the RI-separated vectorized density matrix
+            for iround_rho in range(nround_rho):
+                # Loop over the rounds for saving the magnetic moment
+                for iround_mag in range(nround_mag):
+                    # Loop over the nt_mag time steps
+                    for it_mag in range(nt_mag):
+                        it = iround_rho * nt_rho + iround_mag * nt_mag + it_mag
+                        if it == 0:
+                            La, Lb, Lc = get_Labc(L, L0, h, h_t0, Mz_op, Bs2, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds, 0)
+                        else:
+                            La, Lb, Lc = get_Labc_reuse_La(L, L0, h, h_t0, Mz_op, Bs2, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds, it, Lc, Lb, La)
+                        risvrho = evolve_deltat_liouville(La, Lb, Lc, risvrho, deltat)
+                    # Calculate the magnetic moment
+                    Mz = get_Mz_from_risvrho(risvrho, Mz_op, dim, dims, dimds)
+                    # Calculate the magnetic susceptibility
+                    chimz = get_chimz_from_risvrho(h, h_t0, Bt, ts[it]+deltat, Mz_op, risvrho, X, Rhbar, lambdaa, I0, T, dim, dims, dimds)
+                    # Save the magnetic moment and the magnetic susceptibility
+                    f2.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(ts[it]+deltat, Bt(ts[it]+deltat), Mz, chimz))
+                # Save the RI-separated vectorized density matrix
+                tag = "{:.3f}".format(ts[it] + deltat)
+                dset = f1.create_dataset(tag, data=risvrho)
+        print("rho is saved to {}".format(fname1))
+        print("mmo is saved to {}".format(fname2))
+    elif save_rho and (not save_mag):
+        # nt should be a multiple of nt_rho
+        nround_rho = int( (t1 - t0)//deltat // nt_rho )
+        nt = nround_rho * nt_rho
+        
+        # Adjust the final time
+        t1 = t0 + nt*deltat
+
+        # Get the magnetic field pulse for the Runge-Kutta method
+        nt, ts, Bs2, deltat = get_pulse_RK4_double_grid(Bt, t0, t1, deltat)
+
+        # Output directory
+        outdir_rho, outdir_mag = get_outdirs_RK4(T, I0, lambdaa, Bt_params)
+        if not os.path.exists(outdir_rho):
+            os.makedirs(outdir_rho)
+
+        # Output files
+        fname1 = outdir_rho + '/{:.3f}-{:.3f}ps_dt{:.3f}ps.h5'.format(t0, t1, deltat)
+
+        with h5py.File(fname1, 'w') as f1:
+            tag = "{:.3f}".format(t0)
+            dset = f1.create_dataset(tag, data=risvrho)
+
+            # Loop over the rounds for saving the RI-separated vectorized density matrix
+            for iround_rho in range(nround_rho):
+                # Loop over the nt_rho time steps
+                for it_rho in range(nt_rho):
+                    it = iround_rho * nt_rho + it_rho
+                    if it == 0:
+                        La, Lb, Lc = get_Labc(L, L0, h, h_t0, Mz_op, Bs2, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds, 0)
+                    else:
+                        La, Lb, Lc = get_Labc_reuse_La(L, L0, h, h_t0, Mz_op, Bs2, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds, it, Lc, Lb, La)
+                    risvrho = evolve_deltat_liouville(La, Lb, Lc, risvrho, deltat)
+                # Save the RI-separated vectorized density matrix
+                tag = "{:.3f}".format(ts[it] + deltat)
+                dset = f1.create_dataset(tag, data=risvrho)
+        print("rho is saved to {}".format(fname1))
+    elif (not save_rho) and save_mag:
+        # nt should be a multiple of nt_mag
+        nround_mag = int( (t1 - t0)//deltat // nt_mag )
+        nt = nround_mag * nt_mag
+        
+        # Adjust the final time
+        t1 = t0 + nt*deltat
+
+        # Get the magnetic field pulse for the Runge-Kutta method
+        nt, ts, Bs2, deltat = get_pulse_RK4_double_grid(Bt, t0, t1, deltat)
+
+        # Output directory
+        outdir_rho, outdir_mag = get_outdirs(T, I0, lambdaa, Bt_params)
+        if not os.path.exists(outdir_mag):
+            os.makedirs(outdir_mag)
+
+        # Output files
+        fname2 = outdir_mag + '/{:.3f}-{:.3f}ps_dt{:.3f}ps.dat'.format(t0, t1, deltat)
+
+        with open(fname2, 'w') as f2:
+            Mz = get_Mz_from_risvrho(risvrho, Mz_op, dim, dims, dimds)
+            chimz = get_chimz_from_risvrho(h, h_t0, Bt, t0, Mz_op, risvrho, X, Rhbar, lambdaa, I0, T, dim, dims, dimds)
+            f2.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(t0, Bt(t0), Mz, chimz))
+    
+            # Loop over the rounds for saving the magnetic moment
+            for iround_mag in range(nround_mag):
+                # Loop over the nt_mag time steps
+                for it_mag in range(nt_mag):
+                    it = iround_mag * nt_mag + it_mag
+                    if it == 0:
+                        La, Lb, Lc = get_Labc(L, L0, h, h_t0, Mz_op, Bs2, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds, 0)
+                    else:
+                        La, Lb, Lc = get_Labc_reuse_La(L, L0, h, h_t0, Mz_op, Bs2, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds, it, Lc, Lb, La)
+                    risvrho = evolve_deltat_liouville(La, Lb, Lc, risvrho, deltat)
+                # Save magnetic moment
+                Mz = get_Mz_from_risvrho(risvrho, Mz_op, dim, dims, dimds)
+                chimz = get_chimz_from_risvrho(h, h_t0, Bt, ts[it]+deltat, Mz_op, risvrho, X, Rhbar, lambdaa, I0, T, dim, dims, dimds)
+                f2.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(ts[it]+deltat, Bt(ts[it]+deltat), Mz, chimz))
+        print("mmo is saved to {}".format(fname2))
+    else:
+        # the time period should be a multiple of deltat
+        nt = int( (t1 - t0)//deltat )
+        
+        # Adjust the final time
+        t1 = t0 + nt*deltat
+
+        # Get the magnetic field pulse for the Runge-Kutta method
+        nt, ts, Bs2, deltat = get_pulse_RK4_double_grid(Bt, t0, t1, deltat)
+
+        # Loop over the nt time steps
+        for it in range(nt):
+            if it == 0:
+                La, Lb, Lc = get_Labc(L, L0, h, h_t0, Mz_op, Bs2, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds, 0)
+            else:
+                La, Lb, Lc = get_Labc_reuse_La(L, L0, h, h_t0, Mz_op, Bs2, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds, it, Lc, Lb, La)
+            risvrho = evolve_deltat_liouville(La, Lb, Lc, risvrho, deltat)
 
     return risvrho
 
@@ -741,7 +885,7 @@ def get_outdirs(T, I0, lambdaa, Bt_params):
     Bt_params: parameters for the magnetic fields. See pulse.py for details.
     """
     if Bt_params['Bt_type'] == 'linear':
-        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1f}/risvrho'.format(T, I0, lambdaa, Bt_params['sweep_rate'])
+        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1f}/rho'.format(T, I0, lambdaa, Bt_params['sweep_rate'])
         outdir_mag = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1f}/magnetometry'.format(T, I0, lambdaa, Bt_params['sweep_rate'])
     elif Bt_params['Bt_type'] == 'pwlinear':
         times = Bt_params['times']
@@ -751,17 +895,17 @@ def get_outdirs(T, I0, lambdaa, Bt_params):
         for i in range(1, len(times)):
             outdir += '_t{:.1e}ps-B{:.1f}T'.format(times[i], fields[i])
         outdir = outdir.replace('+', '')
-        outdir_rho = outdir + '/risvrho'
+        outdir_rho = outdir + '/rho'
         outdir_mag = outdir + '/magnetometry'
     elif Bt_params['Bt_type'] == 'pwlinear_by_slope':
         outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_pwlinear_average_sweep_rate_{:.1f}'.format(T, I0, lambdaa, Bt_params['sweep_rate_ave'])
-        outdir_rho = outdir + '/risvrho'
+        outdir_rho = outdir + '/rho'
         outdir_mag = outdir + '/magnetometry'
     elif Bt_params['Bt_type'] == 'sin':
-        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_sin_amplitude_{:.1f}_omega_{:.2f}/risvrho'.format(T, I0, lambdaa, Bt_params['amplitude'], Bt_params['omega'])
+        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_sin_amplitude_{:.1f}_omega_{:.2f}/rho'.format(T, I0, lambdaa, Bt_params['amplitude'], Bt_params['omega'])
         outdir_mag = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_sin_amplitude_{:.1f}_omega_{:.2f}/magnetometry'.format(T, I0, lambdaa, Bt_params['amplitude'], Bt_params['omega'])
     elif Bt_params['Bt_type'] == 'cs':
-        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_cs/risvrho'.format(T, I0, lambdaa)
+        outdir_rho = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_cs/rho'.format(T, I0, lambdaa)
         outdir_mag = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_cs/magnetometry'.format(T, I0, lambdaa)
     else:
         raise ValueError("Invalid Bt_type: {}".format(Bt_params['Bt_type']))
@@ -841,15 +985,8 @@ def evolve_rho_liouville_stairs(t0, t1, deltat, Bt_params, risvrho, L, L0, h_t0,
             Mz = get_Mz_from_risvrho(risvrho, Mz_op, dim, dims, dimds)
             chimz = get_chimz_from_risvrho(h, h_t0, Bt, t0, Mz_op, risvrho, X, Rhbar, lambdaa, I0, T, dim, dims, dimds)
             # chimz = get_chimz_finite_diff(risvrho, t0, 1e6, Bt, L, L0, h, h_t0, Mz_op, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
-            # chimz = np.nan 
             f2.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(t0, Bt(t0), Mz, chimz))
 
-            # Save the initial magnetic moment for calculating the magnetic susceptibility using finite difference
-            Mz_old = Mz + 0.0
-
-            # Step of magnetic field for calculating the magnetic susceptibility using finite difference
-            dB = Bt(deltat) - Bt(0) # Assume that the magnetic field changes linearly with time.
-    
             # Loop over the rounds for saving the RI-separated vectorized density matrix
             for iround_rho in range(nround_rho):
                 # Loop over the rounds for saving the magnetic moment
@@ -870,14 +1007,14 @@ def evolve_rho_liouville_stairs(t0, t1, deltat, Bt_params, risvrho, L, L0, h_t0,
                     chimz = get_chimz_from_risvrho(h, h_t0, Bt, t+half_deltat, Mz_op, risvrho, X, Rhbar, lambdaa, I0, T, dim, dims, dimds)
                     # Attempt 2
                     # chimz = get_chimz_finite_diff(risvrho, t0, 1e3, Bt, L, L0, h, h_t0, Mz_op, C, CST, X, Rhbar, n_nzC, indices_nzC, lambdaa, I0, T, dim, dims, dimds)
-                    # Attempt 3
-                    # chimz = (Mz - Mz_old) / dB; Mz_old = Mz + 0.0
 
                     # Save the magnetic moment and the magnetic susceptibility
                     f2.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(t+half_deltat, Bt(t+half_deltat), Mz, chimz))
                 # Save the RI-separated vectorized density matrix
                 tag = "{:.3f}".format(t + half_deltat)
                 dset = f1.create_dataset(tag, data=risvrho)
+        print("rho is saved to {}".format(fname1))
+        print("mmo is saved to {}".format(fname2))
     elif save_rho and (not save_mag):
         # nt should be a multiple of nt_rho
         nround_rho = int( (t1 - t0)//deltat // nt_rho )
@@ -909,6 +1046,7 @@ def evolve_rho_liouville_stairs(t0, t1, deltat, Bt_params, risvrho, L, L0, h_t0,
                 # Save the RI-separated vectorized density matrix
                 tag = "{:.3f}".format(t + half_deltat)
                 dset = f1.create_dataset(tag, data=risvrho)
+        print("rho is saved to {}".format(fname1))
     elif (not save_rho) and save_mag:
         # nt should be a multiple of nt_mag
         nround_mag = int( (t1 - t0)//deltat // nt_mag )
@@ -943,6 +1081,7 @@ def evolve_rho_liouville_stairs(t0, t1, deltat, Bt_params, risvrho, L, L0, h_t0,
                 Mz = get_Mz_from_risvrho(risvrho, Mz_op, dim, dims, dimds)
                 chimz = get_chimz_from_risvrho(h, h_t0, Bt, t+half_deltat, Mz_op, risvrho, X, Rhbar, lambdaa, I0, T, dim, dims, dimds)
                 f2.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(t+half_deltat, Bt(t+half_deltat), Mz, chimz))
+        print("mmo is saved to {}".format(fname2))
     else:
         # the time period should be a multiple of deltat
         nt = int( (t1 - t0)//deltat )

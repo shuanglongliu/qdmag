@@ -1,9 +1,11 @@
+"""
+A code for interpolating pulse data from a file and saving the interpolated function.
+"""
+
 import os
 import pickle
 import numpy as np
 from scipy.interpolate import CubicSpline, PchipInterpolator
-import matplotlib as mpl
-import matplotlib.pyplot as plt
 
 def get_cs(basename="pulse"):
 

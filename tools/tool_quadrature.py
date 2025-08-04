@@ -212,7 +212,7 @@ def visualize_gauss_legendre_points(euler_angles):
 if __name__ == "__main__":
 
     # The saved angles are in degrees
-    # euler_angles, weights = generate_combined_quadrature(lebedev_degree=3, n_gamma_points=13, save_file=True)
+    euler_angles, weights = generate_combined_quadrature(lebedev_degree=3, n_gamma_points=13, save_file=True)
     # euler_angles, weights = generate_combined_quadrature(lebedev_degree=9, n_gamma_points=13, save_file=True)
     # euler_angles, weights = generate_combined_quadrature(lebedev_degree=15, n_gamma_points=13, save_file=True)
     # euler_angles, weights = generate_combined_quadrature(lebedev_degree=31, n_gamma_points=13, save_file=True)
@@ -225,10 +225,10 @@ if __name__ == "__main__":
     # euler_angles, weights = generate_combined_quadrature(lebedev_degree=9, n_gamma_points=31, save_file=True)
 
     # The returned angles are in radians
-    euler_angles, weights = generate_combined_quadrature(lebedev_degree=9, n_gamma_points=13, save_file=False)
+    # euler_angles, weights = generate_combined_quadrature(lebedev_degree=9, n_gamma_points=13, save_file=False)
 
-    visualize_lebedev_points(euler_angles)
-    visualize_gauss_legendre_points(euler_angles)
+    # visualize_lebedev_points(euler_angles)
+    # visualize_gauss_legendre_points(euler_angles)
 
     # integral = integrate_unit_function(euler_angles, weights)
     # print(f"Integral of unit function: {integral}")
