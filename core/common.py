@@ -38,6 +38,7 @@ class many_spins:
         self.Ss = Ss
         self.nS = nS
         self.gfactors = gfactors
+        self.get_Smax()
         self.get_local_spins()
         self.dim = np.prod([self.local_spins[i].dim for i in range(self.nS)])
         # Zero operator in the whole Hilbert space.
@@ -51,6 +52,12 @@ class many_spins:
         self.get_total_spin()
         self.get_global_magmoms()
         self.get_total_magmom()
+
+    def get_Smax(self):
+        """
+        Get the total spin when all local spins are aligned.
+        """
+        self.Smax = sum(self.Ss)
         
     def get_local_spins(self):
         """
@@ -141,8 +148,8 @@ class eigen_simple:
         self.eigenvalues = np.real(self.eigenvalues)
         self.dim = self.eigenvalues.shape[0]
     
-
     
+
 # ========================
 # Functions
 # ========================
@@ -215,14 +222,24 @@ def read_input():
         data = yaml.safe_load(f)
     Ss = data['spins']
     nS = len(Ss)
-    exchange = data['exchange']
-    anisotropy = data['anisotropy']
+    if 'exchange' in data:
+        exchange = data['exchange']
+    else:
+        exchange = []
+    if 'anisotropy' in data:
+        anisotropy = data['anisotropy']
+    else:
+        anisotropy = []
     gfactors = data['gfactors']
     BT_Bgrid = data['BT_Bgrid']
     BT_Tgrid = data['BT_Tgrid']
     dynamics = data['dynamics']
+    if 'states' in data:
+        states = data['states']
+    else:
+        states = []
     n_thread = data['n_thread']
-    return (Ss, nS, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, dynamics, n_thread)
+    return (Ss, nS, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, dynamics, states, n_thread)
 
 def create_outdir():
     """
@@ -243,6 +260,7 @@ def save_eigenvalues(eigen, offset=True):
     with open("./output/eigenvalues.dat", "w") as f:
         for i in range(eigen.dim):
             f.write("{:16.12f}\n".format(eigenvalues[i]))
+    print("The eigenvalues are saved in ./output/eigenvalues.dat")
 
 def save_eigenvectors(eigen):
     """
@@ -253,6 +271,7 @@ def save_eigenvectors(eigen):
         for i in range(eigen.dim):
             state = eigen.eigenvectors[:, i]
             f.write((eigen.dim*" {:16.12f}" + "\n").format(*state))
+    print("The eigenvectors are saved in ./output/eigenvectors.dat")
 
 def save_operator(op, base_name):
     """
@@ -269,6 +288,7 @@ def save_operator(op, base_name):
         for i in range(n):
             for j in range(n):
                 f.write("{:5d} {:5d} {:12.3e} {:12.3e {:12.3e}}\n".format(i, j, o_real[i, j], o_imag[i, j], o_mod[i, j]))
+    print("The {:s} operator is saved in ./output/{:s}.txt".format(base_name, base_name))
 
 def save_spins(spins, eigen):
     """
@@ -291,6 +311,7 @@ def save_spins(spins, eigen):
             f.write("{:8.3f} ".format(E_S_tot))
             # f.write("# {:8.2f}\n".format(eigen.eigenvalues_offset[eigen.indices[i]]))
             f.write("# {:8.2f}\n".format(eigen.eigenvalues_offset[i]))
+    print("The expectation values of spins are saved in ./output/spins.dat")
 
 def print_emat_array(emat):
     """
@@ -467,7 +488,7 @@ def get_h_Zeeman(spins, Bv, coord):
 
     return h_zee
 
-def get_h_Zeeman_Mv_tot(Mv_tot, Bv, coord):
+def get_h_Zeeman_Mv_eff(Mv_tot, Bv, coord):
     r""" 
     Zeeman term H_Zee = - \vec{\mu} \cdot \vec{B} 
     In the last line, B takes unit of energy (cm^-1 per \mu_B), and mu takes unit of \mu_b.
@@ -516,23 +537,6 @@ def back_transform_O(O, eigen):
     O_new = np.matmul(M, np.matmul(O, M_dagger))
     return O_new
 
-def transform_Mv_tot(Mv_tot, eigen_eff):
-    """
-    Basis transformation for Mv_tot
-    """
-    Mv_tot_new = []
-    for i in range(3):
-        Mi = transform_O(Mv_tot[i], eigen_eff)
-        Mv_tot_new.append(Mi)
-    return Mv_tot_new
-
-def get_effective_basis(spins, exchange, factor, Bz):
-    h_ex_iso = get_h_exchange_iso(spins, exchange, factor)
-    h_zee = get_h_Zeeman(spins, [0.0, 0.0, Bz], 'cartesian')
-    h = h_ex_iso + h_zee
-    eigen = eigen_handy(h)
-    return eigen
-
 ## =================================================================
 ## Functions for energy levels versus B field
 ## =================================================================
@@ -559,7 +563,7 @@ def get_Zeeman_energy_levels(spins, h_ex, h_ani, BT_Bgrid):
         for i in range(nB):
             B = Bmin + i*Bstep
             f.write((" {:12.6f}" + eigen.dim*" {:15.9f}" + "\n").format(B, *eigenvalues[i]))
-    print("The Zeeman energy levels are saved in Zeeman.dat.")
+    print("The Zeeman energy levels are saved in ./output/Zeeman.dat")
 
 def get_Zeeman_energy_levels_Mv_tot(h0, Mv_tot, BT_Bgrid):
     """
@@ -574,7 +578,7 @@ def get_Zeeman_energy_levels_Mv_tot(h0, Mv_tot, BT_Bgrid):
     eigenvalues = np.zeros((nB, eigen.dim))
     for i in range(nB):
         B = Bmin + i*Bstep
-        h_zee = get_h_Zeeman_Mv_tot(Mv_tot, [B,theta_B,phi_B], 'spherical')
+        h_zee = get_h_Zeeman_Mv_eff(Mv_tot, [B,theta_B,phi_B], 'spherical')
         h = h0 + h_zee
         eigen = eigen_handy(h)
         eigenvalues[i] = eigen.eigenvalues[eigen.indices]
@@ -584,7 +588,7 @@ def get_Zeeman_energy_levels_Mv_tot(h0, Mv_tot, BT_Bgrid):
         for i in range(nB):
             B = Bmin + i*Bstep
             f.write((" {:12.6f}" + eigen.dim*" {:15.9f}" + "\n").format(B, *eigenvalues[i]))
-    print("The Zeeman energy levels are saved in Zeeman_eff.dat.")
+    print("The Zeeman energy levels are saved in ./output/Zeeman_eff.dat")
 
 ## =================================================================
 ## Functions for analyzing results.
@@ -634,7 +638,7 @@ def get_h_Mv(h0, Mv_tot, B, theta_B, phi_B):
     Both h0 and Mv_tot should be on the basis of eigenvectors of h0.
     Return h under the magnetic field B.
     """
-    h_zee = get_h_Zeeman_Mv_tot(Mv_tot, [B, theta_B, phi_B], 'spherical')
+    h_zee = get_h_Zeeman_Mv_eff(Mv_tot, [B, theta_B, phi_B], 'spherical')
     h = h0 + h_zee
     return h
 
@@ -869,7 +873,7 @@ def get_equilibrium_occupations(h0, Mv_tot, BT_Bgrid, T):
     # Loop over the magnetic fields
     for i in range(nB):
         Bs[i] = Bmin + i*Bstep
-        h_zee = get_h_Zeeman_Mv_tot(Mv_tot, [0,0,Bs[i]], 'cartesian')
+        h_zee = get_h_Zeeman_Mv_eff(Mv_tot, [0,0,Bs[i]], 'cartesian')
         eigen = eigen_handy(h0 + h_zee)
         Z, Ps[i, :] = get_partition_function(eigen, T)
     # Save the results to a file
@@ -887,7 +891,7 @@ def get_equilibrium_occupations_light(h0, Mv_tot, Bz, T):
     Calculate the equilibrium occupations (probability distribution) of the eigenstates 
     of the system under the a magnetic field along z direction.
     """
-    h_zee = get_h_Zeeman_Mv_tot(Mv_tot, [0,0,Bz], 'cartesian')
+    h_zee = get_h_Zeeman_Mv_eff(Mv_tot, [0,0,Bz], 'cartesian')
     eigen = eigen_handy(h0 + h_zee)
     _, P = get_partition_function(eigen, T)
     # Save the results to a file
@@ -936,7 +940,7 @@ def get_M_vs_B_Mv_tot_kernel(h0, Mv_tot, Bs, theta_B, phi_B, T):
     Ms = []
     for iB in range(nB):
         print("B = {:6.2f}".format(Bs[iB]))
-        h_zee   = get_h_Zeeman_Mv_tot(Mv_tot, [Bs[iB], theta_B, phi_B], "spherical")
+        h_zee   = get_h_Zeeman_Mv_eff(Mv_tot, [Bs[iB], theta_B, phi_B], "spherical")
         h = h0 + h_zee
         eigen = eigen_handy(h)
         Z, _ = get_partition_function(eigen, T)

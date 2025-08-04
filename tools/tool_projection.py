@@ -1,6 +1,6 @@
 import os
 from spin_dynamics.core.common import read_input, many_spins
-from spin_dynamics.core.common import get_h_exchange, get_h_anisotropy, get_h_Zeeman_Mv_tot
+from spin_dynamics.core.common import get_h_exchange, get_h_anisotropy, get_h_Zeeman_Mv_eff
 from spin_dynamics.core.common import get_effective_basis, transform_O, transform_Mv_tot
 from spin_dynamics.core.common import get_projections
 from spin_dynamics.core.effective_basis import get_effective_O, get_effective_Mv
@@ -8,7 +8,7 @@ from spin_dynamics.core.effective_basis import get_effective_O, get_effective_Mv
 if __name__ == "__main__":
 
     # Read input parameters
-    Ss, nS, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, dynamics, n_thread = read_input()
+    Ss, nS, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, dynamics, states, n_thread = read_input()
 
     # Set the number of threads
     os.environ['OMP_NUM_THREADS'] = str(n_thread)
@@ -38,6 +38,6 @@ if __name__ == "__main__":
 
     # State composition at the spedified B field
     B = 2.5 # Tesla
-    h_eff = h_eff + get_h_Zeeman_Mv_tot(Mv_eff, [0,0,B], 'cartesian') 
+    h_eff = h_eff + get_h_Zeeman_Mv_eff(Mv_eff, [0,0,B], 'cartesian') 
     get_projections(h_eff, Sz_eff)
 

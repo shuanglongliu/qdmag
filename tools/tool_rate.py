@@ -11,7 +11,7 @@ from spin_dynamics.core.classical_rate import get_Pe, evolve_P_stairs
 if __name__ == "__main__":
 
     # Read input parameters
-    Ss, nS, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, dynamics, n_thread = read_input()
+    Ss, nS, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, dynamics, states, n_thread = read_input()
 
     # Set the number of threads
     os.environ['OMP_NUM_THREADS'] = str(n_thread)

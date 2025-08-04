@@ -74,10 +74,10 @@ dynamics:
       I0: {I0:.1e}     # Prefactor for phonon density of states. 1e-4
 
     - Bt_type: '{Bt_type:s}'  # Type of the magnetic pulse as a function of time. Options: 'linear', 'pwlinear', 'sin', 'pulse'
-      sweep_rate: {sweep_rate:.1f}  # Slope of the magnetic field vs time. Unit: T per ms. Used only when Bt = 'linear'.
+      sweep_rate: {sweep_rate:.1f}  # Slope of the magnetic field vs time. Unit: T per ps. Used only when Bt = 'linear'.
       times: {times:s} # Turning points of the magnetic field in ps. Used only when Bt = 'pwlinear'.
       fields: {fields:s} # Magnetic field at the turning points in T. Used only when Bt = 'pwlinear'.
-      omega: {omega:.2f} #  Angular frequency of the sine wave in rad ms^-1. The period is 2 pi / omega ms. Used only when Bt = 'sin'.
+      omega: {omega:.2f} #  Angular frequency of the sine wave in rad ps^-1. The period is 2 pi / omega ps. Used only when Bt = 'sin'.
       amplitude: {amplitude:.1f} # Amplitude of the sine wave in T. Used only when Bt = 'sin'.
 
     - tmin: {tmin:.1e}             # Initial time in ps
@@ -88,9 +88,6 @@ dynamics:
       nt_mag: {nt_mag:d}  # Calculate and save magnetization every nt_mag*deltat ps
       save_rho: {save_rho:s} # Save the density matrix ?
       nt_rho: {nt_rho:d}  # Save the density matrix every nt_rho*deltat ps, nt_rho will be adjusted to be a multiple of nt_mag
-
-    - multiphonon: {multiphonon:s} # Include multiphonon processes in the dynamics ?
-      imbalance: {imbalance:s} # Make X unsymmetrical for single phonon processes ?
 
     - states: {states:s} # List of spin states to be included in the dynamics.
     
@@ -145,7 +142,7 @@ class scanning:
         self.I0s = [1e-14, 1e-13, 1e-12] 
         self.n_I0s = len(self.I0s)
 
-        # Sweep rates in T per ms
+        # Sweep rates in T per ps
         self.sweep_rates = [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0]
         self.n_sweep_rates = len(self.sweep_rates)
 
@@ -157,10 +154,10 @@ class scanning:
         self.lambdaa = 10.0 # cm-1
         self.I0 = None # Prefactor for phonon density of states. To be set in get_input() based on I0s
         self.Bt_type = 'linear' # Type of the magnetic pulse as a function of time
-        self.sweep_rate = None # T per ms. To be set in get_input() based on sweep_rates
+        self.sweep_rate = None # T per ps. To be set in get_input() based on sweep_rates
         self.times = '[0.0, 1.0e+9, 10.0e+9]' # Turning points of the magnetic field in ps
         self.fields = '[0.0, 10.0, 100.0]' # Magnetic field at the turning points in T
-        self.omega = 0.2 # Angular frequency of the sine wave in rad ms^-1
+        self.omega = 0.2 # Angular frequency of the sine wave in rad ps^-1
         self.amplitude = 65.0 # Amplitude of the sine wave in T
         self.theta_B = 0.0 # Polar angle of the pulsed magnetic field
         self.phi_B = 0.0 # Azimuthal angle of the pulsed magnetic field
@@ -171,8 +168,6 @@ class scanning:
         self.nt_mag = 100 # Calculate and save magnetization every nt_mag*deltat ps
         self.save_rho = 'false' # Save the density matrix ?
         self.nt_rho = 10 # Save the density matrix every nt_rho*deltat ps
-        self.multiphonon = 'false'
-        self.imbalance = 'false'
         self.states = '[200,150,88,30,10,0,1,2,3,4,5,17,41,99,173,215]'
         self.n_thread = 16
 
@@ -227,7 +222,6 @@ class scanning:
                 tmin=self.tmin, tmax=self.tmax, deltat=self.deltat,\
                 save_mag=self.save_mag, nt_mag=self.nt_mag,\
                 save_rho=self.save_rho, nt_rho=self.nt_rho,\
-                multiphonon=self.multiphonon, imbalance=self.imbalance,\
                 states=self.states, n_thread=self.n_thread))
         os.chdir(root_dir)
 

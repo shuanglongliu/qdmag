@@ -3,7 +3,6 @@ import subprocess
 import numpy as np
 from spin_dynamics.core.constants import const1, Kelvin2wavenumber
 from spin_dynamics.core.common import eigen_simple
-from spin_dynamics.core.analysis import spy_sparsity
 
 r"""
 Codes for solving the quantum master equation described in the Eq. 2.7 of
@@ -90,11 +89,12 @@ def construct_X(Sz_tot):
                 X[i, j] = 1.0
     return X
 
-def get_Rhbar(h, X, T, I0):
+def get_Rhbar(h, X, I0, T):
     """
     Construct the auxiliary operator R multiplied by hbar in both the E and S representations.
     The E representation is spanned by the eigenstates of the Hamiltonian. 
     The S representation is spanned by the eigenstates of the spin operator Sz_tot.
+    Only the Rhbar in the S representation is used in the quantum master equation.
 
     h: Hamiltonian at a certain time in the S representation.
     T: temperature in Kelvin.
@@ -166,23 +166,4 @@ def update_Rhbar(Rhbar, h, X, I0, T):
     # to the eigenstates of the spin operator Sz_tot (S representation)
     Rhbar = np.matmul(M, np.matmul(Rhbar, M_dagger))
     return Rhbar
-
-def spy_XRhbar(X, Rhbar, Sz_tot):
-    """
-    Save and visualize the operator X and the auxiliary operator Rhbar.
-    """
-    n = X.shape[0]
-    create_outdir()
-    with open("./output/X.dat", "w") as f:
-        for i in range(n):
-            for j in range(n):
-                f.write("i   j   Sz_tot_i   Sz_tot_j   X_ij   = {:5d}   {:5d}   {:8.3f}   {:8.3f}   {:5.1f}\n".format( \
-                     i, j, np.real(Sz_tot[i, i]), np.real(Sz_tot[j, j]), X[i, j]))
-    with open("./output/Rhbar.dat", "w") as f:
-        for i in range(n):
-            for j in range(n):
-                f.write("{:5d} {:5d} {:12.4e}\n".format(i, j, Rhbar[i, j]))
-    spy_sparsity(X, "X", precision=1.0e-8, figsize=(10, 10), markersize=5)
-    max_Rhbar = np.max(np.absolute(Rhbar))
-    spy_sparsity(Rhbar, "Rhbar", precision = 0.1*max_Rhbar, figsize=(10, 10), markersize=5)
 

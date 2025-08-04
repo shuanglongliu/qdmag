@@ -5,19 +5,18 @@
 import numpy as np
 import pickle
 from spin_dynamics import root_dir
-from scipy.optimize import fsolve
 from scipy.interpolate import interp1d
 
 def get_Bt(Bt_params):
     """
     Bt_params: dictionary with the following keys and values:
         'Bt_type': 'linear' or 'pwlinear' or 'pwlinear_by_slope' or 'sin' or 'cs'
-        'sweep_rate': sweep rate in T per 0s
+        'sweep_rate': sweep rate in T per ps
         'times': turning time points in ps
         'fields': magnetic fields at the turning points in Tesla
-        'sweep_rates': slope of the linear segments in T per ms before normalization
-        'sweep_rate_ave': average slope in T per ms
-        'omega': angular frequency of the sine wave in rad ms^-1
+        'sweep_rates': slope of the linear segments in T per ps before normalization
+        'sweep_rate_ave': average slope in T per ps
+        'omega': angular frequency of the sine wave in rad ps^-1
         'amplitude': amplitude of the sine wave in T
     """
 
@@ -54,24 +53,24 @@ def get_B_sin_offset(t, *argv):
 def get_B_sin(omega, amplitude):
     """
     t: time in ps
-    B = amplitude*sin(omega*t/1e9): magnetic field in Tesla
+    B = amplitude*sin(omega*t): magnetic field in Tesla
 
-    An example: 65.3473*np.sin(0.187486*t/1e9) as fitted to a pulsed field
+    An example: 65.3473*np.sin(0.187486e-09*t) as fitted to a pulsed field
     """
 
     def B_sin(t):
-        return amplitude*np.sin(omega*t/1e9)
+        return amplitude*np.sin(omega*t)
 
     return B_sin
 
 def get_B_linear(sweep_rate):
     """
-    sweep_rate: rate in T per ms
+    sweep_rate: rate in T per ps
     t: time in ps
-    B = a*t/1e9: magnetic field in Tesla
+    B = a*t: magnetic field in Tesla
     """
     def B_linear(t):
-        return sweep_rate*t/1e9
+        return sweep_rate*t
 
     return B_linear
 
@@ -88,8 +87,8 @@ def get_B_pwlinear(times=[0, 1e6, 1e7, 1e8, 1e9], fields=[0, 3, 5, 8, 10]):
 def get_B_pwlinear_by_sweep_rate(times=[0, 1e6, 1e7, 1e8, 1e9], sweep_rates=[100, 10, 1, 0.1], sweep_rate_ave=10.0):
     """
     times: turning time points in ps
-    sweep_rates: slope of the linear segments in T per ms before normalization
-    sweep_rate_ave: average slope in T per ms
+    sweep_rates: slope of the linear segments in T per ps before normalization
+    sweep_rate_ave: average slope in T per ps
     Return a piecewise linear magnetic field function
     """
     nsweep_rates = len(sweep_rates)
@@ -98,14 +97,14 @@ def get_B_pwlinear_by_sweep_rate(times=[0, 1e6, 1e7, 1e8, 1e9], sweep_rates=[100
         t0 = times[i]
         t1 = times[i+1]
         sweep_rate = sweep_rates[i]
-        fields.append(fields[-1] + sweep_rate*(t1 - t0)/1e9)
+        fields.append(fields[-1] + sweep_rate*(t1 - t0))
 
     # Create the piecewise linear function
     B_pwlinear = interp1d(times, fields, kind='linear', fill_value="extrapolate")
 
     # Normalize the sweep_rates to the average sweep_rate
     tmax = times[-1]
-    fields = sweep_rate_ave/(B_pwlinear(tmax)/tmax*1e9) * np.array(fields)
+    fields = sweep_rate_ave/(B_pwlinear(tmax)/tmax) * np.array(fields)
     B_pwlinear = interp1d(times, fields, kind='linear', fill_value="extrapolate")
 
     return B_pwlinear
@@ -190,10 +189,5 @@ def get_partial_double_grid_left(nt, ts, Bs2, nt_left):
 
 if __name__ == "__main__":
 
-    # find the time in ps at which B = arrgs[0], the second argument of fsolve is the initial guess
-    # solution = fsolve(get_B_sin_offset, 10e+06, args=[0.2]); print(solution)
-
-    # B = get_B_sin(1e+09); print(B) # 0.20827861
-    
     pass
 
