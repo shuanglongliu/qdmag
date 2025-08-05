@@ -28,6 +28,6 @@ if __name__ == "__main__":
     # Set up the quantum master equation
     # And examine the biggest element of the time evolution operator
     lio = liouville(eff, dynamics)
-    # lio.get_L_max_and_expLdeltat_max(3.49, 1e9)
-    lio.examine_L_max_and_expLdeltat_max(Bs, deltats, "0-10T")
+    # lio.get_L_max_and_expLdeltat_max(10.0, 1e6, verbose=True)
+    # lio.examine_L_max_and_expLdeltat_max(Bs, deltats, "0-10T")
 
