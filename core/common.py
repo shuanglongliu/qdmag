@@ -293,7 +293,6 @@ def save_operator(op, base_name):
 def save_spins(spins, eigen):
     """
     Calculate and save expectation of spins for all eigenvectors.
-    To do: this function needs to be improved to deal with the case where there is only one spin.
     """
     create_outdir()
     with open("./output/spins.dat", "w") as f:
@@ -355,6 +354,8 @@ def get_h_exchange(spins, exchange, factor):
     Get the exchange Hamiltonian for all pairs of spins.
     """
     n_pair = len(exchange)
+    if n_pair == 0:
+        return spins.zero
     h_ex = spins.zero
     for i_pair in range(n_pair):
         h_ex = h_ex + get_h_exchange_one_pair(spins, exchange[i_pair], factor)
@@ -390,6 +391,8 @@ def get_h_exchange_iso(spins, exchange, factor):
     Get the isotropic exchange Hamiltonian for all pairs of spins.
     """
     n_pair = len(exchange)
+    if n_pair == 0:
+        return spins.zero
     h_ex = spins.zero
     for i_pair in range(n_pair):
         h_ex = h_ex + get_h_exchange_iso_one_pair(spins, exchange[i_pair], factor)
@@ -423,7 +426,8 @@ def get_h_anisotropy(spins, anisotropy):
     Get the zero-field splitting (ZFS) Hamiltonian for all sites.
     """
     h_ani = spins.zero
-    ## n_site = number of local spins
+    if len(anisotropy) == 0:
+        return h_ani
     for i_site in range(spins.nS):
         h_ani = h_ani + get_h_anisotropy_one_site(spins, anisotropy[i_site])
     return h_ani
@@ -459,7 +463,8 @@ def get_h_anisotropy_ikq(spins, anisotropy, ikq):
     a specific Stevens' operator or crystal field parameter (CFP).
     """
     h_ani = spins.zero
-    ## n_site = number of local spins
+    if len(anisotropy) == 0:
+        return h_ani
     for i_site in range(spins.nS):
         h_ani = h_ani + get_h_anisotropy_one_site_ikq(spins, anisotropy[i_site], ikq)
     return h_ani
@@ -610,13 +615,14 @@ def get_expectation_of_spins(spins, state):
     E_S_tot = (-1+np.sqrt(4*E_S2_tot+1))/2
     return (E_local_spins, E_Sv_tot, E_S2_tot, E_S_tot)
 
-def get_projections(h, Sz):
+def get_projections(eff, Bv_cart):
     """
     A function to get the projections onto the |Ms> basis.
     h: hamiltonian on the effeictive basis which are the eigenstates of Sz.
     Sz: the Sz operator on the effective basis.
     """
-    Sz = np.real(Sz)
+    h = eff.h0_eff + get_h_Zeeman_Mv_eff(eff.Mv_eff, Bv_cart, 'cartesian') 
+    Sz = np.real(eff.Sz_eff)
     eigen = eigen_handy(h)
     state_indices = [i for i in range(1, eigen.dim+1)]
     projections = 100*np.abs( eigen.eigenvectors )**2
@@ -628,6 +634,7 @@ def get_projections(h, Sz):
             for i_state in range(eigen.dim):
                 f.write("{:>6.1f}".format(projections[i_basis, i_state]))
             f.write("\n")
+    print("The projections onto the |Ms> basis are saved in ./output/projections.dat")
 
 ## =======================================================================
 ## Functions for obtaining the time-dependent Hamiltonian H(B(t))

@@ -1,7 +1,10 @@
 import os
+import numpy as np
+from os import environ
 from spin_dynamics.core.common import read_input, many_spins
-from spin_dynamics.core.effective_basis import effective_basis
 from spin_dynamics.core.liouville import liouville
+from spin_dynamics.core.effective_basis import effective_basis
+
 
 if __name__ == "__main__":
 
@@ -14,13 +17,17 @@ if __name__ == "__main__":
     # Spin system
     spins = many_spins(Ss, nS, gfactors)
 
+
     # Set up the effective basis
     eff = effective_basis(spins, exchange, anisotropy, dynamics, states)
 
+    # Sample the magnetic field and time step
+    Bs = np.linspace(0, 10, 11, endpoint=True) # np.linspace(0, 50, 1001, endpoint=True)
+    deltats = [1e3, 1e6 ] # [1e-3, 1e-2, 1e-1, 1., 10., 20., 30., 40., 50., 60., 70., 80., 90., 100., 1e3, 1e4, 1e5, 1e6 ]
+
     # Set up the quantum master equation
+    # And examine the biggest element of the time evolution operator
     lio = liouville(eff, dynamics)
-    # lio.get_initial_rho(from_file=False)
-    # lio.get_initial_rho(from_file=True, 
-    #      fname="./output/T_0.6K_I0_1.00e-14_lambdaa_10.00/Bt_linear_sweep_rate_5.0e-08/rho/0.000-0.100ps_dt0.001ps.h5",
-    #      t_init=lio.tmin)
-    # lio.evolve_rho(method="staircase")
+    # lio.get_L_max_and_expLdeltat_max(10.0, 1e6, verbose=True)
+    # lio.examine_L_max_and_expLdeltat_max(Bs, deltats, "0-10T")
+

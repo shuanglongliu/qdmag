@@ -11,6 +11,7 @@ from spin_dynamics.core.common import eigen_handy, get_h_Zeeman_Mv_eff
 from spin_dynamics.core.common import get_rhoe, back_transform_O
 from spin_dynamics.core.quantum_master import get_Rhbar, update_Rhbar
 from spin_dynamics.core.pulse import get_Bt, get_pulse_RK4_double_grid
+from spin_dynamics.core.hdf5 import get_rho_from_hdf5
 
 r"""
 Codes for solving the quantum master equation described in the Eq. 2.7 of
@@ -143,7 +144,7 @@ class liouville:
             if t_init is None:
                 raise ValueError("Initial time must be provided if from_file is True.")
             # Read the initial density matrix from a file
-            self.risvrho = get_rho_from_hdf5(fname, t_init)
+            self.risvrho = get_rho_from_hdf5(fname, t_init, self.dimds)
         else:
             # Solve the eigenvalue problem for the Hamiltonian at the initial time, which is on the effective basis
             eigen = eigen_handy(self.h)
@@ -627,7 +628,7 @@ class liouville:
                 self.evolve_risvrho_onestair(it)
         return self.risvrho
     
-    def get_Labc(it):
+    def get_Labc(self, it):
         """
         Obtain La = L(ts[it])
                Lb = L(ts[it] + deltat/2)
@@ -640,7 +641,7 @@ class liouville:
         self.update_L_under_magnetic_field(self.Bs2[2*it+1]); np.copyto(self.Lb, self.L)
         self.update_L_under_magnetic_field(self.Bs2[2*it+2]); np.copyto(self.Lc, self.L)
     
-    def update_Labc(it):
+    def update_Labc(self, it):
         """
         Obtain La = L(ts[it])
                Lb = L(ts[it] + deltat/2)
@@ -650,7 +651,7 @@ class liouville:
         self.update_L_under_magnetic_field(self.Bs2[2*it+1]); np.copyto(self.Lb, self.L)
         self.update_L_under_magnetic_field(self.Bs2[2*it+2]); np.copyto(self.Lc, self.L)
     
-    def evolve_risvrho_onestep(it):
+    def evolve_risvrho_onestep(self, it):
         """
         Evolve rho by deltat using the Runge-Kutta method according to the quantum master equation
             d risvrho / d t = L risvrho
@@ -661,9 +662,10 @@ class liouville:
         k2 = self.Lb @ (self.risvrho + 0.5*self.deltat*k1) # np.matmul(Lb, rho + 0.5*deltat*k1)
         k3 = self.Lb @ (self.risvrho + 0.5*self.deltat*k2) # np.matmul(Lb, rho + 0.5*deltat*k2)
         k4 = self.Lc @ (self.risvrho +     self.deltat*k3) # np.matmul(Lc, rho +     deltat*k3)
+        print("it/self.nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, self.nt, self.ts[it], self.Bs2[2*it]))
         self.risvrho = self.risvrho + self.deltat * (k1 + 2*k2 + 2*k3 + k4) / 6
     
-    def evolve_risvrho_steps():
+    def evolve_risvrho_steps(self):
         """
         Evolve the density matrix using the Runge-Kutta method according to the quantum master equation.
         """
@@ -779,7 +781,7 @@ class liouville:
             self.nt, self.ts, self.Bs2, self.deltat = get_pulse_RK4_double_grid(self.Bt, self.tmin, self.tmax, self.deltat)
             # Initialize the L matrices
             self.get_Labc(0)
-            self.evolve_risvrho_RK4()
+            self.evolve_risvrho_steps()
         else:
             raise ValueError("Invalid method: {}".format(method))
     

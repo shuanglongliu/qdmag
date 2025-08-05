@@ -12,6 +12,7 @@ class effective_basis:
 
     def __init__(self, spins, exchange, anisotropy, dynamics, states):
         """
+        Initialize the effective basis.
         """
         self.spins = spins
         self.exchange = exchange
@@ -19,6 +20,7 @@ class effective_basis:
         self.dynamics = dynamics
         self.get_pool_and_pick_states(states)
         self.construct_X_eff()
+        self.get_effective_Sv()
         self.get_effective_Mv()
         self.get_effective_h0()
 
@@ -113,6 +115,28 @@ class effective_basis:
                 jj = self.states[j]
                 O_eff[i, j] = O_pool[ii, jj]
         return O_eff
+
+    def get_effective_Sv(self):
+        """
+        Get the effective spin operators in the effective Hilbert space.
+        """
+        # Transform the spin operators onto the pool basis.
+        Sx_pool = transform_O(self.spins.Sv_tot[0], self.eigen_pool)
+        Sy_pool = transform_O(self.spins.Sv_tot[1], self.eigen_pool)
+        Sz_pool = transform_O(self.spins.Sv_tot[2], self.eigen_pool)
+        # Effective spin operators in the effective Hilbert space.
+        # np.complex64 is not enough to capture the energy differences between the nearly degenerate states (which are indeed degenerate without perturbation).
+        self.Sx_eff = np.zeros((self.dim, self.dim), dtype=np.complex128)
+        self.Sy_eff = np.zeros((self.dim, self.dim), dtype=np.complex128)
+        self.Sz_eff = np.zeros((self.dim, self.dim), dtype=np.complex128)
+        for i in range(self.dim):
+            for j in range(self.dim):
+                ii = self.states[i]
+                jj = self.states[j]
+                self.Sx_eff[i, j] = Sx_pool[ii, jj]
+                self.Sy_eff[i, j] = Sy_pool[ii, jj]
+                self.Sz_eff[i, j] = Sz_pool[ii, jj]
+        self.Sv_eff = [self.Sx_eff, self.Sy_eff, self.Sz_eff]
 
     def get_effective_Mv(self):
         """
