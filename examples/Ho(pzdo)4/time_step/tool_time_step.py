@@ -11,58 +11,23 @@ root_dir = os.path.dirname(os.path.abspath(__file__)) + '/'
 
 input = """
 spins:
-  - 2.5
-  - 2.5
-  - 2.5
-
-exchange:
-  - pair: [1, 2]
-    coupling_matrix: [-2.42,  0.00,  0.00, 0.00,  -2.42,  0.00, 0.00,  0.00,  -2.42]
-    reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
-
-  - pair: [2, 3]
-    coupling_matrix: [-2.42,  0.00,  0.00, 0.00,  -2.42,  0.00, 0.00,  0.00,  -2.42]
-    reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
-
-  - pair: [1, 3]
-    coupling_matrix: [0.00,  0.00,  0.00, 0.00,  0.00,  0.00, 0.00,  0.00,  0.00]
-    reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
+  - 8.0
 
 anisotropy:
   - site: 1
-    ks: [2, 2]
-    qs: [0, 2]
-    Bkqs: [0.0556, 0.0400]
+    ks: [   2,   2,   2,   2,   2,   4,   4,   4,   4,   4,   4,   4,   4,   4,   6,   6,   6,   6,   6,   6,   6,   6,   6,   6,   6,   6,   6,   8,   8,   8,   8,   8,   8,   8,   8,   8,   8,   8,   8,   8,   8,   8,   8,   8,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  10,  12,  12,  12,  12,  12,  12,  12,  12,  12,  12,  12,  12,  12,  12,  12,  12,  12,  12,  12,  12,  12,  12,  12,  12,  12 ]
+    qs: [  -2,  -1,   0,   1,   2,  -4,  -3,  -2,  -1,   0,   1,   2,   3,   4,  -6,  -5,  -4,  -3,  -2,  -1,   0,   1,   2,   3,   4,   5,   6,  -8,  -7,  -6,  -5,  -4,  -3,  -2,  -1,   0,   1,   2,   3,   4,   5,   6,   7,   8, -10,  -9,  -8,  -7,  -6,  -5,  -4,  -3,  -2,  -1,   0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10, -12, -11, -10,  -9,  -8,  -7,  -6,  -5,  -4,  -3,  -2,  -1,   0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12 ]
+    Bkqs: [   3.4994750592E-02,  -2.7086096290E-06,   2.7144135449E-02,  -3.8607263323E-06,   8.5970155653E-02,   4.9292781766E-03,   3.7420773069E-07,  -6.3647621451E-04,  -5.8482618912E-07,   2.5841103918E-03,  -7.7752312986E-07,  -1.5636414673E-03,   8.1060758891E-07,   5.0515480805E-03,  -3.6232763990E-05,  -4.0403705378E-08,   1.3397089227E-04,   1.4505877737E-09,  -7.4211810050E-06,   1.4044754324E-08,  -2.7399050125E-05,   1.3071993690E-08,  -1.8231027282E-05,   1.6135737389E-08,   1.3729465845E-04,  -7.6496350770E-09,  -1.5794354771E-05,   1.4485020379E-08,   1.4738915304E-12,   3.2913487895E-09,  -6.0575611584E-12,   3.2967609246E-09,  -1.2676070811E-13,  -1.3725365053E-10,  -5.8313174807E-14,   9.0399850984E-11,  -4.6479436245E-14,  -3.3713870741E-10,   8.9090318133E-13,   3.3785241673E-09,  -2.4254533148E-12,   1.4347234348E-09,   1.2258449233E-12,   3.5498244158E-10,  -8.6486845220E-12,  -1.3223211813E-13,   2.1295410042E-10,   5.8644230868E-14,  -3.8016711952E-11,   2.8512537705E-16,  -3.7975151723E-12,  -1.1011816128E-14,   4.4556788958E-12,   3.8483425640E-17,  -2.7807784120E-12,   2.1578480178E-15,   1.0946226472E-11,  -7.7951728095E-15,  -3.8917957747E-12,  -3.6446147447E-15,  -1.6571837454E-11,   1.7798064405E-14,   5.2192898827E-12,   5.6895406482E-14,   3.2761852347E-12,   2.2136397908E-13,   8.1544513779E-16,  -1.5276986114E-12,  -1.2854124465E-15,   4.8629684574E-12,   8.7750621765E-16,  -3.8663894329E-13,   3.2650282248E-16,  -2.7144005718E-13,   7.4410060826E-18,  -2.2596178830E-14,  -2.5002105866E-17,   1.3681893596E-14,  -2.7848527210E-17,  -5.5511396757E-14,  -5.3588680407E-17,  -2.7817397251E-13,  -2.8852743990E-16,  -1.6854123596E-13,   3.7028383618E-16,   1.1918827338E-13,   7.1765297823E-16,   5.7864007571E-13,  -6.8329337066E-16,  -2.0566624637E-13 ]
     reference_frame: [{exx:10.6f}, {exy:10.6f}, {exz:10.6f}, {eyx:10.6f}, {eyy:10.6f}, {eyz:10.6f}, {ezx:10.6f}, {ezy:10.6f}, {ezz:10.6f}]
 
-  - site: 2
-    ks: [2, 2]
-    qs: [0, 2]
-    Bkqs: [0.0556, 0.0400]
-    reference_frame: [{exx:10.6f}, {exy:10.6f}, {exz:10.6f}, {eyx:10.6f}, {eyy:10.6f}, {eyz:10.6f}, {ezx:10.6f}, {ezy:10.6f}, {ezz:10.6f}]
-
-  - site: 3
-    ks: [2, 2]
-    qs: [0, 2]
-    Bkqs: [0.0556, 0.0400]
-    reference_frame: [{exx:10.6f}, {exy:10.6f}, {exz:10.6f}, {eyx:10.6f}, {eyy:10.6f}, {eyz:10.6f}, {ezx:10.6f}, {ezy:10.6f}, {ezz:10.6f}]
-  
 gfactors:
   - site: 1
-    gs: [2.000,  0.000,  0.000,  0.000,   2.000,  0.000,  0.000,  0.000,   2.000]
-    reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
-
-  - site: 2
-    gs: [2.000,  0.000,  0.000,  0.000,   2.000,  0.000,  0.000,  0.000,   2.000]
-    reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
-
-  - site: 3
-    gs: [2.000,  0.000,  0.000,  0.000,   2.000,  0.000,  0.000,  0.000,   2.000]
-    reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
+    gs: [1.24, 0.0, 0.0, 0.0, 1.24, 0.0, 0.0, 0.0, 1.24]
+    reference_frame: [1.000000, 0.000000, 0.000000, 0.000000, 1.000000, 0.000000, 0.000000, 0.000000, 1.000000 ]
 
 BT_Bgrid:
-  - [0., {staticB_max:.3f}, {staticB_step:.3f}, 0., 0.] # Bmin, Bmax, Bstep, thetaB, phiB 
-  - [0.6] # [2.0, 10.0, 20.0, 40.0] # T1, T2, ..., Tn
+  - [0., 10.0, 0.1, 0., 0.] # Bmin, Bmax, Bstep, thetaB, phiB 
+  - [2.0] # [2.0, 10.0, 20.0, 40.0] # T1, T2, ..., Tn
 
 BT_Tgrid:
   - [0., 0.5, 1., 0., 0.] # B1, B2, ..., Bn, thetaB, phiB
@@ -74,23 +39,17 @@ dynamics:
       I0: {I0:.1e}     # Prefactor for phonon density of states. 1e-4
 
     - Bt_type: '{Bt_type:s}'  # Type of the magnetic pulse as a function of time. Options: 'linear', 'pwlinear', 'sin', 'pulse'
-      sweep_rate: {sweep_rate:.1f}  # Slope of the magnetic field vs time. Unit: T per ps. Used only when Bt = 'linear'.
-      times: {times:s} # Turning points of the magnetic field in ps. Used only when Bt = 'pwlinear'.
-      fields: {fields:s} # Magnetic field at the turning points in T. Used only when Bt = 'pwlinear'.
-      omega: {omega:.2f} #  Angular frequency of the sine wave in rad ps^-1. The period is 2 pi / omega ps. Used only when Bt = 'sin'.
-      amplitude: {amplitude:.1f} # Amplitude of the sine wave in T. Used only when Bt = 'sin'.
+      sweep_rate: {sweep_rate:.1e}  # Slope of the magnetic field vs time. Unit: T per ps. Used only when Bt = 'linear'.
 
     - tmin: {tmin:.1e}             # Initial time in ps
       tmax: {tmax:.1e}             # Finial time in ps
-      deltat: {deltat:.1e}      # Time step in ps
+      deltat: {deltat:.1e}         # Time step in ps
 
     - save_mag: {save_mag:s} # Calculate and save magnetization during the dynamics ?
       nt_mag: {nt_mag:d}  # Calculate and save magnetization every nt_mag*deltat ps
       save_rho: {save_rho:s} # Save the density matrix ?
       nt_rho: {nt_rho:d}  # Save the density matrix every nt_rho*deltat ps, nt_rho will be adjusted to be a multiple of nt_mag
 
-    - states: {states:s} # List of spin states to be included in the dynamics.
-    
 n_thread: {n_thread:d} # Number of threads used in the calculation
 
 """
@@ -99,8 +58,8 @@ job_array = """#!/bin/bash -l
 
 #SBATCH --account=m2qm-efrc
 #SBATCH --qos=m2qm-efrc
-#SBATCH --job-name=dynamics
-#SBATCH --mail-type=None
+#SBATCH --job-name=qmag_Ho
+#SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=shuan.liu@northeastern.edu
 #SBATCH --partition=hpg-default
 #SBATCH --nodes=1
@@ -115,22 +74,14 @@ job_array = """#!/bin/bash -l
 
 cd ./$SLURM_ARRAY_TASK_ID || exit 1
 
-# Thermal equilibrium
-python /home/shuan.liu.neu/git/spin_dynamics/tools/tool_magnetization.py
-
-# Dynamics
-python /home/shuan.liu.neu/git/spin_dynamics/tools/tool_staircase.py
+python "/home/shuan.liu.neu/git/spin_dynamics/examples/Ho(pzdo)4/tool_staircase.py"
 """
 
 class stepping:
     def __init__(self):
-        self.alpha = 45.0
-        self.beta = 45.0
+        self.alpha = 0.0
+        self.beta = 0.0
         self.gamma = 0.0
-
-        # Parameters for determining the BT_Egrid in the input file
-        self.staticB_max = 10.0 # T
-        self.staticB_step = 0.1 # T
 
         # Parameters for automatically determining input parameters for spin dynamics
         self.dynamicB_steps = [0.00001, 0.0001, 0.001, 0.01, 0.1] # Heights of each stair step in T. deltat will be set to dynamicB_step/sweep_rate.
@@ -140,25 +91,18 @@ class stepping:
         self.n_dynamicB_steps = len(self.dynamicB_steps)
 
         # Input parameters for spin dynamics
-        self.T = 0.6 # Kelvin
+        self.T = 2.0 # Kelvin
         self.lambdaa = 10.0 # cm-1
         self.I0 = 1e-12 # Prefactor for phonon density of states
         self.Bt_type = 'linear' # Type of the magnetic pulse as a function of time
-        self.sweep_rate = 1000.0 # T per ps
-        self.times = '[0.0, 1.0e+9, 10.0e+9]' # Turning points of the magnetic field in ps
-        self.fields = '[0.0, 10.0, 100.0]' # Magnetic field at the turning points in T
-        self.omega = 0.2 # Angular frequency of the sine wave in rad ps^-1
-        self.amplitude = 65.0 # Amplitude of the sine wave in T
-        self.theta_B = 0.0 # Polar angle of the pulsed magnetic field
-        self.phi_B = 0.0 # Azimuthal angle of the pulsed magnetic field
-        self.tmin = 0e+9 # Initial time in ps
-        self.tmax = self.dynamicB_max / self.sweep_rate * 1e+9 # Final time in ps
+        self.sweep_rate = 50.0e-09 # T per ps
+        self.tmin = 0.0e+09 # Initial time in ps
+        self.tmax = self.dynamicB_max / self.sweep_rate # Final time in ps
         self.deltat = None # To be set in get_input() based on dynamicB_step and sweep_rate
         self.save_mag = 'true' # Calculate and save magnetization during the dynamics ?
         self.nt_mag = 1 # Calculate and save magnetization every nt_mag*deltat ps
         self.save_rho = 'false' # Save the density matrix ?
         self.nt_rho = 10 # Save the density matrix every nt_rho*deltat ps
-        self.states = '[200,150,88,30,10,0,1,2,3,4,5,17,41,99,173,215]'
         self.n_thread = 16
 
     def set_directory_name(self, i):
@@ -180,31 +124,18 @@ class stepping:
         self.set_directory_name(i)
         os.chdir(self.directory)
         os.system('pwd')
-        self.deltat = self.dynamicB_steps[i] / self.sweep_rate * 1e+9 # Time step in ps
+        self.deltat = self.dynamicB_steps[i] / self.sweep_rate # Time step in ps
         with open("input.yaml", "w") as f:
             f.write(input.format( \
                 exx=self.emat[0, 0], exy=self.emat[0, 1], exz=self.emat[0, 2],\
                 eyx=self.emat[1, 0], eyy=self.emat[1, 1], eyz=self.emat[1, 2],\
                 ezx=self.emat[2, 0], ezy=self.emat[2, 1], ezz=self.emat[2, 2],\
-                staticB_max=self.staticB_max, staticB_step=self.staticB_step,\
                 T=self.T, lambdaa=self.lambdaa, I0=self.I0,\
                 Bt_type=self.Bt_type, sweep_rate=self.sweep_rate,\
-                times=self.times, fields=self.fields,\
-                omega=self.omega, amplitude=self.amplitude,\
-                theta_B=self.theta_B, phi_B=self.phi_B,\
                 tmin=self.tmin, tmax=self.tmax, deltat=self.deltat,\
                 save_mag=self.save_mag, nt_mag=self.nt_mag,\
                 save_rho=self.save_rho, nt_rho=self.nt_rho,\
-                states=self.states, n_thread=self.n_thread))
-        os.chdir(root_dir)
-
-    def submit_a_job(self, i):
-        """
-        Submit a job to the queue.
-        """
-        self.set_directory_name(i)
-        os.chdir(self.directory)
-        subprocess.run(['sbatch', 'spin.job'])
+                n_thread=self.n_thread))
         os.chdir(root_dir)
 
     def create_directories(self):
@@ -237,23 +168,11 @@ class stepping:
         """
         Is this job done?
         """
-        Bs_eq = self.read_M_eq(i, take_B=True)
         Bs_dy = self.read_M_dy(i, take_B=True)
-
-        if (Bs_eq is None):
-            return
         if (Bs_dy is None):
             return
-
-        if (not np.isclose(Bs_eq["B"][Bs_eq.shape[0]-1], self.staticB_max) ):
-            print(f"{i+1:5d} Equilibrium job is incomplete.")
-        # else:
-        #     print(f"{i+1:5d} Equilibrium job is complete.")
-
         if ( not np.isclose(Bs_dy["B"][Bs_dy.shape[0]-1], self.dynamicB_max) ):
             print(f"{i+1:5d} Dynamics job is incomplete.")
-        # else:
-        #     print(f"{i+1:5d} Dynamics job is complete.")
 
     def check_all_job_status(self):
         """
@@ -262,48 +181,12 @@ class stepping:
         for i in range(self.n_dynamicB_steps):
             self.check_job_status(i)
 
-    def read_M_eq(self, i, take_B=False):
-        self.set_directory_name(i)
-        # print(self.directory)
-        # read csv file
-        fname = os.path.join(self.directory, "output/M-B.csv")
-        # Check if the file exists
-        if not os.path.exists(fname):
-            print(f"{i+1:5d} No output file for the equilibrium job.")
-            return None
-        df = pd.read_csv(fname)
-        if take_B:
-            # Take the column "B" and save it to a new data frame
-            df = df[["B"]]
-        else:
-            # Take the column "Mz" and save it to a new data frame
-            df = df[["Mz"]]
-        # Rename the column "Mz" to self.directory which is a string
-        df.rename(columns={"Mz": self.directory}, inplace=True)
-        return df
-
-    def get_M_eq_avg(self):
-        """
-        Get the average equilibrium magnetization for all orientations.
-        """
-        df = self.read_M_eq(0, take_B=True)
-        Ms = self.read_M_eq(0)
-        for i in range(1, self.n_dynamicB_steps):
-            print(i+1)
-            column = self.read_M_eq(i)
-            # Horizontally stack the dataframes
-            Ms = pd.concat([Ms, column], axis=1)
-        df['avg'] = Ms.mean(axis=1)
-        df = pd.concat([df, Ms], axis=1)
-
-        # Save the data to a csv file
-        df.to_csv("M-B_eq.csv", index=False)
-
     def read_M_dy(self, i, take_B=False):
         self.set_directory_name(i)
         # print(self.directory)
         # read csv file
-        fname = os.path.join(self.directory, f"output/T_{self.T:.1f}K_I0_{self.I0:.2e}_lambdaa_{self.lambdaa:.2f}/Bt_linear_sweep_rate_{self.sweep_rate:.1f}/magnetometry/0.000-{self.tmax:.3f}ps_dt{self.deltat:.3f}ps.dat")
+        fname = f"output/T_{self.T:.1f}K_I0_{self.I0:.2e}_lambdaa_{self.lambdaa:.2f}/Bt_linear_sweep_rate_{self.sweep_rate:.1f}/magnetometry/0.000-{self.tmax:.3f}ps_dt{self.deltat:.3f}ps.dat"
+        fname = os.path.join(self.directory, fname)
         # Check if the file exists
         if not os.path.exists(fname):
             print(f"{i+1:5d} No output file for the dynamical job.")
@@ -319,22 +202,20 @@ class stepping:
             df = pd.DataFrame({self.directory: column})
         return df
 
-    def get_M_dy_avg(self):
+    def get_M_dy_all(self):
         """
         Get the average dynaical magnetization for all orientations.
         """
         df = self.read_M_dy(0, take_B=True)
         Ms = self.read_M_dy(0)
         for i in range(1, self.n_dynamicB_steps):
-            print(i+1)
             column = self.read_M_dy(i)
             # Horizontally stack the dataframes
             Ms = pd.concat([Ms, column], axis=1)
-        df['avg'] = Ms.mean(axis=1)
         df = pd.concat([df, Ms], axis=1)
-
         # Save the data to a csv file
         df.to_csv("M-B_dy.csv", index=False)
+        print(f"All dynamical magnetization data saved to ./M-B_dy.csv")
 
     def remove_directories(self):
         """
@@ -350,11 +231,11 @@ if __name__ == "__main__":
 
     step = stepping()
     # step.create_directories()
-    step.get_inputs()
-    # step.submit_job_array()
+    # step.get_inputs()
+    step.submit_job_array()
     # step.check_all_job_status()
-    # step.get_M_eq_avg()
-    # step.get_M_dy_avg()
+    # step.get_M_eq_all()
+    # step.get_M_dy_all()
 
 
     # =============================================
