@@ -503,7 +503,7 @@ class liouville:
         elif self.Bt_params['Bt_type'] == 'sin':
             outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_sin_amplitude_{:.1f}_omega_{:.2e}/'.format(self.T, self.I0, self.lambdaa, self.Bt_params['amplitude'], self.Bt_params['omega'])
             outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_sin_amplitude_{:.1f}_omega_{:.2e}/'.format(self.T, self.I0, self.lambdaa, self.Bt_params['amplitude'], self.Bt_params['omega'])
-        elif self.Bt_params['Bt_type'] == 'cs':
+        elif self.Bt_params['Bt_type'] == 'cspline':
             outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_cspline/'.format(self.T, self.I0, self.lambdaa)
             outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_cspline/'.format(self.T, self.I0, self.lambdaa)
         else:

@@ -77,7 +77,7 @@ def get_B_cspline():
     Load the monotone cubic spline object for the pulse field
     Units: ps for time and T for magnetic field
     """
-    with open(root_dir + "pulse/cs_pulse.pickle", "rb") as f:
+    with open("./cspline.pickle", "rb") as f:
         B_cs = pickle.load(f)
     return B_cs
 
