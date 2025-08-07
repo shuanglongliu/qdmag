@@ -1,9 +1,9 @@
 import os
-from spin_dynamics.core.common import read_input, many_spins
-from spin_dynamics.core.common import get_h_exchange, get_h_anisotropy
-from spin_dynamics.core.common import get_effective_basis, transform_O, transform_Mv_tot
-from spin_dynamics.core.common import get_equilibrium_occupations, get_equilibrium_occupations_light
-from spin_dynamics.core.effective_basis import get_effective_O, get_effective_Mv
+from qmagnetic.core.common import read_input, many_spins
+from qmagnetic.core.common import get_h_exchange, get_h_anisotropy
+from qmagnetic.core.common import get_effective_basis, transform_O, transform_Mv_tot
+from qmagnetic.core.common import get_equilibrium_occupations, get_equilibrium_occupations_light
+from qmagnetic.core.effective_basis import get_effective_O, get_effective_Mv
 
 if __name__ == "__main__":
 

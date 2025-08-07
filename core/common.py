@@ -5,9 +5,9 @@ import math
 import yaml
 import numpy as np
 import pandas as pd
-from spin_dynamics.core.constants import Tesla2wavenumber, Kelvin2wavenumber
-from spin_dynamics.core.Operators import Operator
-from spin_dynamics.core.StevensOperators import StevensOpA
+from qmagnetic.core.constants import Tesla2wavenumber, Kelvin2wavenumber
+from qmagnetic.core.Operators import Operator
+from qmagnetic.core.StevensOperators import StevensOpA
 
 # ========================
 # Classes
@@ -886,26 +886,26 @@ def get_equilibrium_occupations(h0, Mv_tot, BT_Bgrid, T):
     # Save the results to a file
     create_outdir()
     ostring = "{:8.3f}" + h0.shape[0]*" {:12.3e}" + "\n"
-    with open('./output/eqocc.dat'.format(T), 'w') as f:
+    with open('./output/Ps.dat'.format(T), 'w') as f:
         f.write('# T = {:.3f} K\n'.format(T))
         f.write('# B (Tesla) rho_ii, i=1,...,{:d}\n'.format(h0.shape[0]))
         for i in range(nB):
             f.write(ostring.format(Bs[i], *Ps[i]))
-    print("The equilibrium occupations (probability distribution) are saved in ./output/eqocc.dat")
+    print("The equilibrium occupations (probability distribution) are saved in ./output/Ps.dat")
 
-def get_equilibrium_occupations_light(h0, Mv_tot, Bz, T):
+def get_equilibrium_occupations_light(h0, Mv_tot, B_cart, T):
     """
     Calculate the equilibrium occupations (probability distribution) of the eigenstates 
     of the system under the a magnetic field along z direction.
     """
-    h_zee = get_h_Zeeman_Mv_eff(Mv_tot, [0,0,Bz], 'cartesian')
+    h_zee = get_h_Zeeman_Mv_eff(Mv_tot, B_cart, 'cartesian')
     eigen = eigen_handy(h0 + h_zee)
     _, P = get_partition_function(eigen, T)
     # Save the results to a file
     create_outdir()
     ostring = "{:>6d} {:>12.3e}\n"
     with open('./output/P.dat', 'w') as f:
-        f.write('# Equilibrium occupations at Bz = {:.3f} Tesla and T = {:.3f} K\n'.format(Bz, T))
+        f.write('# Equilibrium occupations at Bx, By, Bz = {:.3f}, {:.3f}, {:.3f} Tesla and T = {:.3f} K\n'.format(*B_cart, T))
         f.write('#    i       rho_ii\n')
         for i in range(eigen.dim):
             f.write(ostring.format(i+1, P[i]))
@@ -986,7 +986,7 @@ def get_M_vs_B(spins, h_ex, h_ani, BT_Bgrid):
     create_outdir()
     # Save the data frame to a CSV file
     df.to_csv("./output/M-B.csv", index=False)
-    print("The magnetization versus B field is saved in ./output/M-B.csv.")
+    print("The magnetization versus B field is saved in ./output/M-B.csv")
     return
 
 def get_M_vs_B_Mv_tot(h0, Mv_tot, BT_Bgrid):

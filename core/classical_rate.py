@@ -3,9 +3,9 @@ import copy
 import numpy as np
 import pandas as pd
 from scipy.linalg import expm
-from spin_dynamics.core.constants import Kelvin2wavenumber, Tesla2wavenumber
-from spin_dynamics.core.common import eigen_simple, get_Mz_from_rho
-from spin_dynamics.core.pulse import get_Bt
+from qmagnetic.core.constants import Kelvin2wavenumber, Tesla2wavenumber
+from qmagnetic.core.common import eigen_simple, get_Mz_from_rho
+from qmagnetic.core.pulse import get_Bt
 
 def get_Pe(energies, T):
     """

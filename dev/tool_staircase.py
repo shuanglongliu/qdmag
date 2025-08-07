@@ -1,1 +1,0 @@
-../tools/tool_staircase.py

@@ -1,7 +1,7 @@
 import numpy as np
-from spin_dynamics.core.common import get_h_exchange, get_h_exchange_iso,  get_h_anisotropy, get_h_Zeeman, eigen_handy
-from spin_dynamics.core.common import transform_O
-from spin_dynamics.core.constants import factor_ex
+from qmagnetic.core.common import get_h_exchange, get_h_exchange_iso,  get_h_anisotropy, get_h_Zeeman, eigen_handy
+from qmagnetic.core.common import transform_O
+from qmagnetic.core.constants import factor_ex
 
 class effective_basis:
     """

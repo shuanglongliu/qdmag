@@ -2,16 +2,17 @@ import os
 import copy
 import numpy as np
 import h5py
+import time
 from filelock import FileLock
 from scipy.linalg import expm
-from spin_dynamics.core.constants import const1, Tesla2wavenumber
-from spin_dynamics.core.common import kronecker_delta, create_outdir
-from spin_dynamics.core.common import get_Mv_from_rho, get_Mz_from_rho
-from spin_dynamics.core.common import eigen_handy, get_h_Zeeman_Mv_eff
-from spin_dynamics.core.common import get_rhoe, back_transform_O
-from spin_dynamics.core.quantum_master import get_Rhbar, update_Rhbar
-from spin_dynamics.core.pulse import get_Bt, get_pulse_RK4_double_grid
-from spin_dynamics.core.hdf5 import get_rho_from_hdf5
+from qmagnetic.core.constants import const1, Tesla2wavenumber
+from qmagnetic.core.common import kronecker_delta, create_outdir
+from qmagnetic.core.common import get_Mv_from_rho, get_Mz_from_rho
+from qmagnetic.core.common import eigen_handy, get_h_Zeeman_Mv_eff
+from qmagnetic.core.common import get_rhoe, back_transform_O
+from qmagnetic.core.quantum_master import get_Rhbar, update_Rhbar
+from qmagnetic.core.pulse import get_Bt, get_pulse_RK4_double_grid
+from qmagnetic.core.hdf5 import get_rho_from_hdf5
 
 r"""
 Codes for solving the quantum master equation described in the Eq. 2.7 of
@@ -426,7 +427,7 @@ class liouville:
             print("B = {:15.6f} T, deltat = {:15.3f}  ps, max(|L|) = {:12.6f}, max(|exp(L * deltat)|) = {:12.6f}\n".format(B, deltat, L_max, expLdeltat_max))
         return (L_max, expLdeltat_max)
 
-    def examine_L_max_and_expLdeltat_max(self, Bs, deltats, tag):
+    def examine_L_max_and_expLdeltat_max(self, Bs, deltats):
         """
         Examine the maximum of the absolute values of the elements of L and exp(L * deltat)
         at various B fields and time steps.
@@ -446,17 +447,17 @@ class liouville:
         # Check if the output directory exists, if not, create it.
         create_outdir()
         # Save L_max in the file L_max.dat
-        with open("./output/L_max_" + tag + ".dat", "w") as f:
+        with open("./output/L_max.dat", "w") as f:
             f.write("# B (T)   L_max\n")
             for i in range(m):
                 f.write( "{:15.6f} {:15.6f}\n".format(Bs[i], L_max[i]) )
-        print("L_max saved to ./output/L_max_" + tag + ".dat")
+        print("L_max saved to ./output/L_max.dat")
         # Save expLdeltat_max in the file expLdeltat_max.dat
-        with open("./output/expLdeltat_max_" + tag + ".dat", "w") as f:
+        with open("./output/expLdeltat_max.dat", "w") as f:
             f.write( ("# B (T)" + n*"   dt = {:.3f} ps" + "\n").format(*deltats) )
             for i in range(m):
                 f.write( ("{:15.6f}" + n*" {:15.6f}" + "\n").format(Bs[i], *expLdeltat_max[i, :]) )
-        print("expLdeltat_max saved to ./output/expLdeltat_max_" + tag + ".dat")
+        print("expLdeltat_max saved to ./output/expLdeltat_max.dat")
 
     def convert_rho_to_risvrho(self, rho):
         """
@@ -492,22 +493,21 @@ class liouville:
             outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1e}/'.format(self.T, self.I0, self.lambdaa, self.Bt_params['sweep_rate'])
             outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1e}/'.format(self.T, self.I0, self.lambdaa, self.Bt_params['sweep_rate'])
         elif self.Bt_params['Bt_type'] == 'pwlinear':
-            times = Bt_params['times']
-            fields = Bt_params['fields']
-            outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/'.format(T, I0, lambdaa)
+            times = self.Bt_params['times']
+            fields = self.Bt_params['fields']
+            outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/'.format(self.T, self.I0, self.lambdaa)
             outdir += 'Bt_pwlinear_t{:.1e}ps-B{:.1f}T'.format(times[0], fields[0])
             for i in range(1, len(times)):
                 outdir += '_t{:.1e}ps-B{:.1f}T'.format(times[i], fields[i])
-        elif self.Bt_params['Bt_type'] == 'pwlinear_by_slope':
-            outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_pwlinear_average_sweep_rate_{:.1e}'.format(self.T, self.I0, self.lambdaa, self.Bt_params['sweep_rate_ave'])
+            outdir += '/'
         elif self.Bt_params['Bt_type'] == 'sin':
-            outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_sin_amplitude_{:.1f}_omega_{:.2e}'.format(self.T, self.I0, self.lambdaa, self.Bt_params['amplitude'], Bt_params['omega'])
-            outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_sin_amplitude_{:.1f}_omega_{:.2e}'.format(self.T, self.I0, self.lambdaa, self.Bt_params['amplitude'], Bt_params['omega'])
+            outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_sin_amplitude_{:.1f}_omega_{:.2e}/'.format(self.T, self.I0, self.lambdaa, self.Bt_params['amplitude'], self.Bt_params['omega'])
+            outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_sin_amplitude_{:.1f}_omega_{:.2e}/'.format(self.T, self.I0, self.lambdaa, self.Bt_params['amplitude'], self.Bt_params['omega'])
         elif self.Bt_params['Bt_type'] == 'cs':
-            outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_cs'.format(self.T, self.I0, self.lambdaa)
-            outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_cs'.format(self.T, self.I0, self.lambdaa)
+            outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_cspline/'.format(self.T, self.I0, self.lambdaa)
+            outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_cspline/'.format(self.T, self.I0, self.lambdaa)
         else:
-            raise ValueError("Invalid Bt_type: {}".format(Bt_params['Bt_type']))
+            raise ValueError("Invalid Bt_type: {}".format(self.Bt_params['Bt_type']))
         outdir = outdir.replace('+', '')
         self.outdir_rho = outdir + dir_rho
         self.outdir_mag = outdir + dir_mag
@@ -524,24 +524,30 @@ class liouville:
         """
         if self.save_rho and self.save_mag:
             # nt_rho should be a multiple of nt_mag
-            self.nround_mag = int( max(self.nt_rho // self.nt_mag, 1) )
+            self.nround_mag = round( max(self.nt_rho // self.nt_mag, 1) )
             self.nt_rho = self.nround_mag * self.nt_mag
             # nt should be a multiple of nt_rho
-            self.nround_rho = int( max((self.tmax - self.tmin)//self.deltat // self.nt_rho, 1) )
+            self.nround_rho = round( max((self.tmax - self.tmin)/self.deltat / self.nt_rho, 1) )
             self.nt = self.nround_rho * self.nt_rho
         elif self.save_rho and (not self.save_mag):
             # nt should be a multiple of nt_rho
-            self.nround_rho = int( (self.tmax - self.tmin)//self.deltat // self.nt_rho )
+            self.nround_rho = round( (self.tmax - self.tmin)/self.deltat / self.nt_rho )
             self.nt = self.nround_rho * self.nt_rho
         elif (not self.save_rho) and self.save_mag:
             # nt should be a multiple of nt_mag
-            self.nround_mag = int( (self.tmax - self.tmin)//self.deltat // self.nt_mag )
+            self.nround_mag = round( (self.tmax - self.tmin)/self.deltat / self.nt_mag )
             self.nt = self.nround_mag * self.nt_mag
         else:
             # the time period should be a multiple of deltat
-            self.nt = int( (self.tmax - self.tmin)//self.deltat )
-        # Adjust the final time
-        self.tmax = self.tmin + self.nt*self.deltat
+            self.nt = round( (self.tmax - self.tmin)/self.deltat )
+        # Check if the parameters are compatible
+        if abs(self.tmax - (self.tmin + self.nt*self.deltat)) >= 1e-3:
+            print("deltat = {:.3f} ps".format(self.deltat))
+            print("nt = {:9d}".format(self.nt))
+            print("tmin = {:.3f} ps".format(self.tmin))
+            print("tmax = {:.3f} ps".format(self.tmax))
+            print("tmin + nt * deltat = {:.3f} ps".format(self.tmax - self.tmin + self.nt*self.deltat))
+            raise ValueError("tmax - tmin is not a multiple of deltat")
 
     def unit_save_rho(self, fobj, t):
         dset = fobj.create_dataset("{:.3f}".format(t), data=self.risvrho)
@@ -774,6 +780,7 @@ class liouville:
             "staircase" for the staircase approximation
             "RK4" for the Runge-Kutta method
         """
+        start = time.time()
         if method == "staircase":
             self.evolve_risvrho_stairs()
         elif method == "RK4":
@@ -784,6 +791,8 @@ class liouville:
             self.evolve_risvrho_steps()
         else:
             raise ValueError("Invalid method: {}".format(method))
+        end = time.time()
+        print(f"The function evolve_rho took {end - start:.2f} seconds using the {method} method.")
     
 # ============================================================================ #
 # Auxilliary functions for constructing the Liouville superoperator.

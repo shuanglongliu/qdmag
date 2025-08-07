@@ -1,7 +1,7 @@
 import os
-from spin_dynamics.core.common import read_input, many_spins, save_eigenvalues, save_eigenvectors
-from spin_dynamics.core.common import get_h_exchange, get_h_anisotropy, get_h_Zeeman, eigen_handy
-from spin_dynamics.core.constants import factor_ex
+from qmagnetic.core.common import read_input, many_spins, save_eigenvalues, save_eigenvectors
+from qmagnetic.core.common import get_h_exchange, get_h_anisotropy, get_h_Zeeman, eigen_handy
+from qmagnetic.core.constants import factor_ex
 
 if __name__ == "__main__":
 

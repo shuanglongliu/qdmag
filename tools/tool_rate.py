@@ -1,12 +1,12 @@
 import os
 import sys
 import time
-from spin_dynamics.core.common import read_input, many_spins
-from spin_dynamics.core.common import get_h_exchange, get_h_anisotropy, get_h_Zeeman, eigen_simple
-from spin_dynamics.core.common import get_effective_basis, transform_O, transform_Mv_tot
-from spin_dynamics.core.effective_basis import get_effective_O, get_effective_Mv
-from spin_dynamics.core.pulse import get_Bt
-from spin_dynamics.core.classical_rate import get_Pe, evolve_P_stairs
+from qmagnetic.core.common import read_input, many_spins
+from qmagnetic.core.common import get_h_exchange, get_h_anisotropy, get_h_Zeeman, eigen_simple
+from qmagnetic.core.common import get_effective_basis, transform_O, transform_Mv_tot
+from qmagnetic.core.effective_basis import get_effective_O, get_effective_Mv
+from qmagnetic.core.pulse import get_Bt
+from qmagnetic.core.classical_rate import get_Pe, evolve_P_stairs
 
 if __name__ == "__main__":
 

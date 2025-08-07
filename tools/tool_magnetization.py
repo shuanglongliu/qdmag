@@ -1,8 +1,8 @@
 import os
-from spin_dynamics.core.common import read_input, many_spins
-from spin_dynamics.core.common import get_h_exchange, get_h_anisotropy
-from spin_dynamics.core.common import get_M_vs_B, get_M_vs_B_Mv_tot
-from spin_dynamics.core.effective_basis import effective_basis
+from qmagnetic.core.common import read_input, many_spins
+from qmagnetic.core.common import get_h_exchange, get_h_anisotropy
+from qmagnetic.core.common import get_M_vs_B, get_M_vs_B_Mv_tot
+from qmagnetic.core.effective_basis import effective_basis
 
 if __name__ == "__main__":
 

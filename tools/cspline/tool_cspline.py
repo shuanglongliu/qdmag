@@ -7,7 +7,7 @@ import pickle
 import numpy as np
 from scipy.interpolate import CubicSpline, PchipInterpolator
 
-def get_cs(basename="pulse"):
+def get_cspline(basename="pulse"):
 
     # File name
     fname = os.path.join(os.path.dirname(__file__), basename + ".dat")
@@ -23,12 +23,12 @@ def get_cs(basename="pulse"):
     cs = PchipInterpolator(data[:, 0], data[:, 1]) # monotone cubic spline
 
     # Save the interpolated function
-    fname = os.path.join(os.path.dirname(__file__), "cs_" + basename + ".pickle")
+    fname = os.path.join(os.path.dirname(__file__), "cspline.pickle")
     with open(fname, "wb") as f:
         pickle.dump(cs, f, pickle.HIGHEST_PROTOCOL)
 
-def load_cs_and_save_file(basename="pulse"):
-    fname = os.path.join(os.path.dirname(__file__), "cs_" + basename + ".pickle")
+def load_cspline_and_save_interplated_data():
+    fname = os.path.join(os.path.dirname(__file__), "cspline.pickle")
     with open(fname, "rb") as f:
         cs = pickle.load(f)
 
@@ -36,16 +36,16 @@ def load_cs_and_save_file(basename="pulse"):
     xs = np.linspace(0, 1e10, nx, endpoint=True)
     ys = cs(xs)
 
-    fname = os.path.join(os.path.dirname(__file__), basename + "_interpolate.dat")
+    fname = os.path.join(os.path.dirname(__file__), "cspline.dat")
     with open(fname, "w") as f:
         for i in range(nx):
             f.write("{:18.6f} {:12.6f}\n".format(xs[i], ys[i]))
 
 if __name__ == "__main__":
 
-    # get_cs("pulse1")
+    # get_cspline("pulse")
 
-    # load_cs_and_save_file("pulse1")
+    # load_cspline_and_save_interplated_data()
 
     pass
 

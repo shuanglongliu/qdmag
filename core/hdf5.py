@@ -18,8 +18,16 @@ def get_hdf5_file_size(t, dt, dimds):
     """
     bitsperfloat64 = 64 # bits per double precision float
     bit2byte = 8 # factor for converting bits to bytes
+    byte2Kb = 1024 # factor for converting bytes to Kb
+    byte2Mb = 1024 * 1024 # factor for converting bytes to Mb
     byte2Gb = 1024 * 1024 * 1024 # factor for converting bytes to Gb
-    fsize = ( t / dt ) * dimds * bitsperfloat64 / bit2byte / byte2Gb
+    fsize = ( t / dt + 1) * dimds * bitsperfloat64 / bit2byte
+    print("File size of hdf5 file: {:.2f} bytes".format(fsize))
+    fsize = ( t / dt + 1) * dimds * bitsperfloat64 / bit2byte / byte2Kb
+    print("File size of hdf5 file: {:.2f} Kb".format(fsize))
+    fsize = ( t / dt + 1) * dimds * bitsperfloat64 / bit2byte / byte2Mb
+    print("File size of hdf5 file: {:.2f} Mb".format(fsize))
+    fsize = ( t / dt + 1) * dimds * bitsperfloat64 / bit2byte / byte2Gb
     print("File size of hdf5 file: {:.2f} Gb".format(fsize))
 
 def combine_hdf5_files(file1, file2, output_file):
