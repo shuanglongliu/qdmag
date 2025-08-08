@@ -43,30 +43,25 @@ class effective_basis:
             The eigenvalues are sorted automatically by np.linalg.eigh.
           Sz_pool: the Sz operator on the pool basis (in the S representation).
         """
-        if self.spins.nS == 1:
+        if self.spins.nS == 1 or (isinstance(states, str) and (states == "all" or states == "full")):
             # For a single spin, use the full Hilbert space.
             self.dim = self.spins.dim
+            self.states = list(range(self.dim))
             h_zee = get_h_Zeeman(self.spins, [0.,0.,1e-4], 'cartesian')
             self.eigen_pool = eigen_handy(h_zee)
-            if len(states) == 0:
-                # If no states are provided, use the full Hilbert space.
-                self.states = list(range(self.dim))
-            else:
-                # The indices are specified in the input file.
-                if len(states) == self.dim:
-                    self.states = states
-                else:
-                    print("Error: The number of states provided does not match the dimension of the Hilbert space. Stopping ...")
-                    exit(1)
             self.Sz_pool = transform_O(self.spins.Sv_tot[2], self.eigen_pool)
             self.Sz_pool = np.real(self.Sz_pool)
         else:
             # For a multi-spin system, use a subspace based on the isotropic exchange interaction and a small Zeeman field.
             h_ex_iso = get_h_exchange_iso(self.spins, self.exchange, factor_ex)
+            # Check is h_ex_iso is zero
+            if np.all(np.isclose(h_ex_iso, 0.0)):
+                print("Warning: The isotropic exchange interaction is zero. The default effective basis may not be suitable.")
             h_zee = get_h_Zeeman(self.spins, [0.0, 0.0, 1e-4], 'cartesian')
             h = h_ex_iso + h_zee
             self.eigen_pool = eigen_handy(h)
-            if len(states) == 0:
+            if len(states) == 0 or (isinstance(states, str) and (states == "default")):
+                print("Using the default effective basis.")
                 # If no indices are provided, use the minimal basis.
                 self.states = []
                 self.dim = int(2*self.spins.Smax + 1)
