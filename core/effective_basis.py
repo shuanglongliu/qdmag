@@ -38,18 +38,31 @@ class effective_basis:
         Returns:
           dim: the dimension of the effective Hilbert space.
           indices: the indices of the selected states in the pool.
-          eigen_pool: a pool of candidate states for the effective basis in the S representation.
+          eigen_S: a pool of candidate states for the effective basis in the S representation.
             It contains the eigenvalues and eigenvectors
             The eigenvalues are sorted automatically by np.linalg.eigh.
           Sz_pool: the Sz operator on the pool basis (in the S representation).
         """
-        if self.spins.nS == 1 or (isinstance(states, str) and (states == "all" or states == "full")):
+        if self.spins.nS == 1:
             # For a single spin, use the full Hilbert space.
             self.dim = self.spins.dim
             self.states = list(range(self.dim))
+            # Two choices of eigen_S:
+            # 1. Use the eigenstates of the Zeeman term
+            # h_zee = get_h_Zeeman(self.spins, [0.,0.,1e-4], 'cartesian')
+            # self.eigen_S = eigen_handy(h_zee)
+            # 2. Use the eigenstates of Sz.
+            self.eigen_S = eigen_handy(self.spins.Sv_tot[2])
+            self.Sz_pool = transform_O(self.spins.Sv_tot[2], self.eigen_S)
+            self.Sz_pool = np.real(self.Sz_pool)
+            # It dodes not solve the divergence problem to use the eigenstates of Sn = en_x*Sx + en_y*Sy + en_z*Sz as the basis for time evolution.
+        elif isinstance(states, str) and (states == "all" or states == "full"):
+            # For a multi-spin system, use the full Hilbert space.
+            self.dim = self.spins.dim
+            self.states = list(range(self.dim))
             h_zee = get_h_Zeeman(self.spins, [0.,0.,1e-4], 'cartesian')
-            self.eigen_pool = eigen_handy(h_zee)
-            self.Sz_pool = transform_O(self.spins.Sv_tot[2], self.eigen_pool)
+            self.eigen_S = eigen_handy(h_zee)
+            self.Sz_pool = transform_O(self.spins.Sv_tot[2], self.eigen_S)
             self.Sz_pool = np.real(self.Sz_pool)
         else:
             # For a multi-spin system, use a subspace based on the isotropic exchange interaction and a small Zeeman field.
@@ -59,13 +72,13 @@ class effective_basis:
                 print("Warning: The isotropic exchange interaction is zero. The default effective basis may not be suitable.")
             h_zee = get_h_Zeeman(self.spins, [0.0, 0.0, 1e-4], 'cartesian')
             h = h_ex_iso + h_zee
-            self.eigen_pool = eigen_handy(h)
+            self.eigen_S = eigen_handy(h)
             if len(states) == 0 or (isinstance(states, str) and (states == "default")):
                 print("Using the default effective basis.")
                 # If no indices are provided, use the minimal basis.
                 self.states = []
                 self.dim = int(2*self.spins.Smax + 1)
-                self.Sz_pool = transform_O(self.spins.Sv_tot[2], self.eigen_pool)
+                self.Sz_pool = transform_O(self.spins.Sv_tot[2], self.eigen_S)
                 self.Sz_pool = np.real(self.Sz_pool)
                 for i in range(self.dim):
                     Sz_target = -self.spins.Smax + i
@@ -77,7 +90,7 @@ class effective_basis:
                 # The indices are specified in the the input file.
                 self.states = states
                 self.dim = len(self.states)
-                self.Sz_pool = transform_O(self.spins.Sv_tot[2], self.eigen_pool)
+                self.Sz_pool = transform_O(self.spins.Sv_tot[2], self.eigen_S)
                 self.Sz_pool = np.real(self.Sz_pool)
 
     def construct_X_eff(self):
@@ -101,7 +114,7 @@ class effective_basis:
         the full operator O_full defined on the initial common basis.
         """
         # Transform the operator O_full onto the pool basis.
-        O_pool = transform_O(O_full, self.eigen_pool)
+        O_pool = transform_O(O_full, self.eigen_S)
         # np.complex64 is not enough to capture the energy differences between the nearly degenerate states (which are indeed degenerate without perturbation).
         O_eff = np.zeros((self.dim, self.dim), dtype=np.complex128)
         for i in range(self.dim):
@@ -116,9 +129,9 @@ class effective_basis:
         Get the effective spin operators in the effective Hilbert space.
         """
         # Transform the spin operators onto the pool basis.
-        Sx_pool = transform_O(self.spins.Sv_tot[0], self.eigen_pool)
-        Sy_pool = transform_O(self.spins.Sv_tot[1], self.eigen_pool)
-        Sz_pool = transform_O(self.spins.Sv_tot[2], self.eigen_pool)
+        Sx_pool = transform_O(self.spins.Sv_tot[0], self.eigen_S)
+        Sy_pool = transform_O(self.spins.Sv_tot[1], self.eigen_S)
+        Sz_pool = transform_O(self.spins.Sv_tot[2], self.eigen_S)
         # Effective spin operators in the effective Hilbert space.
         # np.complex64 is not enough to capture the energy differences between the nearly degenerate states (which are indeed degenerate without perturbation).
         self.Sx_eff = np.zeros((self.dim, self.dim), dtype=np.complex128)
@@ -138,9 +151,9 @@ class effective_basis:
         Get the effective magnetization operators in the effective Hilbert space.
         """
         # Transform the magnetization operators onto the pool basis.
-        Mx_pool = transform_O(self.spins.Mv_tot[0], self.eigen_pool)
-        My_pool = transform_O(self.spins.Mv_tot[1], self.eigen_pool)
-        Mz_pool = transform_O(self.spins.Mv_tot[2], self.eigen_pool)
+        Mx_pool = transform_O(self.spins.Mv_tot[0], self.eigen_S)
+        My_pool = transform_O(self.spins.Mv_tot[1], self.eigen_S)
+        Mz_pool = transform_O(self.spins.Mv_tot[2], self.eigen_S)
         # Effective magnetization operators in the effective Hilbert space.
         # np.complex64 is not enough to capture the energy differences between the nearly degenerate states (which are indeed degenerate without perturbation).
         self.Mx_eff = np.zeros((self.dim, self.dim), dtype=np.complex128)
@@ -179,7 +192,7 @@ class effective_basis:
                 h_ani = get_h_anisotropy(self.spins, self.anisotropy)
                 h = h_ex + h_ani
         # Transform the Hamiltonian onto the pool basis.
-        h_pool = transform_O(h, self.eigen_pool)
+        h_pool = transform_O(h, self.eigen_S)
         # Get the effective Hamiltonian in the effective Hilbert space.
         self.h0_eff = np.zeros((self.dim, self.dim), dtype=np.complex128)
         for i in range(self.dim):
@@ -187,4 +200,18 @@ class effective_basis:
                 ii = self.states[i]
                 jj = self.states[j]
                 self.h0_eff[i, j] = h_pool[ii, jj]
+        # Hermitianize the Hamitonian if it is not Hermitian.
+        tolerance = 1e-12
+        deviation = np.abs(np.conjugate(np.transpose(self.h0_eff)) - self.h0_eff)
+        if np.isclose(deviation, tolerance).all():
+            pass
+        else:
+            print("Warning: The Hamiltonian is not Hermitian. Hermitianizing ...")
+            self.h0_eff = (self.h0_eff + np.conjugate(np.transpose(self.h0_eff))) / 2.0
+            deviation = np.abs(np.conjugate(np.transpose(self.h0_eff)) - self.h0_eff)
+            if np.isclose(deviation, tolerance).all():
+                print("The Hamiltonian is now Hermitian.")
+            else:
+                print("Error: The Hamiltonian is still not Hermitian after Hermitianization. Stopping ...")
+                exit(1)
 

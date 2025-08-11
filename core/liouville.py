@@ -417,16 +417,6 @@ class liouville:
         self.L[self.dims:self.dimds,         0: self.dims] = self.L0[self.dims:self.dimds,         0: self.dims] - c1Azeere - (factorCim - factorCSTim)
         self.L[self.dims:self.dimds, self.dims:self.dimds] = self.L0[self.dims:self.dimds, self.dims:self.dimds] + c1Azeeim - (factorCre - factorCSTre)
 
-    def get_L_max_and_expLdeltat_max(self, B, deltat, verbose=False):
-        """
-        Get the maximum of the absolute values of the elements of L and exp(L * deltat) at the given magnetic field B and time step deltat.
-        """
-        self.update_L_under_magnetic_field(B)
-        L_max, expLdeltat_max = np.max(np.abs(self.L)), np.max(np.abs(expm(self.L*deltat)))
-        if verbose:
-            print("B = {:15.6f} T, deltat = {:15.3f}  ps, max(|L|) = {:12.6f}, max(|exp(L * deltat)|) = {:12.6f}\n".format(B, deltat, L_max, expLdeltat_max))
-        return (L_max, expLdeltat_max)
-
     def examine_L_max_and_expLdeltat_max(self, Bs, deltats):
         """
         Examine the maximum of the absolute values of the elements of L and exp(L * deltat)
@@ -441,9 +431,11 @@ class liouville:
         expLdeltat_max = np.zeros((m, n))
         # Get the maximum of the absolute values of the elements of L and exp(L * deltat)
         for i in range(m):
+            self.update_L_under_magnetic_field(Bs[i])
+            L_max[i] = np.max(np.abs(self.L))
             for j in range(n):
                 print("Examining B = {:15.6f} T, deltat = {:15.3f} ps ...".format(Bs[i], deltats[j]))
-                L_max[i], expLdeltat_max[i, j] = self.get_L_max_and_expLdeltat_max(Bs[i], deltats[j])
+                expLdeltat_max[i, j] = np.max(np.abs(expm(self.L*deltats[j])))
         # Check if the output directory exists, if not, create it.
         create_outdir()
         # Save L_max in the file L_max.dat
