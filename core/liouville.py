@@ -12,7 +12,7 @@ from qmagnetic.core.common import eigen_handy, get_h_Zeeman_Mv_eff
 from qmagnetic.core.common import get_rhoe, back_transform_O
 from qmagnetic.core.quantum_master import get_Rhbar, update_Rhbar
 from qmagnetic.core.pulse import get_Bt, get_pulse_RK4_double_grid
-from qmagnetic.core.hdf5 import get_rho_from_hdf5
+from qmagnetic.core.hdf5 import get_risvrho_from_hdf5
 
 r"""
 Codes for solving the quantum master equation described in the Eq. 2.7 of
@@ -145,7 +145,7 @@ class liouville:
             if t_init is None:
                 raise ValueError("Initial time must be provided if from_file is True.")
             # Read the initial density matrix from a file
-            self.risvrho = get_rho_from_hdf5(fname, t_init, self.dimds)
+            self.risvrho = get_risvrho_from_hdf5(fname, t_init, self.dimds)
         else:
             # Solve the eigenvalue problem for the Hamiltonian at the initial time, which is on the effective basis
             eigen = eigen_handy(self.h)
