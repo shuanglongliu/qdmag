@@ -477,7 +477,7 @@ def get_h_Zeeman(spins, Bv, coord):
     r""" 
     Zeeman term H_Zee = - \vec{\mu} \cdot \vec{B} = \mu_B/\hbar \vec{B}[i] g_s[i,j] \vec{S}[j]
                       = \vec{B}[i] g_s[i,j] \vec{S}[j]
-    In the last line, B takes unit of energy (cm^-1 per \mu_B), and spin takes unit of \hbar.
+    B takes unit of energy (cm^-1 per \mu_B), and spin takes unit of \hbar.
     coord: 's*' (for spherical) or else (for cartesian).
     Units: Tesla for B, deg for angles.
     """
@@ -490,6 +490,27 @@ def get_h_Zeeman(spins, Bv, coord):
     h_zee = spins.zero
     for i in range(3):
         h_zee = h_zee - Bv[i]*spins.Mv_tot[i]
+
+    return h_zee
+
+def get_h_Zeeman_iso(spins, Bv, coord):
+    r""" 
+    Zeeman term H_Zee = - \vec{\mu} \cdot \vec{B} = \mu_B/\hbar \vec{B}[i] g_s[i,j] \vec{S}[j]
+                      = \vec{B}[i] g_s[i,j] \vec{S}[j]
+                      = -2 \vec{B}[i] \vec{S}[i] # Iostropic g-factor
+    B takes unit of energy (cm^-1 per \mu_B), and spin takes unit of \hbar.
+    coord: 's*' (for spherical) or else (for cartesian).
+    Units: Tesla for B, deg for angles.
+    """
+
+    if coord[0] == 's' or coord[0] == 'S':
+        Bv = Tesla2wavenumber*np.array(sph2cart_deg(Bv))
+    else:
+        Bv = Tesla2wavenumber*np.array(Bv)
+    
+    h_zee = spins.zero
+    for i in range(3):
+        h_zee = h_zee  + 2.0*Bv[i]*spins.Sv_tot[i]
 
     return h_zee
 

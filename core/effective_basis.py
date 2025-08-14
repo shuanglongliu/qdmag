@@ -48,10 +48,10 @@ class effective_basis:
             self.dim = self.spins.dim
             self.states = list(range(self.dim))
             # Two choices of eigen_S:
-            # 1. Use the eigenstates of the Zeeman term
-            # h_zee = get_h_Zeeman(self.spins, [0.,0.,1e-4], 'cartesian')
-            # self.eigen_S = eigen_handy(h_zee)
-            # 2. Use the eigenstates of Sz.
+            # 1. Use the eigenstates of the isotropic Zeeman term
+            # h_zee_iso = get_h_Zeeman_iso(self.spins, [0.,0.,1e-4], 'cartesian')
+            # self.eigen_S = eigen_handy(h_zee_iso)
+            # 2. Use the eigenstates of Sz. (Same as the first choice.)
             self.eigen_S = eigen_handy(self.spins.Sv_tot[2])
             self.Sz_pool = transform_O(self.spins.Sv_tot[2], self.eigen_S)
             self.Sz_pool = np.real(self.Sz_pool)
@@ -60,15 +60,15 @@ class effective_basis:
             # For a multi-spin system, use the full Hilbert space.
             self.dim = self.spins.dim
             self.states = list(range(self.dim))
-            # 1. Use the eigenstates of the Zeeman term
-            # h_zee = get_h_Zeeman(self.spins, [0.,0.,1e-4], 'cartesian')
-            # self.eigen_S = eigen_handy(h_zee)
-            # 2. Use the eigenstates of Sz.
+            # 1. Use the eigenstates of the isotropic Zeeman term
+            # h_zee_iso = get_h_Zeeman_iso(self.spins, [0.,0.,1e-4], 'cartesian')
+            # self.eigen_S = eigen_handy(h_zee_iso)
+            # 2. Use the eigenstates of Sz. (Same as the first choice.)
             # self.eigen_S = eigen_handy(self.spins.Sv_tot[2])
-            # 3. Use the eigenstates of h_ex_iso + h_zee.
+            # 3. Use the eigenstates of h_ex_iso + h_zee_iso.
             h_ex_iso = get_h_exchange_iso(self.spins, self.exchange, factor_ex)
-            h_zee = get_h_Zeeman(self.spins, [0.0, 0.0, 1e-4], 'cartesian')
-            h = h_ex_iso + h_zee
+            h_zee_iso = get_h_Zeeman_iso(self.spins, [0.0, 0.0, 1e-4], 'cartesian')
+            h = h_ex_iso + h_zee_iso
             self.eigen_S = eigen_handy(h)
             self.Sz_pool = transform_O(self.spins.Sv_tot[2], self.eigen_S)
             self.Sz_pool = np.real(self.Sz_pool)
@@ -78,8 +78,8 @@ class effective_basis:
             # Check is h_ex_iso is zero
             if np.all(np.isclose(h_ex_iso, 0.0)):
                 print("Warning: The isotropic exchange interaction is zero. The default effective basis may not be suitable.")
-            h_zee = get_h_Zeeman(self.spins, [0.0, 0.0, 1e-4], 'cartesian')
-            h = h_ex_iso + h_zee
+            h_zee_iso = get_h_Zeeman_iso(self.spins, [0.0, 0.0, 1e-4], 'cartesian')
+            h = h_ex_iso + h_zee_iso
             self.eigen_S = eigen_handy(h)
             if len(states) == 0 or (isinstance(states, str) and (states == "default")):
                 print("Using the default effective basis.")
@@ -94,12 +94,15 @@ class effective_basis:
                         if abs(self.Sz_pool[j, j] - Sz_target) < 1e-6:
                             self.states.append(j)
                             break
-            else:
+            elif isinstance(states, list) and len(states) > 0:
                 # The indices are specified in the the input file.
                 self.states = states
                 self.dim = len(self.states)
                 self.Sz_pool = transform_O(self.spins.Sv_tot[2], self.eigen_S)
                 self.Sz_pool = np.real(self.Sz_pool)
+            else:
+                print("Error: Invalid states input. It should be a list of indices, an empty list (same as 'default'), 'default', or 'all'/'full'. Stopping ...")
+                exit(1)
 
     def construct_X_eff(self):
         """
