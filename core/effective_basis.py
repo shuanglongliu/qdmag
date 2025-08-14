@@ -1,5 +1,5 @@
 import numpy as np
-from qmagnetic.core.common import get_h_exchange, get_h_exchange_iso,  get_h_anisotropy, get_h_Zeeman, eigen_handy
+from qmagnetic.core.common import get_h_exchange, get_h_exchange_iso,  get_h_anisotropy, get_h_Zeeman, get_h_Zeeman_iso, eigen_handy
 from qmagnetic.core.common import transform_O
 from qmagnetic.core.constants import factor_ex
 
