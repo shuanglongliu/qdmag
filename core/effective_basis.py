@@ -60,8 +60,16 @@ class effective_basis:
             # For a multi-spin system, use the full Hilbert space.
             self.dim = self.spins.dim
             self.states = list(range(self.dim))
-            h_zee = get_h_Zeeman(self.spins, [0.,0.,1e-4], 'cartesian')
-            self.eigen_S = eigen_handy(h_zee)
+            # 1. Use the eigenstates of the Zeeman term
+            # h_zee = get_h_Zeeman(self.spins, [0.,0.,1e-4], 'cartesian')
+            # self.eigen_S = eigen_handy(h_zee)
+            # 2. Use the eigenstates of Sz.
+            # self.eigen_S = eigen_handy(self.spins.Sv_tot[2])
+            # 3. Use the eigenstates of h_ex_iso + h_zee.
+            h_ex_iso = get_h_exchange_iso(self.spins, self.exchange, factor_ex)
+            h_zee = get_h_Zeeman(self.spins, [0.0, 0.0, 1e-4], 'cartesian')
+            h = h_ex_iso + h_zee
+            self.eigen_S = eigen_handy(h)
             self.Sz_pool = transform_O(self.spins.Sv_tot[2], self.eigen_S)
             self.Sz_pool = np.real(self.Sz_pool)
         else:
