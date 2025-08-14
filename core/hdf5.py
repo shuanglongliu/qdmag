@@ -1,10 +1,45 @@
 import h5py
 import numpy as np
 
-def get_rho_from_hdf5(fname, t, dimds):
+def get_risvrho_from_hdf5(fname, t, dimds):
     with h5py.File(fname, "r") as f1:
-        rho = np.array( f1["{:.3f}".format(t)][0:dimds] )
-    return rho
+        risvrho = np.array( f1["{:.3f}".format(t)][0:dimds] )
+    return risvrho
+
+def check_conditions_of_rho(fname, t, lio, tolerance=1e-6):
+    with h5py.File(fname, "r") as f1:
+        risvrho = f1["{:.3f}".format(t)][0:lio.dimds]
+    rho_re = risvrho[0:lio.dims]
+    rho_im = risvrho[lio.dims:lio.dimds]
+    rho = np.reshape(rho_re + 1j * rho_im, (lio.dim, lio.dim))
+    is_normalized = 0
+    is_hermitian = 0
+    is_positive = 0
+    is_cschineq = 0
+    # Check if the trace is 1
+    trace_rho = np.trace(rho)
+    if np.abs(trace_rho - 1) < tolerance:
+        is_normalized = 1
+    # Check if the density matrix is Hermitian
+    if np.allclose(rho, rho.conj().T, atol=tolerance):
+        is_hermitian = 1
+    # Check if the density matrix is positive semi-definite
+    eigenvalues = np.linalg.eigvalsh(rho)
+    if np.all(eigenvalues >= -tolerance):
+        is_positive = 1
+    # Check if the Cauchy-Schwarz inequality holds, |\rho_ij|^2 <= \rho_ii * \rho_jj
+    rhosq = np.abs(rho)**2
+    np.fill_diagonal(rhosq, 0)
+    if np.all(np.outer(np.diag(rho), np.diag(rho)) - rhosq >= tolerance):
+        is_cschineq = 1
+    # Print the results
+    print("Conditions for the density matrix:")
+    print("Normalized: ", is_normalized)
+    print("Hermitian: ", is_hermitian)
+    print("Positive semi-definite: ", is_positive)
+    print("Cauchy-Schwarz inequality: ", is_cschineq)
+    return is_normalized, is_hermitian, is_positive, is_cschineq
+
 
 def get_hdf5_file_size(t, dt, dimds):
     """
