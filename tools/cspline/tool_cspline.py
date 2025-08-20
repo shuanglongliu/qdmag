@@ -33,7 +33,7 @@ def load_cspline_and_save_interplated_data():
         cs = pickle.load(f)
 
     nx = 101
-    xs = np.linspace(0, 1e10, nx, endpoint=True)
+    xs = np.linspace(0, 0.1e9, nx, endpoint=True)
     ys = cs(xs)
 
     fname = os.path.join(os.path.dirname(__file__), "cspline.dat")
@@ -45,7 +45,7 @@ if __name__ == "__main__":
 
     # get_cspline("pulse")
 
-    # load_cspline_and_save_interplated_data()
+    load_cspline_and_save_interplated_data()
 
     pass
 
