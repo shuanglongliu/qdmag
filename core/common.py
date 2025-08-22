@@ -786,7 +786,7 @@ def get_Mv_from_rho(rho, Mv_tot):
     """
     Mv = []
     for i in range(3):
-        Mi = np.trace( np.matmul(rho, Mv_tot[i]) )
+        Mi = np.real( np.trace( np.matmul(rho, Mv_tot[i]) ) )
         Mv.append(Mi)
     return Mv
 

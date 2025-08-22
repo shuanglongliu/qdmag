@@ -3,6 +3,7 @@ import copy
 import numpy as np
 import h5py
 import time
+import pandas as pd
 from filelock import FileLock
 from scipy.linalg import expm
 from qmagnetic.core.constants import const1, Tesla2wavenumber
@@ -509,7 +510,7 @@ class liouville:
             os.makedirs(self.outdir_mag)
         # Output files
         self.frho = self.outdir_rho + '/{:.3f}-{:.3f}ps_dt{:.3f}ps.h5'.format(self.tmin, self.tmax, self.deltat)
-        self.fmag = self.outdir_mag + '/{:.3f}-{:.3f}ps_dt{:.3f}ps.dat'.format(self.tmin, self.tmax, self.deltat)
+        self.fmag = self.outdir_mag + '/{:.3f}-{:.3f}ps_dt{:.3f}ps.csv'.format(self.tmin, self.tmax, self.deltat)
     
     def set_up_loop(self):
         """
@@ -544,11 +545,17 @@ class liouville:
     def unit_save_rho(self, fobj, t):
         dset = fobj.create_dataset("{:.3f}".format(t), data=self.risvrho)
 
-    def unit_save_mag(self, fobj, t):
-        Mz = self.get_Mz_from_risvrho()
-        chimz = self.get_chimz_from_risvrho(t)
-        fobj.write("{:20.3f} {:20.6E} {:20.8E} {:20.8E}\n".format(t, self.Bt(t), Mz, chimz))
+    def unit_save_mag(self, fobj, t, header=False):
+        Mv = self.get_Mv_from_risvrho()
+        df = pd.DataFrame([{'t': t, 'B': self.Bt(t), 'Mx': Mv[0], 'My': Mv[1], 'Mz': Mv[2]}])
+        df.to_csv(fobj, header=header, index=False)
     
+        # Save only the Mz and the magnetic susceptibility, used in early versions of the code
+        # Mz = self.get_Mz_from_risvrho()
+        # chimz = self.get_chimz_from_risvrho(t)
+        # df = pd.DataFrame([{'t': t, 'B': self.Bt(t), 'Mz': Mz, 'chimz': chimz}])
+        # df.to_csv(fobj, header=header, index=False)
+
     def evolve_risvrho_onestair(self, it):
         """
         Evolve rho by deltat of constant Bfield using the analytical solution of the quantum master equation
@@ -579,7 +586,7 @@ class liouville:
             with h5py.File(self.frho, 'w') as f1,  open(self.fmag, 'w') as f2:
                 # Save the initial density matrix, magnetic moment, and the magnetic susceptibility
                 self.unit_save_rho(f1, self.tmin)
-                self.unit_save_mag(f2, self.tmin)
+                self.unit_save_mag(f2, self.tmin, header=True)
                 # Loop over the rounds for saving the RI-separated vectorized density matrix
                 for iround_rho in range(self.nround_rho):
                     # Loop over the rounds for saving the magnetic properties
@@ -610,7 +617,7 @@ class liouville:
         elif (not self.save_rho) and self.save_mag:
             with open(self.fmag, 'w') as f2:
                 # Save the initial magnetic moment and the magnetic susceptibility
-                self.unit_save_mag(f2, self.tmin)
+                self.unit_save_mag(f2, self.tmin, header=True)
                 # Loop over the rounds for saving the magnetic moment
                 for iround_mag in range(self.nround_mag):
                     # Loop over the self.nt_mag time steps
