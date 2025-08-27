@@ -80,6 +80,7 @@ class effective_basis:
                 print("Warning: The isotropic exchange interaction is zero. The default effective basis may not be suitable.")
             h_zee_iso = get_h_Zeeman_iso(self.spins, [0.0, 0.0, 1e-4], 'cartesian')
             h = h_ex_iso + h_zee_iso
+            # h = h_ex_iso + h_zee_iso + 1e-6 * self.spins.S2_tot  # Add a small S^2 term to lift the degeneracy of S.
             self.eigen_S = eigen_handy(h)
             if len(states) == 0 or (isinstance(states, str) and (states == "default")):
                 print("Using the default effective basis.")
