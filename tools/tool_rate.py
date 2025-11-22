@@ -1,12 +1,12 @@
 import os
 import sys
 import time
-from qmagnetic.core.common import read_input, many_spins
-from qmagnetic.core.common import get_h_exchange, get_h_anisotropy, get_h_Zeeman, eigen_simple
-from qmagnetic.core.common import get_effective_basis, transform_O, transform_Mv_tot
-from qmagnetic.core.effective_basis import get_effective_O, get_effective_Mv
-from qmagnetic.core.pulse import get_Bt
-from qmagnetic.core.classical_rate import get_Pe, evolve_P_stairs
+from qdmag.core.common import read_input, many_spins
+from qdmag.core.common import get_h_exchange, get_h_anisotropy, get_h_Zeeman, eigen_simple
+from qdmag.core.common import get_effective_basis, transform_O, transform_Mv_tot
+from qdmag.core.effective_basis import get_effective_O, get_effective_Mv
+from qdmag.core.pulse import get_Bt
+from qdmag.core.classical_rate import get_Pe, evolve_P_stairs
 
 if __name__ == "__main__":
 

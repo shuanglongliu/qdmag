@@ -3,7 +3,7 @@
 # The original code is licensed under the GPL-3.0 license
 
 import numpy as np
-from qmagnetic.core.Operators import Operator, LSOperator
+from qdmag.core.Operators import Operator, LSOperator
 
 
 # Modified by SLL @ UF, Mar 22, 2023

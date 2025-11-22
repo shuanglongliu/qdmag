@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from qmagnetic.core.common import create_outdir
+from qdmag.core.common import create_outdir
 
 def check_hermitian(op):
     maxdiff = np.max( np.absolute( np.conjugate(np.transpose(op)) - op ) )

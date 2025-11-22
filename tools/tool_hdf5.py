@@ -1,4 +1,4 @@
-from qmagnetic.core.hdf5 import get_hdf5_file_size, combine_hdf5_files, check_hdf5
+from qdmag.core.hdf5 import get_hdf5_file_size, combine_hdf5_files, check_hdf5
 
 if __name__ == "__main__":
     

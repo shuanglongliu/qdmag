@@ -6,14 +6,14 @@ import time
 import pandas as pd
 from filelock import FileLock
 from scipy.linalg import expm
-from qmagnetic.core.constants import const1, Tesla2wavenumber
-from qmagnetic.core.common import kronecker_delta, create_outdir
-from qmagnetic.core.common import get_Mv_from_rho, get_Mz_from_rho
-from qmagnetic.core.common import eigen_handy, get_h_Zeeman_Mv_eff
-from qmagnetic.core.common import get_rhoe, back_transform_O
-from qmagnetic.core.quantum_master import get_Rhbar, update_Rhbar
-from qmagnetic.core.pulse import get_Bt, get_pulse_RK4_double_grid
-from qmagnetic.core.hdf5 import get_risvrho_from_hdf5
+from qdmag.core.constants import const1, Tesla2wavenumber
+from qdmag.core.common import kronecker_delta, create_outdir
+from qdmag.core.common import get_Mv_from_rho, get_Mz_from_rho
+from qdmag.core.common import eigen_handy, get_h_Zeeman_Mv_eff
+from qdmag.core.common import get_rhoe, back_transform_O
+from qdmag.core.quantum_master import get_Rhbar, update_Rhbar
+from qdmag.core.pulse import get_Bt, get_pulse_RK4_double_grid
+from qdmag.core.hdf5 import get_risvrho_from_hdf5
 
 r"""
 Codes for solving the quantum master equation described in the Eq. 2.7 of

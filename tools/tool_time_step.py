@@ -5,7 +5,7 @@ import subprocess
 import numpy as np
 import pandas as pd
 from scipy.spatial.transform import Rotation as R
-from qmagnetic.core.common import print_emat_array
+from qdmag.core.common import print_emat_array
 
 root_dir = os.path.dirname(os.path.abspath(__file__)) + '/'
 
@@ -116,10 +116,10 @@ job_array = """#!/bin/bash -l
 cd ./$SLURM_ARRAY_TASK_ID || exit 1
 
 # Thermal equilibrium
-python /home/shuan.liu.neu/git/qmagnetic/tools/tool_magnetization.py
+python /home/shuan.liu.neu/git/qdmag/tools/tool_magnetization.py
 
 # Dynamics
-python /home/shuan.liu.neu/git/qmagnetic/tools/tool_staircase.py
+python /home/shuan.liu.neu/git/qdmag/tools/tool_staircase.py
 """
 
 class stepping:

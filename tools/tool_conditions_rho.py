@@ -1,10 +1,10 @@
 import os
 import math
 import numpy as np
-from qmagnetic.core.common import read_input, many_spins
-from qmagnetic.core.effective_basis import effective_basis
-from qmagnetic.core.liouville import liouville
-from qmagnetic.core.hdf5 import check_conditions_of_rho
+from qdmag.core.common import read_input, many_spins
+from qdmag.core.effective_basis import effective_basis
+from qdmag.core.liouville import liouville
+from qdmag.core.hdf5 import check_conditions_of_rho
 
 if __name__ == "__main__":
 

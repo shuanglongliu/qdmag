@@ -1,7 +1,7 @@
 import os
-from qmagnetic.core.common import read_input, many_spins, save_spins
-from qmagnetic.core.common import get_h_exchange, get_h_anisotropy, get_h_Zeeman, eigen_handy
-from qmagnetic.core.constants import factor_ex
+from qdmag.core.common import read_input, many_spins, save_spins
+from qdmag.core.common import get_h_exchange, get_h_anisotropy, get_h_Zeeman, eigen_handy
+from qdmag.core.constants import factor_ex
 
 if __name__ == "__main__":
 

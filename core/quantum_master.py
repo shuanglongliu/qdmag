@@ -1,8 +1,8 @@
 import os
 import subprocess
 import numpy as np
-from qmagnetic.core.constants import const1, Kelvin2wavenumber
-from qmagnetic.core.common import eigen_simple
+from qdmag.core.constants import const1, Kelvin2wavenumber
+from qdmag.core.common import eigen_simple
 
 r"""
 Codes for solving the quantum master equation described in the Eq. 2.7 of

@@ -1,9 +1,9 @@
 import os
 import numpy as np
 from os import environ
-from qmagnetic.core.common import read_input, many_spins
-from qmagnetic.core.liouville import liouville
-from qmagnetic.core.effective_basis import effective_basis
+from qdmag.core.common import read_input, many_spins
+from qdmag.core.liouville import liouville
+from qdmag.core.effective_basis import effective_basis
 
 
 if __name__ == "__main__":

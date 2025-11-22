@@ -4,7 +4,7 @@
 
 import numpy as np
 import pickle
-from qmagnetic import root_dir
+from qdmag import root_dir
 from scipy.interpolate import interp1d
 
 def get_Bt(Bt_params):

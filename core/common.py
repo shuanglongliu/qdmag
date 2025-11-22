@@ -5,9 +5,9 @@ import math
 import yaml
 import numpy as np
 import pandas as pd
-from qmagnetic.core.constants import Tesla2wavenumber, Kelvin2wavenumber
-from qmagnetic.core.Operators import Operator
-from qmagnetic.core.StevensOperators import StevensOpA
+from qdmag.core.constants import Tesla2wavenumber, Kelvin2wavenumber
+from qdmag.core.Operators import Operator
+from qdmag.core.StevensOperators import StevensOpA
 
 # ========================
 # Classes
