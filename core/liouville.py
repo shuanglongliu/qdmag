@@ -93,6 +93,8 @@ class liouville:
         self.nt_mag        = dynamics[3]['nt_mag']        # Calculate and save magnetization every nt_mag*deltat ps
         self.save_rho      = dynamics[3]['save_rho']      # Save rho ?
         self.nt_rho        = dynamics[3]['nt_rho']        # Save rho every nt_rho*deltat ps
+        self.save_drdt     = dynamics[3]['save_drdt']     # Save drho/dt (diagonal only)?
+        self.nt_drdt       = dynamics[3]['nt_drdt']       # Save drho/dt (diagonal only) every nt_drdt*deltat ps
 
         # Set the time
         self.t = self.tmin
@@ -138,6 +140,10 @@ class liouville:
     
         # Construct the superoperator L at t = tmin ps with spin-phonon coupling
         self.L = self.construct_L(self.A, self.C)
+
+        # Construct the superoperators LA and LC for the contributions from A and C, which will be updated at each time step.
+        self.LA = self.construct_L(self.A, None)
+        self.LC = self.construct_L(None, self.C)
 
     def get_initial_rho(self, from_file=False, fname=None, t_init=None):
         if from_file:
@@ -305,13 +311,24 @@ class liouville:
     
         Are = np.real(A)
         Aim = np.imag(A)
-    
-        if C is None:
+
+        if A is not None and C is None:
             # Construct L from A only
             L11 =  const1 * Aim
             L12 =  const1 * Are
             L21 = -const1 * Are
             L22 =  const1 * Aim
+        elif A is None and C is not None:
+            # Construct L from C only
+            CST = self.construct_CST(C)
+            Cre = np.real(C)
+            Cim = np.imag(C)
+            CSTre = np.real(CST)
+            CSTim = np.imag(CST)
+            L11 = -self.lambdaa**2 * np.pi * const1**2 * (Cre + CSTre)
+            L12 =  self.lambdaa**2 * np.pi * const1**2 * (Cim + CSTim)
+            L21 = -self.lambdaa**2 * np.pi * const1**2 * (Cim - CSTim)
+            L22 = -self.lambdaa**2 * np.pi * const1**2 * (Cre - CSTre)
         else:
             CST = self.construct_CST(C)
             Cre = np.real(C)
@@ -411,12 +428,26 @@ class liouville:
         factorCim = np.imag(factorC)
         factorCSTre = np.real(factorCST)
         factorCSTim = np.imag(factorCST)
-    
-        # Add the Zeeman interaction and the spin-phonon coupling to the L matrix
-        self.L[        0:self.dims,          0: self.dims] = self.L0[        0:self.dims,          0: self.dims] + c1Azeeim - (factorCre + factorCSTre)
-        self.L[        0:self.dims,  self.dims:self.dimds] = self.L0[        0:self.dims,  self.dims:self.dimds] + c1Azeere + (factorCim + factorCSTim)
-        self.L[self.dims:self.dimds,         0: self.dims] = self.L0[self.dims:self.dimds,         0: self.dims] - c1Azeere - (factorCim - factorCSTim)
-        self.L[self.dims:self.dimds, self.dims:self.dimds] = self.L0[self.dims:self.dimds, self.dims:self.dimds] + c1Azeeim - (factorCre - factorCSTre)
+
+        # Update the L matrixby including the Zeeman interaction and the spin-phonon coupling at the same time  
+        # self.L[        0:self.dims,          0: self.dims] = self.L0[        0:self.dims,          0: self.dims] + c1Azeeim - (factorCre + factorCSTre)
+        # self.L[        0:self.dims,  self.dims:self.dimds] = self.L0[        0:self.dims,  self.dims:self.dimds] + c1Azeere + (factorCim + factorCSTim)
+        # self.L[self.dims:self.dimds,         0: self.dims] = self.L0[self.dims:self.dimds,         0: self.dims] - c1Azeere - (factorCim - factorCSTim)
+        # self.L[self.dims:self.dimds, self.dims:self.dimds] = self.L0[self.dims:self.dimds, self.dims:self.dimds] + c1Azeeim - (factorCre - factorCSTre)
+
+        # Update the LA and LC matrices for the contributions from A and C
+        self.LA[        0:self.dims,          0: self.dims] = self.L0[        0:self.dims,          0: self.dims] + c1Azeeim
+        self.LA[        0:self.dims,  self.dims:self.dimds] = self.L0[        0:self.dims,  self.dims:self.dimds] + c1Azeere
+        self.LA[self.dims:self.dimds,         0: self.dims] = self.L0[self.dims:self.dimds,         0: self.dims] - c1Azeere
+        self.LA[self.dims:self.dimds, self.dims:self.dimds] = self.L0[self.dims:self.dimds, self.dims:self.dimds] + c1Azeeim
+
+        self.LC[        0:self.dims,          0: self.dims] = - (factorCre + factorCSTre)
+        self.LC[        0:self.dims,  self.dims:self.dimds] =   (factorCim + factorCSTim)
+        self.LC[self.dims:self.dimds,         0: self.dims] = - (factorCim - factorCSTim)
+        self.LC[self.dims:self.dimds, self.dims:self.dimds] = - (factorCre - factorCSTre)
+
+        # Update the L matrix, which includes the Zeeman interaction and the spin-phonon coupling
+        self.L = self.LA + self.LC
 
     def examine_L_max_and_expLdeltat_max(self, Bs, deltats):
         """
@@ -479,9 +510,11 @@ class liouville:
         if RK4:
             dir_rho = "rho_RK4"
             dir_mag = "magnetometry_RK4"
+            dir_drdt = "drdt_RK4"
         else:
             dir_rho = "rho"
             dir_mag = "magnetometry"
+            dir_drdt = "drdt"
         if self.Bt_params['Bt_type'] == 'linear':
             outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1e}/'.format(self.T, self.I0, self.lambdaa, self.Bt_params['sweep_rate'])
             outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1e}/'.format(self.T, self.I0, self.lambdaa, self.Bt_params['sweep_rate'])
@@ -504,32 +537,69 @@ class liouville:
         outdir = outdir.replace('+', '')
         self.outdir_rho = outdir + dir_rho
         self.outdir_mag = outdir + dir_mag
+        self.outdir_drdt = outdir + dir_drdt
         if self.save_rho and (not os.path.exists(self.outdir_rho)):
             os.makedirs(self.outdir_rho)
         if self.save_mag and (not os.path.exists(self.outdir_mag)):
             os.makedirs(self.outdir_mag)
+        if self.save_drdt and (not os.path.exists(self.outdir_drdt)):
+            os.makedirs(self.outdir_drdt)
         # Output files
-        self.frho = self.outdir_rho + '/{:.3f}-{:.3f}ps_dt{:.3f}ps.h5'.format(self.tmin, self.tmax, self.deltat)
-        self.fmag = self.outdir_mag + '/{:.3f}-{:.3f}ps_dt{:.3f}ps.csv'.format(self.tmin, self.tmax, self.deltat)
+        self.frho = self.outdir_rho + '/t{:.3f}-{:.3f}ps_dt{:.3f}ps.h5'.format(self.tmin, self.tmax, self.deltat)
+        self.fmag = self.outdir_mag + '/t{:.3f}-{:.3f}ps_dt{:.3f}ps.csv'.format(self.tmin, self.tmax, self.deltat)
+        self.fdrdt = self.outdir_drdt + '/t{:.3f}-{:.3f}ps_dt{:.3f}ps.csv'.format(self.tmin, self.tmax, self.deltat)
     
     def set_up_loop(self):
         """
+        Set up the loop parameters for the time evolution.
+        The hierarchy from finest to coarsest save interval is:
+            nt_mag <= nt_rho <= nt_drdt
+        Each coarser interval is adjusted to be a multiple of the finer ones.
+        nt is then adjusted to be a multiple of the coarsest active interval.
         """
-        if self.save_rho and self.save_mag:
+        if self.save_rho and self.save_mag and self.save_drdt:
+            # nt_rho should be a multiple of nt_mag
+            self.nround_mag = round( max(self.nt_rho // self.nt_mag, 1) )
+            self.nt_rho = self.nround_mag * self.nt_mag
+            # nt_drdt should be a multiple of nt_rho (and thus nt_mag)
+            self.nround_rho_per_drdt = round( max(self.nt_drdt // self.nt_rho, 1) )
+            self.nt_drdt = self.nround_rho_per_drdt * self.nt_rho
+            # nt should be a multiple of nt_drdt
+            self.nround_drdt = round( max((self.tmax - self.tmin)/self.deltat / self.nt_drdt, 1) )
+            self.nt = self.nround_drdt * self.nt_drdt
+        elif self.save_rho and self.save_mag and (not self.save_drdt):
             # nt_rho should be a multiple of nt_mag
             self.nround_mag = round( max(self.nt_rho // self.nt_mag, 1) )
             self.nt_rho = self.nround_mag * self.nt_mag
             # nt should be a multiple of nt_rho
             self.nround_rho = round( max((self.tmax - self.tmin)/self.deltat / self.nt_rho, 1) )
             self.nt = self.nround_rho * self.nt_rho
-        elif self.save_rho and (not self.save_mag):
+        elif self.save_rho and (not self.save_mag) and self.save_drdt:
+            # nt_drdt should be a multiple of nt_rho
+            self.nround_rho_per_drdt = round( max(self.nt_drdt // self.nt_rho, 1) )
+            self.nt_drdt = self.nround_rho_per_drdt * self.nt_rho
+            # nt should be a multiple of nt_drdt
+            self.nround_drdt = round( max((self.tmax - self.tmin)/self.deltat / self.nt_drdt, 1) )
+            self.nt = self.nround_drdt * self.nt_drdt
+        elif self.save_rho and (not self.save_mag) and (not self.save_drdt):
             # nt should be a multiple of nt_rho
             self.nround_rho = round( (self.tmax - self.tmin)/self.deltat / self.nt_rho )
             self.nt = self.nround_rho * self.nt_rho
-        elif (not self.save_rho) and self.save_mag:
+        elif (not self.save_rho) and self.save_mag and self.save_drdt:
+            # nt_drdt should be a multiple of nt_mag
+            self.nround_mag_per_drdt = round( max(self.nt_drdt // self.nt_mag, 1) )
+            self.nt_drdt = self.nround_mag_per_drdt * self.nt_mag
+            # nt should be a multiple of nt_drdt
+            self.nround_drdt = round( max((self.tmax - self.tmin)/self.deltat / self.nt_drdt, 1) )
+            self.nt = self.nround_drdt * self.nt_drdt
+        elif (not self.save_rho) and self.save_mag and (not self.save_drdt):
             # nt should be a multiple of nt_mag
             self.nround_mag = round( (self.tmax - self.tmin)/self.deltat / self.nt_mag )
             self.nt = self.nround_mag * self.nt_mag
+        elif (not self.save_rho) and (not self.save_mag) and self.save_drdt:
+            # nt should be a multiple of nt_drdt
+            self.nround_drdt = round( (self.tmax - self.tmin)/self.deltat / self.nt_drdt )
+            self.nt = self.nround_drdt * self.nt_drdt
         else:
             # the time period should be a multiple of deltat
             self.nt = round( (self.tmax - self.tmin)/self.deltat )
@@ -555,6 +625,25 @@ class liouville:
         # chimz = self.get_chimz_from_risvrho(t)
         # df = pd.DataFrame([{'t': t, 'B': self.Bt(t), 'Mz': Mz, 'chimz': chimz}])
         # df.to_csv(fobj, header=header, index=False)
+
+    def unit_save_drdt(self, fobj, t, header=False):
+        """
+        Save the diagonal elements of drho/dt, which are the population changes, at time t.
+        """
+        # Calculate drho/dt from the quantum master equation
+        drisvrhodt_LA = self.LA @ self.risvrho
+        drisvrhodt_LC = self.LC @ self.risvrho
+        drisvrhodt = self.L @ self.risvrho
+
+        # Empty DataFrame is deprecated, use list of dicts instead
+        df = pd.DataFrame()
+        for i in range(self.dim):
+            # i,j -> I = i * dim + j
+            I = get_composite_index(i, i, self.dim)
+            df = df._append({'t': t, 'B': self.Bt(t), 'i': i, 'drdt_coh': drisvrhodt_LA[I], 'drdt_dis': drisvrhodt_LC[I], 'drdt_tot': drisvrhodt[I]}, ignore_index=True)
+
+        # Save the data to a csv file
+        df.to_csv(fobj, header=header, index=False)
 
     def evolve_risvrho_onestair(self, it):
         """
@@ -582,7 +671,32 @@ class liouville:
         self.set_up_outdirs()
         # Set up the loop parameters
         self.set_up_loop()
-        if self.save_rho and self.save_mag:
+        if self.save_rho and self.save_mag and self.save_drdt:
+            with h5py.File(self.frho, 'w') as f1, open(self.fmag, 'w') as f2, open(self.fdrdt, 'w') as f3:
+                # Save the initial density matrix, magnetic moment, and drho/dt
+                self.unit_save_rho(f1, self.tmin)
+                self.unit_save_mag(f2, self.tmin, header=True)
+                self.unit_save_drdt(f3, self.tmin, header=True)
+                # Loop over the rounds for saving drho/dt
+                for iround_drdt in range(self.nround_drdt):
+                    # Loop over the rounds for saving the RI-separated vectorized density matrix
+                    for iround_rho_per_drdt in range(self.nround_rho_per_drdt):
+                        # Loop over the rounds for saving the magnetic properties
+                        for iround_mag in range(self.nround_mag):
+                            # Loop over the self.nt_mag time steps
+                            for it_mag in range(self.nt_mag):
+                                it = iround_drdt * self.nt_drdt + iround_rho_per_drdt * self.nt_rho + iround_mag * self.nt_mag + it_mag
+                                self.evolve_risvrho_onestair(it)
+                            # Calculate and save the magnetic properties
+                            self.unit_save_mag(f2, self.t+self.deltat/2)
+                        # Save the RI-separated vectorized density matrix
+                        self.unit_save_rho(f1, self.t+self.deltat/2)
+                    # Save drho/dt
+                    self.unit_save_drdt(f3, self.t+self.deltat/2)
+            print("rho is saved to {}".format(self.frho))
+            print("mag is saved to {}".format(self.fmag))
+            print("drdt is saved to {}".format(self.fdrdt))
+        elif self.save_rho and self.save_mag and (not self.save_drdt):
             with h5py.File(self.frho, 'w') as f1,  open(self.fmag, 'w') as f2:
                 # Save the initial density matrix, magnetic moment, and the magnetic susceptibility
                 self.unit_save_rho(f1, self.tmin)
@@ -601,7 +715,26 @@ class liouville:
                     self.unit_save_rho(f1, self.t+self.deltat/2)
             print("rho is saved to {}".format(self.frho))
             print("mag is saved to {}".format(self.fmag))
-        elif self.save_rho and (not self.save_mag):
+        elif self.save_rho and (not self.save_mag) and self.save_drdt:
+            with h5py.File(self.frho, 'w') as f1, open(self.fdrdt, 'w') as f3:
+                # Save the initial density matrix and drho/dt
+                self.unit_save_rho(f1, self.tmin)
+                self.unit_save_drdt(f3, self.tmin, header=True)
+                # Loop over the rounds for saving drho/dt
+                for iround_drdt in range(self.nround_drdt):
+                    # Loop over the rounds for saving the RI-separated vectorized density matrix
+                    for iround_rho_per_drdt in range(self.nround_rho_per_drdt):
+                        # Loop over the self.nt_rho time steps
+                        for it_rho in range(self.nt_rho):
+                            it = iround_drdt * self.nt_drdt + iround_rho_per_drdt * self.nt_rho + it_rho
+                            self.evolve_risvrho_onestair(it)
+                        # Save the RI-separated vectorized density matrix
+                        self.unit_save_rho(f1, self.t+self.deltat/2)
+                    # Save drho/dt
+                    self.unit_save_drdt(f3, self.t+self.deltat/2)
+            print("rho is saved to {}".format(self.frho))
+            print("drdt is saved to {}".format(self.fdrdt))
+        elif self.save_rho and (not self.save_mag) and (not self.save_drdt):
             with h5py.File(self.frho, 'w') as f1:
                 # Save the initial density matrix
                 self.unit_save_rho(f1, self.tmin)
@@ -614,7 +747,26 @@ class liouville:
                     # Save the RI-separated vectorized density matrix
                     self.unit_save_rho(f1, self.t+self.deltat/2)
             print("rho is saved to {}".format(self.frho))
-        elif (not self.save_rho) and self.save_mag:
+        elif (not self.save_rho) and self.save_mag and self.save_drdt:
+            with open(self.fmag, 'w') as f2, open(self.fdrdt, 'w') as f3:
+                # Save the initial magnetic moment and drho/dt
+                self.unit_save_mag(f2, self.tmin, header=True)
+                self.unit_save_drdt(f3, self.tmin, header=True)
+                # Loop over the rounds for saving drho/dt
+                for iround_drdt in range(self.nround_drdt):
+                    # Loop over the rounds for saving the magnetic properties
+                    for iround_mag_per_drdt in range(self.nround_mag_per_drdt):
+                        # Loop over the self.nt_mag time steps
+                        for it_mag in range(self.nt_mag):
+                            it = iround_drdt * self.nt_drdt + iround_mag_per_drdt * self.nt_mag + it_mag
+                            self.evolve_risvrho_onestair(it)
+                        # Save magnetic moment
+                        self.unit_save_mag(f2, self.t+self.deltat/2)
+                    # Save drho/dt
+                    self.unit_save_drdt(f3, self.t+self.deltat/2)
+            print("mag is saved to {}".format(self.fmag))
+            print("drdt is saved to {}".format(self.fdrdt))
+        elif (not self.save_rho) and self.save_mag and (not self.save_drdt):
             with open(self.fmag, 'w') as f2:
                 # Save the initial magnetic moment and the magnetic susceptibility
                 self.unit_save_mag(f2, self.tmin, header=True)
@@ -627,6 +779,19 @@ class liouville:
                     # Save magnetic moment
                     self.unit_save_mag(f2, self.t+self.deltat/2)
             print("mag is saved to {}".format(self.fmag))
+        elif (not self.save_rho) and (not self.save_mag) and self.save_drdt:
+            with open(self.fdrdt, 'w') as f3:
+                # Save the initial drho/dt
+                self.unit_save_drdt(f3, self.tmin, header=True)
+                # Loop over the rounds for saving drho/dt
+                for iround_drdt in range(self.nround_drdt):
+                    # Loop over the self.nt_drdt time steps
+                    for it_drdt in range(self.nt_drdt):
+                        it = iround_drdt * self.nt_drdt + it_drdt
+                        self.evolve_risvrho_onestair(it)
+                    # Save drho/dt
+                    self.unit_save_drdt(f3, self.t+self.deltat/2)
+            print("drdt is saved to {}".format(self.fdrdt))
         else:
             # Loop over the self.nt time steps
             for it in range(self.nt):
@@ -678,7 +843,32 @@ class liouville:
         self.set_up_outdirs(RK4=True)
         # Set up the loop parameters
         self.set_up_loop()
-        if self.save_rho and self.save_mag:
+        if self.save_rho and self.save_mag and self.save_drdt:
+            with h5py.File(self.frho, 'w') as f1, open(self.fmag, 'w') as f2, open(self.fdrdt, 'w') as f3:
+                # Save the initial density matrix, magnetic moment, and drho/dt
+                self.unit_save_rho(f1, self.tmin)
+                self.unit_save_mag(f2, self.tmin)
+                self.unit_save_drdt(f3, self.tmin)
+                # Loop over the rounds for saving drho/dt
+                for iround_drdt in range(self.nround_drdt):
+                    # Loop over the rounds for saving the RI-separated vectorized density matrix
+                    for iround_rho_per_drdt in range(self.nround_rho_per_drdt):
+                        # Loop over the rounds for saving the magnetic properties
+                        for iround_mag in range(self.nround_mag):
+                            # Loop over the self.nt_mag time steps
+                            for it_mag in range(self.nt_mag):
+                                it = iround_drdt * self.nt_drdt + iround_rho_per_drdt * self.nt_rho + iround_mag * self.nt_mag + it_mag
+                                self.evolve_risvrho_onestep(it)
+                            # Calculate and save the magnetic properties
+                            self.unit_save_mag(f2, self.ts[it+1])
+                        # Save the RI-separated vectorized density matrix
+                        self.unit_save_rho(f1, self.ts[it+1])
+                    # Save drho/dt
+                    self.unit_save_drdt(f3, self.ts[it+1])
+            print("rho is saved to {}".format(self.frho))
+            print("mag is saved to {}".format(self.fmag))
+            print("drdt is saved to {}".format(self.fdrdt))
+        elif self.save_rho and self.save_mag and (not self.save_drdt):
             with h5py.File(self.frho, 'w') as f1,  open(self.fmag, 'w') as f2:
                 # Save the initial density matrix, magnetic moment, and the magnetic susceptibility
                 self.unit_save_rho(f1, self.tmin)
@@ -697,7 +887,26 @@ class liouville:
                     self.unit_save_rho(f1, self.ts[it+1])
             print("rho is saved to {}".format(self.frho))
             print("mag is saved to {}".format(self.fmag))
-        elif self.save_rho and (not self.save_mag):
+        elif self.save_rho and (not self.save_mag) and self.save_drdt:
+            with h5py.File(self.frho, 'w') as f1, open(self.fdrdt, 'w') as f3:
+                # Save the initial density matrix and drho/dt
+                self.unit_save_rho(f1, self.tmin)
+                self.unit_save_drdt(f3, self.tmin)
+                # Loop over the rounds for saving drho/dt
+                for iround_drdt in range(self.nround_drdt):
+                    # Loop over the rounds for saving the RI-separated vectorized density matrix
+                    for iround_rho_per_drdt in range(self.nround_rho_per_drdt):
+                        # Loop over the self.nt_rho time steps
+                        for it_rho in range(self.nt_rho):
+                            it = iround_drdt * self.nt_drdt + iround_rho_per_drdt * self.nt_rho + it_rho
+                            self.evolve_risvrho_onestep(it)
+                        # Save the RI-separated vectorized density matrix
+                        self.unit_save_rho(f1, self.ts[it+1])
+                    # Save drho/dt
+                    self.unit_save_drdt(f3, self.ts[it+1])
+            print("rho is saved to {}".format(self.frho))
+            print("drdt is saved to {}".format(self.fdrdt))
+        elif self.save_rho and (not self.save_mag) and (not self.save_drdt):
             with h5py.File(self.frho, 'w') as f1:
                 # Save the initial density matrix
                 self.unit_save_rho(f1, self.tmin)
@@ -710,7 +919,26 @@ class liouville:
                     # Save the RI-separated vectorized density matrix
                     self.unit_save_rho(f1, self.ts[it+1])
             print("rho is saved to {}".format(self.frho))
-        elif (not self.save_rho) and self.save_mag:
+        elif (not self.save_rho) and self.save_mag and self.save_drdt:
+            with open(self.fmag, 'w') as f2, open(self.fdrdt, 'w') as f3:
+                # Save the initial magnetic moment and drho/dt
+                self.unit_save_mag(f2, self.tmin)
+                self.unit_save_drdt(f3, self.tmin)
+                # Loop over the rounds for saving drho/dt
+                for iround_drdt in range(self.nround_drdt):
+                    # Loop over the rounds for saving the magnetic properties
+                    for iround_mag_per_drdt in range(self.nround_mag_per_drdt):
+                        # Loop over the self.nt_mag time steps
+                        for it_mag in range(self.nt_mag):
+                            it = iround_drdt * self.nt_drdt + iround_mag_per_drdt * self.nt_mag + it_mag
+                            self.evolve_risvrho_onestep(it)
+                        # Save magnetic moment
+                        self.unit_save_mag(f2, self.ts[it+1])
+                    # Save drho/dt
+                    self.unit_save_drdt(f3, self.ts[it+1])
+            print("mag is saved to {}".format(self.fmag))
+            print("drdt is saved to {}".format(self.fdrdt))
+        elif (not self.save_rho) and self.save_mag and (not self.save_drdt):
             with open(self.fmag, 'w') as f2:
                 # Save the initial magnetic moment and the magnetic susceptibility
                 self.unit_save_mag(f2, self.tmin)
@@ -723,6 +951,19 @@ class liouville:
                     # Save magnetic moment
                     self.unit_save_mag(f2, self.ts[it+1])
             print("mag is saved to {}".format(self.fmag))
+        elif (not self.save_rho) and (not self.save_mag) and self.save_drdt:
+            with open(self.fdrdt, 'w') as f3:
+                # Save the initial drho/dt
+                self.unit_save_drdt(f3, self.tmin)
+                # Loop over the rounds for saving drho/dt
+                for iround_drdt in range(self.nround_drdt):
+                    # Loop over the self.nt_drdt time steps
+                    for it_drdt in range(self.nt_drdt):
+                        it = iround_drdt * self.nt_drdt + it_drdt
+                        self.evolve_risvrho_onestep(it)
+                    # Save drho/dt
+                    self.unit_save_drdt(f3, self.ts[it+1])
+            print("drdt is saved to {}".format(self.fdrdt))
         else:
             # Loop over the self.nt time steps
             for it in range(self.nt):
