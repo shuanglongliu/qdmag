@@ -86,7 +86,7 @@ This maintains numerical stability for time steps orders of magnitude larger tha
 
 ### Effective Hamiltonian
 
-For large multinuclear systems where the full Hilbert space dimension N = Πᵢ(2Sᵢ+1) is too large, an effective Hamiltonian of dimension n ≪ N is constructed by selecting thermally relevant basis states. The basis states are chosen as the lowest-energy eigenstates of $\hat{H}_\text{ex} + \hat{H}_\text{Zee}(B_z = 10^{-4}\, \text{T})$ for each value of the total $S_z$ projection by default. The small perturbative Zeeman field ensures the eigenstates are also eigenstates of the total $\hat{S}_z$ operator.
+For large multinuclear systems where the full Hilbert space dimension N = Πᵢ(2Sᵢ+1) is too large, an effective Hamiltonian of dimension n ≪ N is constructed by selecting thermally relevant basis states. The basis states are chosen as the lowest-energy eigenstates of $\hat{H}_\textrm{ex} + \hat{H}_\textrm{Zee}(B_z = 10^{-4}\ \textrm{T})$ for each value of the total $S_z$ projection by default. The small perturbative Zeeman field ensures the eigenstates are also eigenstates of the total $\hat{S}_z$ operator.
 
 ### Powder Averaging
 
