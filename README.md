@@ -1,6 +1,6 @@
 # spin\_dynamics
 
-Codes for solving the time-dependent Schrodinger equation, the von Neumann equation, and the quantum master equation based on spin Hamiltonians. 
+Codes for solving time-dependent magnetization of magnetic molecules under a pulsed magnetic field based on [a generalized Lindblad equation][1,2]. The molecule is modeled as a spin system coupled to a phonon bath. 
 
 Set the variable "\_\_file\_\_" in \_\_init\_\_.py to "path/to/spin\_dynamics/" after downloading the code. The forward slash at the end of the path is required.
 
@@ -11,3 +11,8 @@ The exchange term and the Zeeman term commute if the exchange couplings are isot
 ## tool_staircare.py
 
 An example code for solving the Liouville-form quantum master equation using the staircase approximation.
+
+# References
+
+[1] K. Saito, S. Takesue, and S. Miyashita, Energy transport in the integrable system in contact with various types of phonon reservoirs, Phys. Rev. E 61, 2397 (2000). 
+[2] Hiroki Nakano and Seiji Miyashita, Magnetization Process of Nanoscale Iron Cluster, J. Phys. Soc. Jpn. 70, 2151–2157 (2001). 
