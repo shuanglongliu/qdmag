@@ -1,7 +1,7 @@
 import os
 from qdmag.core.common import read_input, many_spins
 from qdmag.core.effective_basis import effective_basis
-from qdmag.core.common import get_equilibrium_occupations, get_equilibrium_occupations_light
+from qdmag.core.common import get_projections
 
 if __name__ == "__main__":
 
@@ -17,13 +17,7 @@ if __name__ == "__main__":
     # Set up the effective basis
     eff = effective_basis(spins, exchange, anisotropy, dynamics, states)
 
-    # Get the equilibrium occupations at B=[Bx, By, Bz] and T
-    # Bx, By, Bz = 0.0, 0.0, 0.0 # Magnetic field in Tesla
-    # T = 2.0 # Temperature in Kelvin
-    # get_equilibrium_occupations_light(eff.h0_eff, eff.Mv_eff, [Bx, By, Bz], T)
-
-    # Get the equilibrium occupations at T for a range of B values
-    T = 2.0 # Temperature in Kelvin
-    get_equilibrium_occupations(eff.h0_eff, eff.Mv_eff, BT_Bgrid, T)
-
+    # State composition at the spedified B field
+    Bx, By, Bz = 0.0, 0.0, 0.1 # Tesla
+    get_projections(eff, [Bx, By, Bz])
 
