@@ -108,7 +108,12 @@ Three case studies are included to demonstrate the package:
 
 ## Usage
 
-### Minimal example
+
+### Input file
+
+All input parameters are loaded from an `input.yaml` file in the working directory. Example input files can be found in the `examples/` folder. 
+
+### An example script
 
 ```python
 import os
@@ -132,13 +137,13 @@ if __name__ == "__main__":
 
     # Set up the quantum master equation
     lio = liouville(eff, dynamics)
+
+    # Initialize the density matrix
     lio.get_initial_rho(from_file=False)
+
+    # Evolve the density matrix according to the quantum master equation
     lio.evolve_rho(method="staircase")
 ```
-
-### Input file
-
-All input parameters are loaded from an `input.yaml` file in the working directory. Example input files can be found in the `examples/` folder. 
 
 ### Convergence
 
