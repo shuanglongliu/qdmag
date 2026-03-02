@@ -39,8 +39,10 @@ Add the directory that contains qdmag to the evironment variable PYTHONPATH.
 
 - Python 3.x
 - NumPy
-- SciPy (used for quadrature weights and spline fitting)
-- h5py (used for HDF5 I/O)
+- SciPy (quadrature weights, spline fitting, matrix exponential, and Euler angle transformations)
+- h5py (HDF5 I/O for density matrix storage and retrieval)
+- pandas (tabular output of magnetization and level population time series)
+- matplotlib (optional; sparsity visualization and quadrature point plots)
 
 ## Theory
 
