@@ -161,7 +161,7 @@ Diagonalizes the spin Hamiltonian at a fixed field (default: $B_z = 10^{-4}$ T) 
 
 ### `tool_spins.py`
 
-Computes and saves the **expectation values of individual spin operators** $\langle S_{i,\alpha} \rangle$ for each eigenstate. Useful for characterizing the spin composition of the low-energy spectrum.
+Computes and saves the **expectation values of individual spin operators** $\langle S_{i,\alpha} \rangle$ for each eigenstate. Useful for characterizing the spin composition of the certain states.
 
 ### `tool_projection.py`
 
