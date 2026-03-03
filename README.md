@@ -197,7 +197,7 @@ Evolves the spin state using a **classical rate equation** (transition rate matr
 
 ### `tool_time_step.py`
 
-Utility for **convergence testing of the staircase time step**. Automatically generates `input.yaml` files and SLURM job scripts for a series of calculations with systematically varied step sizes $\Delta B$. Also provides methods for collecting, averaging, and comparing equilibrium and dynamical magnetization results across step sizes.
+Utility for **convergence testing of the staircase time step**. Automatically generates `input.yaml` files and SLURM job scripts for a series of calculations with systematically varied step sizes $\Delta B$. Also provides methods for collecting and comparing equilibrium and dynamical magnetization results across step sizes.
 
 ## Acknowledgments
 
