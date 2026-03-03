@@ -22,7 +22,7 @@ Magnetic molecules — including transition metal complexes and lanthanide-based
 - **Two time-propagation methods**:
   - Staircase approximation for numerically stable long-time propagation (millisecond timescales)
   - Fourth-order Runge–Kutta (RK4) for high-accuracy short-time propagation
-- **Effective Hamiltonian** construction for large spin systems, reducing the full Hilbert space dimension N = Π(2Sᵢ+1) to a computationally feasible subspace of thermally relevant states
+- **Effective Hamiltonian** construction for large spin systems, reducing the full Hilbert space dimension N = Πᵢ(2Sᵢ+1) to a computationally feasible subspace of thermally relevant states
 - **Powder averaging** over random molecular orientations using Lebedev + Gauss-Legendre quadrature (up to 1118 orientations)
 - **Liouville form** of the quantum master equation for efficient matrix-based time propagation
 - **HDF5-based I/O** for density matrix storage, retrieval, and file management
