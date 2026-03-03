@@ -82,7 +82,7 @@ where the dissipator $\Gamma\rho(t) = ([X, R\rho(t)] + [X, R\rho(t)]^\dagger) \l
 
 The continuous B(t) profile is replaced by a staircase function. Within each step the Hamiltonian is constant and the propagator has the exact closed-form solution:
 
-$$\rho(t + \Delta t) = \exp(\mathcal{L}\,\Delta t)\,\rho(t)$$
+$$\rho(t + \Delta t) = \exp(\mathcal{L}\,\Delta t)\ \rho(t)$$
 
 This maintains numerical stability for time steps orders of magnitude larger than those required by Runge–Kutta methods, making millisecond simulations feasible.
 
