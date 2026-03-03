@@ -348,7 +348,6 @@ class powder:
         df = pd.read_csv(fname)
         if take_B:
             # Take the column "B"
-            # df = pd.DataFrame({"B": column})
             df = df[["B"]]
         else:
             # Take the column 'Mz' and save it to a new data frame with a column name self.directory
