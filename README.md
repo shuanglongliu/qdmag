@@ -177,7 +177,7 @@ Validates the **physical conditions of the density matrix** $\rho(t)$ stored in 
 
 ### `tool_transform_rho.py`
 
-Transforms the density matrix between representations. Converts $\rho(t)$ from the **spin (S) representation** (eigenstates of $\hat{S}_z^\text{tot}$) to the **energy (E) representation** (eigenstates of the full Hamiltonian $\hat{H}(t)$). Reads from one HDF5 file and writes to another.
+Transforms the density matrix between representations. Converts $\rho(t)$ from the **spin (S) representation** (eigenstates of $\hat{S}_{\text{tot},z}$) to the **energy (E) representation** (eigenstates of the full Hamiltonian). Reads from one HDF5 file and writes to another.
 
 ### `tool_quadrature.py`
 
