@@ -76,7 +76,7 @@ The generalized Lindblad equation reads:
 
 $$\frac{d\rho(t)}{dt} = \frac{1}{i\hbar}[\hat{H}, \rho(t)] - \Gamma\rho(t)$$
 
-where the dissipator $\Gamma\rho(t) = ([X, R\rho(t)] + [X, R\rho(t)]^\dagger) \lambda^2\pi/\hbar$ accounts for spin-phonon coupling. The spectral density is taken as $I(\omega) = I_0 \omega^\alpha \theta(\omega)$, with $\alpha = 2$ (super-Ohmic bath) as the default. The adjustable parameters are the prefactor $I_0$ and the spin-phonon coupling constant $\lambda$ (typically a few $\textrm{cm}^{-1}$).
+where the dissipator $\Gamma\rho(t) = ([X, R\rho(t)] + [X, R\rho(t)]^\dagger) \lambda^2\pi/\hbar$ accounts for spin-phonon coupling. The phonon spectral density is taken as $I(\omega) = I_0 \omega^\alpha \theta(\omega)$, with $\alpha = 2$ (super-Ohmic bath) as the default. The adjustable parameters are the prefactor $I_0$ and the spin-phonon coupling constant $\lambda$ (typically a few $\textrm{cm}^{-1}$).
 
 ### Staircase Approximation
 
