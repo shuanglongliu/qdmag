@@ -183,10 +183,6 @@ Transforms the density matrix between representations. Converts $\rho(t)$ from t
 
 Generates and saves **Lebedev + Gauss-Legendre quadrature points and weights** for powder averaging. Euler angles (α, β, γ) in degrees and combined weights are written to `points_and_weights.txt`. Optional visualization of the Lebedev sphere points and Gauss-Legendre γ points is available via matplotlib.
 
-```python
-euler_angles, weights = generate_combined_quadrature(lebedev_degree=31, n_gamma_points=12)
-```
-
 ### `tool_hdf5.py`
 
 HDF5 file utilities: estimates the **file size** for a given simulation (time duration, time step, and density matrix dimension), **combines** two sequential HDF5 output files into one, and **inspects** the contents of an existing HDF5 file.
