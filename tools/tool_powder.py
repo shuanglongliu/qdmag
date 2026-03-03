@@ -340,20 +340,20 @@ class powder:
         self.set_directory_name(i)
         # print(self.directory)
         # read csv file
-        fname = os.path.join(self.directory, f"output/T_{self.T:.1f}K_I0_{self.I0:.2e}_lambdaa_{self.lambdaa:.2f}/Bt_linear_sweep_rate_{self.sweep_rate:.1f}/magnetometry/0.000-{self.tmax:.3f}ps_dt{self.deltat:.3f}ps.dat")
+        fname = os.path.join(self.directory, f"output/T_{self.T:.1f}K_I0_{self.I0:.2e}_lambdaa_{self.lambdaa:.2f}/Bt_linear_sweep_rate_{self.sweep_rate:.1f}/magnetometry/0.000-{self.tmax:.3f}ps_dt{self.deltat:.3f}ps.csv")
         # Check if the file exists
         if not os.path.exists(fname):
             print(f"{i+1:5d} No output file for the dynamical job.")
             return None
-        df = pd.read_csv(fname, sep=r'\s+', header=None)
+        df = pd.read_csv(fname)
         if take_B:
-            # Take the second column and save it to a new data frame with a column name "B"
-            column = df.iloc[:, 1]
-            df = pd.DataFrame({"B": column})
+            # Take the column "B"
+            # df = pd.DataFrame({"B": column})
+            df = df[["B"]]
         else:
-            # Take the third column and save it to a new data frame with a column name self.directory
-            column = df.iloc[:, 2]
-            df = pd.DataFrame({self.directory: column})
+            # Take the column 'Mz' and save it to a new data frame with a column name self.directory
+            df = df[["Mz"]]
+            df.rename(columns={"Mz": self.directory}, inplace=True)
         return df
 
     def get_M_dy_avg(self):
