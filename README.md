@@ -115,37 +115,13 @@ Three case studies are included to demonstrate the package:
 
 All input parameters are loaded from an `input.yaml` file in the working directory. Example input files can be found in the `examples/` folder. 
 
-### An example script
+### Run the code
 
-```python
-import os
-from qdmag.core.common import read_input, many_spins
-from qdmag.core.effective_basis import effective_basis
-from qdmag.core.liouville import liouville
-
-if __name__ == "__main__":
-
-    # Read input parameters
-    Ss, nS, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, dynamics, states, n_thread = read_input()
-
-    # Set the number of threads
-    os.environ['OMP_NUM_THREADS'] = str(n_thread)
-
-    # Spin system
-    spins = many_spins(Ss, nS, gfactors)
-
-    # Set up the effective basis
-    eff = effective_basis(spins, exchange, anisotropy, dynamics, states)
-
-    # Set up the quantum master equation
-    lio = liouville(eff, dynamics)
-
-    # Initialize the density matrix
-    lio.get_initial_rho(from_file=False)
-
-    # Evolve the density matrix according to the quantum master equation
-    lio.evolve_rho(method="staircase")
+```bash
+python tool_staircase.py 
 ```
+
+The `tool_staircase.py` script must be run in the same directory as the input file. This script and other useful scripts can be found in the `tools/` directory. See the **Tools** section below for brief descriptions of each script. 
 
 ### Convergence
 
