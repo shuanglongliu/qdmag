@@ -125,7 +125,7 @@ The `tool_staircase.py` script must be run in the same directory as the input fi
 
 ### Convergence
 
-The time step `dt` should be chosen to converge the magnetization. A practical starting point is `dt = 0.0001 T / sweep_rate`. Decreasing `dt` until the result no longer changes is recommended. See Appendix C of the companion paper for a convergence study.
+The time step `dt` should be chosen to converge the magnetization. A practical starting point is `dt = 0.0001 T / sweep_rate`. Decreasing `dt` until the result no longer changes is recommended. 
 
 ## Tools
 
