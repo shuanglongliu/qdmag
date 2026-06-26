@@ -31,7 +31,7 @@ dynamics:
       sweep_rate: 50.0e-09  # Slope of the magnetic field vs time. Unit: T per ps. Used only when Bt = 'linear'.
 
     - tmin: 0.0e+00             # Initial time in ps
-      tmax: 1.0e+09             # Finial time in ps, period = 46.80 ps
+      tmax: 1.0e+09             # Finial time in ps
       deltat: 1.0e+04           # Time step in ps
 
     - save_mag: true # Calculate and save magnetization during the dynamics ?
@@ -41,5 +41,5 @@ dynamics:
       save_drdt: false # Save the time derivative of the density matrix ?
       nt_drdt: 1 # Save the time derivative of the density matrix every nt_drdt*deltat ps
 
-n_threads: 16 # Number of threads used in the calculation
+n_threads: 4 # Number of threads used in the calculation
 
