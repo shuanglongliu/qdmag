@@ -45,28 +45,41 @@ def omega2energy(omega):
     """
     return omega / const1
 
-def spectral_density(omega, I0=1e-4):
+def spectral_density(omega, I0=1e-4, alpha=2):
     """
-    The spectral density for phonons: I(ω) = I0 * omega^2 * θ(omega) where θ(omega) is the step function.
+    The spectral density for phonons: I(ω) = I0 * omega^alpha * θ(omega) where θ(omega) is the step function.
       Units: ps for spectral density I and and its prefactor I0.
-    Numerically, I0*lambdaa^2 is the only tunable parameter in the quantum master equation. 
-      We will fix I0 and tune lambdaa. 
+    The phonon bath is called sub-Ohmic, Ohmic, and super-Ohmic for alpha < 1, alpha = 1,
+      and alpha > 1, respectively [Grabert, Schramm, Ingold, Phys. Rep. 168, 115 (1988)].
+    Numerically, I0*lambdaa^2 is the only tunable parameter in the quantum master equation.
+      We will fix I0 and tune lambdaa.
     If I0 = 1, then Rhbar have huge matrix elements. Then, rho diverges.
       int_0^10 I(ω) dω = 1 => I0 * 10^3 / 3 = 1 => I0 = 3*10-3.
     """
-    return I0 * omega**2 * np.heaviside(omega, 0.5)
+    # The step function zeroes omega <= 0, so exponentiate only the positive
+    # part. This keeps non-integer alpha (sub-/super-Ohmic baths) finite, where
+    # (negative)**alpha would otherwise produce nan; identical for integer alpha.
+    pos = np.where(omega > 0, omega, 0.0)
+    return I0 * pos**alpha * np.heaviside(omega, 0.5)
 
-def Phi(T, omega, I0):
+def Phi(T, omega, I0, alpha=2):
     """
     Construct the function Phi in the quantum master equation.
     """
     beta = 1/(Kelvin2wavenumber * T)
     energy = omega2energy(omega)
     if abs( beta*energy ) < 1e-3:
-        # Use Taylor expansion to avoid divergence
-        result = abs( -I0*omega*omega/2 + I0*const1*omega/beta )
+        # Use Taylor expansion to avoid divergence. For the spectral density
+        # I(omega) = I0 * |omega|^alpha * sgn(omega), the small beta*energy limit
+        # of (I(omega) - I(-omega)) / (exp(beta*energy) - 1) is
+        #   I0*const1*|omega|^(alpha-1)/beta - I0*sgn(omega)*|omega|^alpha/2.
+        # This reduces to the original ω^2 expression at alpha = 2. No abs():
+        # the exact Phi is non-negative and the leading |omega|^(alpha-1) term
+        # dominates here, so a wrong sign should surface rather than be masked.
+        result = ( I0*const1*np.abs(omega)**(alpha-1)/beta
+                   - I0*np.sign(omega)*np.abs(omega)**alpha/2 )
     else:
-        numerator = spectral_density(omega, I0=I0) - spectral_density(-omega, I0=I0)
+        numerator = spectral_density(omega, I0=I0, alpha=alpha) - spectral_density(-omega, I0=I0, alpha=alpha)
         # Print beta, energy, and their product to check the divergence
         # print("beta, energy, beta*energy = {:12.4e} {:12.4e} {:12.4e}".format(beta, energy, beta*energy))
         denominator = np.exp(beta * energy) - 1
@@ -89,7 +102,7 @@ def construct_X(Sz_tot):
                 X[i, j] = 1.0
     return X
 
-def get_Rhbar(h, X, I0, T):
+def get_Rhbar(h, X, I0, T, alpha=2):
     """
     Construct the auxiliary operator R multiplied by hbar in both the E and S representations.
     The E representation is spanned by the eigenstates of the Hamiltonian. 
@@ -122,13 +135,13 @@ def get_Rhbar(h, X, I0, T):
     for i in range(X.shape[0]):
         for j in range(X.shape[1]):
             omega_ij = omegas[i] - omegas[j]
-            Rhbar[i, j] = X_E[i, j] * Phi(T, omega_ij, I0)
+            Rhbar[i, j] = X_E[i, j] * Phi(T, omega_ij, I0, alpha=alpha)
     # Change the basis functions from the eigenstates of the Hamiltonian H (E representation)
     # to the eigenstates of the spin operator Sz_tot (S representation)
     Rhbar = np.matmul(M, np.matmul(Rhbar, M_dagger))
     return Rhbar
 
-def update_Rhbar(Rhbar, h, X, I0, T):
+def update_Rhbar(Rhbar, h, X, I0, T, alpha=2):
     """
     Construct the auxiliary operator R multiplied by hbar in both the E and S representations.
     The E representation is spanned by the eigenstates of the Hamiltonian. 
@@ -161,7 +174,7 @@ def update_Rhbar(Rhbar, h, X, I0, T):
     for i in range(X.shape[0]):
         for j in range(X.shape[1]):
             omega_ij = omegas[i] - omegas[j]
-            Rhbar[i, j] = X_E[i, j] * Phi(T, omega_ij, I0)
+            Rhbar[i, j] = X_E[i, j] * Phi(T, omega_ij, I0, alpha=alpha)
     # Change the basis functions from the eigenstates of the Hamiltonian H (E representation)
     # to the eigenstates of the spin operator Sz_tot (S representation)
     Rhbar = np.matmul(M, np.matmul(Rhbar, M_dagger))

@@ -82,6 +82,7 @@ class liouville:
         self.T             = dynamics[0]['T']             # Temperature in K
         self.lambdaa       = dynamics[0]['lambdaa']       # Spin phonon coupling constant in cm-1
         self.I0            = dynamics[0]['I0']            # Prefactor for the phonon density of states in ps
+        self.alpha         = dynamics[0].get('alpha', 2)  # Spectral-density exponent I(w) ~ w^alpha (sub-/Ohmic/super-Ohmic)
 
         self.Bt_params     = dynamics[1]                  # Parameters for the pulsed magnetic field
 
@@ -129,7 +130,7 @@ class liouville:
         self.A = self.construct_A(self.h, diagonal_H=False, dtype=np.complex128)
     
         # Construct the superoperator Rhbar in the S representation at t = tmin ps
-        self.Rhbar = get_Rhbar(self.h, self.X, self.I0, self.T)
+        self.Rhbar = get_Rhbar(self.h, self.X, self.I0, self.T, alpha=self.alpha)
     
         # Construct the superoperator C which is time dependent due to Rhbar
         self.C = self.construct_C(self.X, self.Rhbar)
@@ -420,7 +421,7 @@ class liouville:
         self.h = self.h0 + self.h_zee
     
         # Update the operators C and CST
-        self.Rhbar = update_Rhbar(self.Rhbar, self.h, self.X, self.I0, self.T)
+        self.Rhbar = update_Rhbar(self.Rhbar, self.h, self.X, self.I0, self.T, alpha=self.alpha)
         self.update_C_and_CST()
         factorC = self.lambdaa**2 * np.pi * const1**2 * self.C
         factorCST = self.lambdaa**2 * np.pi * const1**2 * self.CST
@@ -1007,7 +1008,7 @@ class liouville:
         # Hamiltonian at time t
         self.h = self.h0 - Tesla2wavenumber * self.Bt(t) * self.Mz
         # Rhbar at time t
-        self.Rhbar = update_Rhbar(self.Rhbar, self.h, self.X, self.I0, self.T)
+        self.Rhbar = update_Rhbar(self.Rhbar, self.h, self.X, self.I0, self.T, alpha=self.alpha)
         # Get the density matrix rho from the RI-separated vectorized density matrix risvrho
         self.rho = self.convert_risvrho_to_rho(self.risvrho)
         # Call get_chimz_from_rho
