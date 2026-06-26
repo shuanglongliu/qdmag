@@ -34,10 +34,10 @@ class one_local_spin:
 
 class many_spins:
     """ Spin operators relevant to several spins """
-    def __init__(self, Ss, nS, gfactors):
+    def __init__(self, Ss, nS, gfactor):
         self.Ss = Ss
         self.nS = nS
-        self.gfactors = gfactors
+        self.gfactor = gfactor
         self.get_Smax()
         self.get_local_spins()
         self.dim = np.prod([self.local_spins[i].dim for i in range(self.nS)])
@@ -101,10 +101,10 @@ class many_spins:
         self.global_magmoms = []
         for i in range(self.nS):
             self.global_magmoms.append([])
-            i_site = self.gfactors[i]['site']
-            gs = self.gfactors[i]['gs']
+            i_site = self.gfactor[i]['site']
+            gs = self.gfactor[i]['gs']
             gs = np.array(gs).reshape((3,3))
-            A = self.gfactors[i]['reference_frame']
+            A = self.gfactor[i]['reference_frame']
             A = np.array(A).reshape((3,3))
             gs = np.matmul(np.transpose(A), np.matmul(gs, A))
             for j in range(3):
@@ -230,7 +230,7 @@ def read_input():
         anisotropy = data['anisotropy']
     else:
         anisotropy = []
-    gfactors = data['gfactors']
+    gfactor = data['gfactor']
     BT_Bgrid = data['BT_Bgrid']
     BT_Tgrid = data['BT_Tgrid']
     dynamics = data['dynamics']
@@ -238,8 +238,8 @@ def read_input():
         states = data['states']
     else:
         states = []
-    n_thread = data['n_thread']
-    return (Ss, nS, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, dynamics, states, n_thread)
+    n_threads = data['n_threads']
+    return (Ss, nS, exchange, anisotropy, gfactor, BT_Bgrid, BT_Tgrid, dynamics, states, n_threads)
 
 def create_outdir():
     """

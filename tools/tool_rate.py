@@ -11,13 +11,13 @@ from qdmag.core.classical_rate import get_Pe, evolve_P_stairs
 if __name__ == "__main__":
 
     # Read input parameters
-    Ss, nS, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, dynamics, states, n_thread = read_input()
+    Ss, nS, exchange, anisotropy, gfactor, BT_Bgrid, BT_Tgrid, dynamics, states, n_threads = read_input()
 
     # Set the number of threads
-    os.environ['OMP_NUM_THREADS'] = str(n_thread)
+    os.environ['OMP_NUM_THREADS'] = str(n_threads)
 
     # Spin system
-    spins = many_spins(Ss, nS, gfactors)
+    spins = many_spins(Ss, nS, gfactor)
 
     # Control parameters for time evolution
     T             = dynamics[0]['T']             # Temperature in K

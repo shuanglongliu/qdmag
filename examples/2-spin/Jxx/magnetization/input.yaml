@@ -7,7 +7,7 @@ exchange:
     coupling_matrix: [0.20,  0.00,  0.00, 0.00,  0.00,  0.00, 0.00, 0.00,  0.00]
     reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
 
-gfactors:
+gfactor:
   - site: 1
     gs: [2.000,  0.000,  0.000,  0.000,   2.000,  0.000,  0.000,  0.000,   2.000]
     reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
@@ -29,6 +29,7 @@ dynamics:
     - T: 0.200          # Temperature in K
       lambdaa: 10.00   # Spin phonon coupling constant in cm-1
       I0: 1.0e-10     # Prefactor for phonon density of states. 1e-4
+      alpha: 2.0      # Spectral-density exponent I(w) ~ w^alpha. <1 sub-Ohmic, =1 Ohmic, >1 super-Ohmic. Default 2.
 
     - Bt_type: 'linear'  # Type of the magnetic pulse as a function of time. Options: 'linear', 'pwlinear', 'sin', 'cspline'
       sweep_rate: 10.0e-09  # Slope of the magnetic field vs time. Unit: T per ps. Used only when Bt = 'linear'.
@@ -46,5 +47,5 @@ dynamics:
 # This is the same as the default basis set, as determined automatically by the code.
 states: "all"
 
-n_thread: 4 # Number of threads used in the calculation
+n_threads: 4 # Number of threads used in the calculation
 

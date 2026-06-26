@@ -45,7 +45,7 @@ anisotropy:
     Bkqs: [0.0556, 0.0400]
     reference_frame: [{exx:10.6f}, {exy:10.6f}, {exz:10.6f}, {eyx:10.6f}, {eyy:10.6f}, {eyz:10.6f}, {ezx:10.6f}, {ezy:10.6f}, {ezz:10.6f}]
   
-gfactors:
+gfactor:
   - site: 1
     gs: [2.000,  0.000,  0.000,  0.000,   2.000,  0.000,  0.000,  0.000,   2.000]
     reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
@@ -89,7 +89,7 @@ dynamics:
 
     - states: {states:s} # List of spin states to be included in the dynamics.
     
-n_thread: {n_thread:d} # Number of threads used in the calculation
+n_threads: {n_threads:d} # Number of threads used in the calculation
 
 """
 
@@ -160,7 +160,7 @@ class powder:
         self.save_rho = 'false' # Save the density matrix ?
         self.set_nt_rho() # self.nt_rho: Save the density matrix every nt_rho*deltat ps
         self.states = '[200,150,88,30,10,0,1,2,3,4,5,17,41,99,173,215]'
-        self.n_thread = 16
+        self.n_threads = 16
 
     def load_points_and_weights(self):
         """
@@ -228,7 +228,7 @@ class powder:
                 tmin=self.tmin, tmax=self.tmax, deltat=self.deltat,\
                 save_mag=self.save_mag, nt_mag=self.nt_mag,\
                 save_rho=self.save_rho, nt_rho=self.nt_rho,\
-                states=self.states, n_thread=self.n_thread))
+                states=self.states, n_threads=self.n_threads))
         os.chdir(root_dir)
 
     def submit_a_job(self, i):

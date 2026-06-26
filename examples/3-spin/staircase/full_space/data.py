@@ -36,7 +36,7 @@ anisotropy:
     Bkqs: [0.0556, 0.0400]
     reference_frame: [  1.000000,   0.000000,   0.000000,   0.000000,   1.000000,   0.000000,   0.000000,   0.000000,   1.000000]
   
-gfactors:
+gfactor:
   - site: 1
     gs: [2.000,  0.000,  0.000,  0.000,   2.000,  0.000,  0.000,  0.000,   2.000]
     reference_frame: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
@@ -82,7 +82,7 @@ dynamics:
 # states: [200,150,88,30,10,0,1,2,3,4,5,17,41,99,173,215] 
 states: 'all'
     
-n_thread: 32 # Number of threads used in the calculation
+n_threads: 32 # Number of threads used in the calculation
 """
 
 job_script = """#!/bin/bash -l
@@ -138,13 +138,13 @@ from qdmag.core.liouville import liouville
 if __name__ == "__main__":
 
     # Read input parameters
-    Ss, nS, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, dynamics, states, n_thread = read_input()
+    Ss, nS, exchange, anisotropy, gfactor, BT_Bgrid, BT_Tgrid, dynamics, states, n_threads = read_input()
 
     # Set the number of threads
-    os.environ['OMP_NUM_THREADS'] = str(n_thread)
+    os.environ['OMP_NUM_THREADS'] = str(n_threads)
 
     # Spin system
-    spins = many_spins(Ss, nS, gfactors)
+    spins = many_spins(Ss, nS, gfactor)
 
     # Set up the effective basis
     eff = effective_basis(spins, exchange, anisotropy, dynamics, states)
@@ -166,13 +166,13 @@ from qdmag.core.liouville import liouville
 if __name__ == "__main__":
 
     # Read input parameters
-    Ss, nS, exchange, anisotropy, gfactors, BT_Bgrid, BT_Tgrid, dynamics, states, n_thread = read_input()
+    Ss, nS, exchange, anisotropy, gfactor, BT_Bgrid, BT_Tgrid, dynamics, states, n_threads = read_input()
 
     # Set the number of threads
-    os.environ['OMP_NUM_THREADS'] = str(n_thread)
+    os.environ['OMP_NUM_THREADS'] = str(n_threads)
 
     # Spin system
-    spins = many_spins(Ss, nS, gfactors)
+    spins = many_spins(Ss, nS, gfactor)
 
     # Set up the effective basis
     eff = effective_basis(spins, exchange, anisotropy, dynamics, states)
