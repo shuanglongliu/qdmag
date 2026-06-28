@@ -90,12 +90,18 @@ class liouville:
         self.tmax          = dynamics[2]['tmax']          # Finial time in ps
         self.deltat        = dynamics[2]['deltat']        # Time step in ps
                       
-        self.save_mag      = dynamics[3]['save_mag']      # Save magnetization ?
-        self.nt_mag        = dynamics[3]['nt_mag']        # Calculate and save magnetization every nt_mag*deltat ps
-        self.save_rho      = dynamics[3]['save_rho']      # Save rho ?
-        self.nt_rho        = dynamics[3]['nt_rho']        # Save rho every nt_rho*deltat ps
-        self.save_drdt     = dynamics[3]['save_drdt']     # Save drho/dt (diagonal only)?
-        self.nt_drdt       = dynamics[3]['nt_drdt']       # Save drho/dt (diagonal only) every nt_drdt*deltat ps
+        # Output controls; the whole block and every key in it are optional
+        # and fall back to sensible defaults.
+        output = dynamics[3] if len(dynamics) > 3 else {}
+        self.save_mag      = output.get('save_mag', True)     # Save magnetization ?
+        self.save_rho      = output.get('save_rho', False)    # Save rho ?
+        self.save_drdt     = output.get('save_drdt', False)   # Save drho/dt (diagonal only)?
+        # Default nt_mag so that ~100 magnetization data points are saved over [tmin, tmax].
+        ntot = max(round((self.tmax - self.tmin) / self.deltat), 1)
+        default_nt_mag = max(round(ntot / 100), 1)
+        self.nt_mag        = output.get('nt_mag', default_nt_mag)  # Calculate and save magnetization every nt_mag*deltat ps
+        self.nt_rho        = output.get('nt_rho', 1)         # Save rho every nt_rho*deltat ps
+        self.nt_drdt       = output.get('nt_drdt', 1)        # Save drho/dt (diagonal only) every nt_drdt*deltat ps
 
         # Set the time
         self.t = self.tmin
