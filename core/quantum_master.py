@@ -78,11 +78,18 @@ def Phi(T, omega, I0, alpha=2):
         # dominates here, so a wrong sign should surface rather than be masked.
         result = ( I0*const1*np.abs(omega)**(alpha-1)/beta
                    - I0*np.sign(omega)*np.abs(omega)**alpha/2 )
+    elif beta * energy > 700:
+        # Large positive beta*energy: exp(beta*energy) overflows float64
+        # (max exponent ~709) and the Bose-Einstein factor 1/(exp(beta*energy)-1)
+        # underflows to 0. The transition requires absorbing more energy than the
+        # bath can supply at this temperature, so Phi -> 0. Return 0 directly to
+        # avoid the harmless overflow warning from exp.
+        result = 0.0 * omega  # preserve scalar/array shape of omega
     else:
         numerator = spectral_density(omega, I0=I0, alpha=alpha) - spectral_density(-omega, I0=I0, alpha=alpha)
         # Print beta, energy, and their product to check the divergence
         # print("beta, energy, beta*energy = {:12.4e} {:12.4e} {:12.4e}".format(beta, energy, beta*energy))
-        denominator = np.exp(beta * energy) - 1
+        denominator = np.expm1(beta * energy)
         result = numerator / denominator
     return result
 
