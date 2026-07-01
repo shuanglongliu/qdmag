@@ -1,5 +1,4 @@
 import os
-import math
 import h5py
 import numpy as np
 from qdmag.core.common import read_input, many_spins
@@ -30,9 +29,9 @@ if __name__ == "__main__":
     f1name = 'risvrho_S.h5'
     f2name = 'risvrho_E.h5'
     with h5py.File(f1name, "r") as f1, h5py.File(f2name, "w") as f2:
-        for i in range(math.floor((dynamics[2]['tmax'] - dynamics[2]['tmin']) / dynamics[2]['deltat'])):
-            t = dynamics[2]['tmin'] + i * dynamics[2]['deltat']
-            risvrho = f1["{:.3f}".format(t)][0:lio.dimds]
+        for tkey in f1.keys():
+            t = float(tkey)
+            risvrho = f1[tkey][0:lio.dimds]
             rho = lio.convert_risvrho_to_rho(risvrho)
             h = lio.h0 - Tesla2wavenumber * lio.Bt(t) * lio.Mz
             eigen = eigen_simple(h)
@@ -44,5 +43,5 @@ if __name__ == "__main__":
             # using the unitary transformation matrix M
             rho_E = np.matmul(M_dagger, np.matmul(rho, M))
             risvrho_E = lio.convert_rho_to_risvrho(rho_E)
-            f2.create_dataset("{:.3f}".format(t), data=risvrho_E)
+            f2.create_dataset(tkey, data=risvrho_E)
 
