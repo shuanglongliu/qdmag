@@ -76,7 +76,7 @@ The generalized Lindblad equation reads:
 
 $$\frac{d\rho(t)}{dt} = \frac{1}{i\hbar}[\hat{H}, \rho(t)] - \Gamma\rho(t)$$
 
-where the dissipator $\Gamma\rho(t) = ([X, R\rho(t)] + [X, R\rho(t)]^\dagger) \lambda^2\pi/\hbar$ accounts for spin-phonon coupling. The phonon spectral density is taken as $I(\omega) = I_0 \omega^\alpha \theta(\omega)$, with $\alpha = 2$ (super-Ohmic bath) as the default. The adjustable parameters are the prefactor $I_0$ and the spin-phonon coupling constant $\lambda$ (typically a few $\textrm{cm}^{-1}$).
+where the dissipator $\Gamma\rho(t) = ([X, R\rho(t)] + [X, R\rho(t)]^\dagger) \lambda^2\pi/\hbar$ accounts for spin-phonon coupling. The phonon spectral density is taken as $I(\omega) = I_0 \omega^\alpha \theta(\omega)$. The adjustable parameters are the prefactor $I_0$, the spin-phonon coupling constant $\lambda$ (typically a few $\textrm{cm}^{-1}$), and the spectral-density exponent $\alpha$ (default 2, giving a super-Ohmic bath; $\alpha < 1$ is sub-Ohmic and $\alpha = 1$ is Ohmic).
 
 ### Staircase Approximation
 
@@ -147,6 +147,8 @@ Runs the quantum master equation using the **fourth-order Runge–Kutta (RK4)** 
 lio.evolve_rho(method="RK4")
 ```
 
+Both solvers read their output controls from the optional fourth `dynamics` block in `input.yaml` (`save_mag`, `save_rho`, `save_drdt`, and the corresponding `nt_mag`/`nt_rho`/`nt_drdt` save intervals). The block, and every key within it, may be omitted, falling back to defaults that save only the magnetization at roughly 100 points over `[tmin, tmax]`.
+
 ### `tool_magnetization.py`
 
 Computes the **equilibrium magnetization M(B)** as a function of applied field. Supports both the full Hilbert space and the reduced effective basis. Output is written to `output/M-B.csv`.
@@ -190,6 +192,10 @@ HDF5 file utilities: estimates the **file size** for a given simulation (time du
 ### `tool_divergence.py`
 
 Diagnostic tool for examining the **magnitude of the Liouville superoperator** $\mathcal{L}$ and the time-evolution operator $\exp(\mathcal{L} \Delta t)$ over a grid of magnetic field values and time steps. Useful for identifying parameter regimes where the staircase propagation may become numerically unstable.
+
+### `tool_commutation.py`
+
+Diagnostic tool for checking **whether the Hamiltonian commutes with itself over time**. Checks (1) if the time-independent part $\hat{H}_\text{ex} + \hat{H}_\text{ZFS}$ commutes with the instantaneous Zeeman term $\hat{H}_\text{Zee}(t)$, and (2) if the full Hamiltonian $\hat{H}(t)$ commutes with its value at $t = 0$, at several sampled times over `[tmin, tmax]`. Useful for checking whether the eigenbasis stays fixed during the pulse (e.g., for an isotropic **g**-tensor with the field along a fixed axis).
 
 ### `tool_rate.py`
 
