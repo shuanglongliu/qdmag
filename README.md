@@ -139,27 +139,51 @@ Runs the quantum master equation using the **staircase approximation**. This is 
 lio.evolve_rho(method="staircase")
 ```
 
-The staircase propagator is selected by the optional `propagator` key in the third `dynamics` block of `input.yaml`, which takes one of three values:
+The staircase propagator is selected by the optional `propagator` key in the third `dynamics` block of `input.yaml`, which takes one of five values:
 
 | `propagator` | Method | Cost |
 | --- | --- | --- |
 | `Pade` (default) | Forms the full matrix exponential `expm(L*deltat)` with the scaling-and-squaring Padé approximant, then applies it | Fixed O(n^3), independent of `deltat`, but the matrix must fit in memory |
 | `Taylor` | Evaluates the action `exp(L*deltat) @ risvrho` with a truncated Taylor series (`scipy.sparse.linalg.expm_multiply`) | Proportional to `||L*deltat||` |
 | `Krylov` | Projects onto a Krylov subspace built by Arnoldi and exponentiates the small Hessenberg matrix | Proportional to `||L*deltat||`; uses `L` only through matrix-vector products, so it does not need `L` in dense form |
+| `Taylor_sparse` | As `Taylor`, but `L` is built and held in sparse CSR format | As `Taylor`, with a much cheaper per-stair rebuild of `L` |
+| `Krylov_sparse` | As `Krylov`, but `L` is built and held in sparse CSR format | As `Krylov`, with a much cheaper per-stair rebuild of `L` |
 
 `Krylov` accepts two further optional keys: `krylov_m` (subspace dimension, default 30) and `krylov_tol` (per-substep error tolerance, default 1e-10, kept tight because the error accumulates over as many as 1e5 stairs). The choice is resolved once when the `liouville` object is constructed, so it costs nothing inside the time loop, and an unrecognized name raises immediately.
 
-Which to use is governed by `||L*deltat||_1`, since only `Pade` is insensitive to it. Measured on the 1-spin example (`dimds = 578`, `krylov_m = 30`), one propagation costs:
+Which to use is governed by `||L*deltat||_1`, since only `Pade` is insensitive to it. Measured on the 1-spin example (`dimds = 578`, `krylov_m = 30`), one propagation costs (median of 5):
 
-| `deltat` (ps) | `\|\|L*deltat\|\|_1` | `Pade` [s] | `Taylor` [s] | `Krylov` [s] |
-| --- | --- | --- | --- | --- |
-| 0.01 | 5.4e-01 | 0.024 | 0.002 | **0.001** |
-| 0.1 | 5.4e+00 | 0.028 | 0.002 | **0.001** |
-| 1 | 5.4e+01 | 0.037 | 0.005 | **0.003** |
-| 10 | 5.4e+02 | 0.055 | 0.061 | **0.033** |
-| 100 | 5.4e+03 | **0.066** | 0.421 | 0.257 |
+| `deltat` (ps) | `\|\|L*deltat\|\|_1` | `Pade` [s] | `Taylor` [s] | `Krylov` [s] | `max\|Krylov - Pade\|` |
+| --- | --- | --- | --- | --- | --- |
+| 0.01 | 5.4e-01 | 0.0223 | 0.0019 | **0.0004** | 1.1e-16 |
+| 0.1 | 5.4e+00 | 0.0643 | 0.0029 | **0.0006** | 6.1e-16 |
+| 1 | 5.4e+01 | 0.0552 | 0.0118 | **0.0009** | 1.6e-15 |
+| 10 | 5.4e+02 | 0.0746 | 0.1029 | **0.0048** | 1.7e-14 |
+| 100 | 5.4e+03 | 0.1127 | 0.7232 | **0.0360** | 2.9e-13 |
 
-All three agree to machine precision. `Krylov` is roughly 2x faster than `Taylor` throughout and overtakes `Pade` below `||L*deltat||_1 ~ 1.5e3`; `Taylor` overtakes it below `~5e2`. For long-time pulsed-field runs the time step is large — `deltat = 1e4 ps` gives `||L*deltat||_1 = 5.4e5` — and `Pade` wins by orders of magnitude, which is why it is the default. Check with `np.linalg.norm(lio.L * lio.deltat, 1)` before committing to a long run. The reason to reach for `Krylov` is not speed at these sizes but systems where `L` is too large to exponentiate, or to store densely, at all.
+All three agree to machine precision. `Krylov` is the fastest of the three over this whole range and, extrapolating its linear growth in `||L*deltat||`, overtakes `Pade` only above `||L*deltat||_1 ~ 1e4`. For long-time pulsed-field runs the time step is large — `deltat = 1e4 ps` gives `||L*deltat||_1 = 5.4e5` — and there `Pade` wins by well over an order of magnitude, which is why it remains the default. Check with `np.linalg.norm(lio.L * lio.deltat, 1)` before committing to a long run.
+
+Timings on a laptop vary by 20-30% run to run; the orderings above are stable but the individual numbers should be read as indicative.
+
+### Sparse superoperators
+
+The `_sparse` propagators change how `L` is stored and rebuilt, not the mathematics. `A` has only `2*dim-1` nonzeros per row by construction, so `L` is structurally sparse and its density falls as `~2/dim`. Selecting `Taylor_sparse` or `Krylov_sparse` makes `liouville` build `L0`, `LA`, `LC` and `L` with `scipy.sparse` and skip the dense superoperator entirely, which is what makes large effective bases reachable — a dense `L` for the Mn trimer full space (`dim = 216`, `dimds = 93312`) would need 65 GiB.
+
+The rebuild of `L` at every stair is also much cheaper, because the sparse path assembles `A` and `C` from Kronecker products instead of looping in Python, and skips `get_indices_nzC` entirely. Measured in a real stair loop on the 1-spin example (`dimds = 578`, `deltat = 1 ps`, median of 15 interleaved rounds):
+
+| `propagator` | rebuild `L` [s] | propagate [s] | total per stair [s] |
+| --- | --- | --- | --- |
+| `Pade` | 0.0257 | 0.0766 | 0.1023 |
+| `Taylor` | 0.0314 | 0.0153 | 0.0467 |
+| `Krylov` | 0.0248 | 0.0133 | 0.0381 |
+| `Taylor_sparse` | **0.0064** | 0.0283 | 0.0347 |
+| `Krylov_sparse` | **0.0066** | 0.0223 | **0.0288** |
+
+All five agree to ~1e-13 after 100 stairs. The sparse rebuild is about 4x faster than the dense one. Note, though, that at this size `L` is still 34% dense, so sparse matrix-vector products lose to dense BLAS: both `_sparse` variants *propagate* more slowly than their dense twins and win only through the cheaper rebuild. The balance tips further towards sparse as `dim` grows and the density falls towards `~2/dim`.
+
+`method="RK4"` requires a dense `L` and raises if a `_sparse` propagator is selected.
+
+Independently of the propagator, `construct_A` now has a vectorized twin, `construct_A_vectorized`, which computes the same superoperator as `kron(H, Id) - kron(Id, H.T)` rather than by a Python double loop over `dims**2`. It is bitwise identical and about 80x faster (0.0636 s to 0.0008 s at `dimds = 578`), and it is what the dense path uses; the original loop is kept for reference. This cuts the per-stair rebuild of a dense `L` from about 0.086 s to 0.023 s, so existing `Pade` runs at the production `deltat` get roughly 1.6x faster end to end.
 
 Note: `propagator` replaces the earlier boolean `exp_Taylor` key. Input files that still set `exp_Taylor: true` fall back to the default `Pade` without warning.
 

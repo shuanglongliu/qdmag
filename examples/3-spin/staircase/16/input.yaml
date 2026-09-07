@@ -70,7 +70,7 @@ dynamics:
     - tmin: 0.0e+00             # Initial time in ps
       tmax: 2.0e+08             # Finial time in ps
       deltat: 2.0e+04           # Time step in ps
-      propagator: Pade          # Propagator for exp(L*deltat): Pade (default) | Taylor | Krylov
+      propagator: Pade          # Propagator for exp(L*deltat): Pade (default) | Taylor | Krylov | Taylor_sparse | Krylov_sparse
 
     - save_mag: true # Calculate and save magnetization during the dynamics ?
       nt_mag: 10  # Calculate and save magnetization every nt_mag*deltat ps

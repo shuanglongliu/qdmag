@@ -5,6 +5,7 @@ import h5py
 import time
 import pandas as pd
 from filelock import FileLock
+import scipy.sparse as sp
 from scipy.linalg import expm
 from scipy.sparse.linalg import expm_multiply
 from qdmag.core.constants import const1, Tesla2wavenumber
@@ -128,11 +129,9 @@ class liouville:
         # The pulsed magnetic field
         self.Bt = get_Bt(self.Bt_params)
 
-        # Set up the Liouville superoperator
-        self.set_up_liouville()
-
-        # Resolve the propagator choice once here instead of at every one of the
-        # up to ~1e5 time steps.
+        # Resolve the propagator choice once here instead of at every one of the up to ~1e5
+        # time steps. The choice also decides whether the Liouville superoperator is stored
+        # dense or sparse, so it is set up from inside set_up_propagator.
         self.set_up_propagator()
 
     def set_up_propagator(self):
@@ -142,13 +141,25 @@ class liouville:
         Called once from __init__ so that the time loop never branches on the choice, and so
         that an unrecognized name fails here rather than at the first of ~1e5 time steps.
         """
-        propagators = {'Pade':   self.propagate_risvrho_Pade,
-                       'Taylor': self.propagate_risvrho_Taylor,
-                       'Krylov': self.propagate_risvrho_Krylov}
+        # name -> (propagator, is L stored sparse?)
+        propagators = {'Pade':          (self.propagate_risvrho_Pade,          False),
+                       'Taylor':        (self.propagate_risvrho_Taylor,        False),
+                       'Krylov':        (self.propagate_risvrho_Krylov,        False),
+                       'Taylor_sparse': (self.propagate_risvrho_Taylor_sparse, True),
+                       'Krylov_sparse': (self.propagate_risvrho_Krylov_sparse, True)}
         if self.propagator not in propagators:
             raise ValueError("Invalid propagator: {}. Choose from {}.".format(
                 self.propagator, sorted(propagators)))
-        self.propagate_risvrho = propagators[self.propagator]
+        self.propagate_risvrho, self.sparse_L = propagators[self.propagator]
+
+        # Build the superoperator in the matching storage format, and bind the per-stair
+        # update to the matching routine so the time loop does not branch on the format.
+        if self.sparse_L:
+            self.set_up_liouville_sparse()
+            self.update_L = self.update_L_sparse_under_magnetic_field
+        else:
+            self.set_up_liouville()
+            self.update_L = self.update_L_under_magnetic_field
 
     def set_up_liouville(self):
         """
@@ -158,7 +169,7 @@ class liouville:
         # h0, A0, and L0 are time independent.
 
         # Construct the superoperator L0 at t = 0 ps without spin-phonon coupling
-        self.A0 = self.construct_A(self.h0, diagonal_H=False, dtype=np.complex128)
+        self.A0 = self.construct_A_vectorized(self.h0, dtype=np.complex128)
         self.L0 = self.construct_L(self.A0, None)
     
         # h_zee, h, A, Rhbar, C, CST, and L will be updated at each time step.
@@ -171,7 +182,7 @@ class liouville:
         self.h = self.h0 + self.h_zee
 
         # Construct the superoperator A at t = tmin ps, it will be updated at each time step
-        self.A = self.construct_A(self.h, diagonal_H=False, dtype=np.complex128)
+        self.A = self.construct_A_vectorized(self.h, dtype=np.complex128)
     
         # Construct the superoperator Rhbar in the S representation at t = tmin ps
         self.Rhbar = get_Rhbar(self.h, self.X, self.I0, self.T, alpha=self.alpha)
@@ -207,6 +218,55 @@ class liouville:
             self.rho = back_transform_O(self.rho, eigen)
             # Convert the density matrix to the double super density matrix
             self.risvrho = self.convert_rho_to_risvrho(self.rho)
+
+    def set_up_liouville_sparse(self):
+        """
+        Sparse counterpart of set_up_liouville: builds L0, C and L in CSR format and never
+        forms a dense superoperator. Selected by the '*_sparse' propagators.
+        """
+
+        # Row permutation I = i*dim + j -> It = j*dim + i, used by construct_CST_sparse.
+        self.index_transpose = np.arange(self.dims).reshape(self.dim, self.dim).T.ravel()
+
+        # h0, A0 and L0 are time independent.
+        self.A0 = self.construct_A_sparse(self.h0)
+        self.L0 = self.construct_L_sparse(self.A0, None)
+
+        # Zeeman term and effective Hamiltonian at t = tmin ps
+        self.h_zee = -1 * Tesla2wavenumber * self.Bt(self.tmin) * self.Mz
+        self.h = self.h0 + self.h_zee
+
+        # Rhbar in the S representation at t = tmin ps, updated at each time step
+        self.Rhbar = get_Rhbar(self.h, self.X, self.I0, self.T, alpha=self.alpha)
+
+        # C, CST, LA, LC and L at t = tmin ps
+        self.update_L_sparse_under_magnetic_field(self.Bt(self.tmin))
+
+    def update_L_sparse_under_magnetic_field(self, B):
+        """
+        Sparse counterpart of update_L_under_magnetic_field.
+
+        The block algebra is identical; it is only expressed through construct_L_sparse rather
+        than by assigning into the four quadrants of a preallocated dense array, since a sparse
+        matrix cannot be updated in place cheaply. Note that
+            LA = L0 + construct_L(Azee, None)
+        holds exactly, because construct_L is linear in A.
+        """
+
+        # Zeeman term and the Hamiltonian at this field
+        self.h_zee = -1 * Tesla2wavenumber * B * self.Mz
+        self.h = self.h0 + self.h_zee
+
+        # Coherent part: the time independent L0 plus the Zeeman contribution
+        Azee = self.construct_A_sparse(self.h_zee)
+        self.LA = (self.L0 + self.construct_L_sparse(Azee, None)).tocsr()
+
+        # Dissipative part, time dependent through Rhbar
+        self.Rhbar = update_Rhbar(self.Rhbar, self.h, self.X, self.I0, self.T, alpha=self.alpha)
+        self.C = self.construct_C_sparse(self.X, self.Rhbar)
+        self.LC = self.construct_L_sparse(None, self.C)
+
+        self.L = (self.LA + self.LC).tocsr()
 
     def construct_A(self, H, diagonal_H=False, dtype=np.complex128):
         """
@@ -256,6 +316,93 @@ class liouville:
                     A[I, J] = H[i, k] * kronecker_delta(l, j) - kronecker_delta(i, k) * H[l, j]
     
         return A
+
+    def construct_A_vectorized(self, H, dtype=np.complex128):
+        """
+        Same superoperator as construct_A, written as a pair of Kronecker products instead of
+        a Python double loop over dims**2:
+
+            A_{IJ} = H_{ik} delta_{lj} - delta_{ik} H_{lj}
+                   = kron(H, Id)_{IJ} - kron(Id, H^T)_{IJ},   I = i*N + j,  J = k*N + l
+
+        because kron(H, Id)[I, J] = H_{ik} delta_{jl} and kron(Id, H^T)[I, J] = delta_{ik} H_{lj}.
+        construct_A is kept for reference and gives bitwise identical results.
+        """
+
+        Id = np.eye(self.dim, dtype=dtype)
+        Hd = np.asarray(H, dtype=dtype)
+        return np.kron(Hd, Id) - np.kron(Id, Hd.T)
+
+    def construct_A_sparse(self, H, dtype=np.complex128):
+        """
+        Sparse counterpart of construct_A_vectorized, returned in CSR format.
+
+        A has only 2*dim-1 nonzeros per row by construction, so its density is ~2/dim and the
+        saving grows with the size of the system.
+        """
+
+        Id = sp.identity(self.dim, format='csr', dtype=dtype)
+        Hs = sp.csr_matrix(np.asarray(H, dtype=dtype))
+        return (sp.kron(Hs, Id, format='csr') - sp.kron(Id, Hs.T, format='csr')).tocsr()
+
+    def construct_C_sparse(self, X, Rhbar):
+        """
+        Sparse counterpart of construct_C, returned in CSR format.
+
+            C_{IJ} = (X Rhbar)_{ik} delta_{lj} - Rhbar_{ik} X_{lj}
+                   = kron(X Rhbar, Id)_{IJ} - kron(Rhbar, X^T)_{IJ}
+        """
+
+        XRhbar = np.matmul(X, Rhbar)
+        Id = sp.identity(self.dim, format='csr', dtype=np.complex128)
+        XRs = sp.csr_matrix(np.asarray(XRhbar, dtype=np.complex128))
+        Rs  = sp.csr_matrix(np.asarray(Rhbar,  dtype=np.complex128))
+        Xs  = sp.csr_matrix(np.asarray(X,      dtype=np.complex128))
+        return (sp.kron(XRs, Id, format='csr') - sp.kron(Rs, Xs.T, format='csr')).tocsr()
+
+    def construct_CST_sparse(self, C):
+        """
+        Sparse counterpart of construct_CST: CST_{IJ} = C_{It J} with I -> ij -> ji -> It.
+        That is a permutation of the rows of C, applied here with the precomputed index map
+        self.index_transpose (see set_up_liouville_sparse).
+        """
+
+        return C[self.index_transpose, :]
+
+    def construct_L_sparse(self, A, C):
+        """
+        Sparse counterpart of construct_L. Same block structure and same prefactors; only the
+        assembly differs, using sp.bmat instead of np.hstack/np.vstack.
+        """
+
+        lam = self.lambdaa**2 * np.pi * const1**2
+
+        if A is not None and C is None:
+            Are = A.real
+            Aim = A.imag
+            L11 =  const1 * Aim
+            L12 =  const1 * Are
+            L21 = -const1 * Are
+            L22 =  const1 * Aim
+        elif A is None and C is not None:
+            CST = self.construct_CST_sparse(C)
+            Cre, Cim = C.real, C.imag
+            CSTre, CSTim = CST.real, CST.imag
+            L11 = -lam * (Cre + CSTre)
+            L12 =  lam * (Cim + CSTim)
+            L21 = -lam * (Cim - CSTim)
+            L22 = -lam * (Cre - CSTre)
+        else:
+            CST = self.construct_CST_sparse(C)
+            Are, Aim = A.real, A.imag
+            Cre, Cim = C.real, C.imag
+            CSTre, CSTim = CST.real, CST.imag
+            L11 =  const1 * Aim - lam * (Cre + CSTre)
+            L12 =  const1 * Are + lam * (Cim + CSTim)
+            L21 = -const1 * Are - lam * (Cim - CSTim)
+            L22 =  const1 * Aim - lam * (Cre - CSTre)
+
+        return sp.bmat([[L11, L12], [L21, L22]], format='csr')
 
     def construct_C(self, X, Rhbar):
         """
@@ -456,7 +603,7 @@ class liouville:
         # Calculate the A operator corresponding to the Zeeman interaction
     
         self.h_zee = -1 * Tesla2wavenumber * B * self.Mz
-        Azee = self.construct_A(self.h_zee, diagonal_H=False, dtype=np.complex128)
+        Azee = self.construct_A_vectorized(self.h_zee, dtype=np.complex128)
         c1Azee = const1 * Azee
         c1Azeere = np.real(c1Azee)
         c1Azeeim = np.imag(c1Azee)
@@ -719,6 +866,29 @@ class liouville:
         """
         self.risvrho = self.exp_action_Krylov(self.risvrho, self.deltat)
 
+    def propagate_risvrho_Taylor_sparse(self):
+        """
+        Apply exp(L deltat) to risvrho with a truncated Taylor series, with L held sparse.
+        Selected by propagator = 'Taylor_sparse'. Do not call directly; call
+        self.propagate_risvrho, which set_up_propagator binds to one of the propagators.
+
+        The arithmetic is the same as propagate_risvrho_Taylor; the difference is that
+        set_up_propagator has built L in CSR format, so expm_multiply works on a sparse
+        operator and no dense superoperator is ever formed.
+        """
+        self.risvrho = expm_multiply(self.L * self.deltat, self.risvrho)
+
+    def propagate_risvrho_Krylov_sparse(self):
+        """
+        Apply exp(L deltat) to risvrho by Arnoldi projection, with L held sparse.
+        Selected by propagator = 'Krylov_sparse'. Do not call directly; call
+        self.propagate_risvrho, which set_up_propagator binds to one of the propagators.
+
+        Shares exp_action_Krylov with the dense variant: that code already touches L only
+        through matrix-vector products, so it works unchanged on a CSR matrix.
+        """
+        self.risvrho = self.exp_action_Krylov(self.risvrho, self.deltat)
+
     def exp_action_Krylov(self, v, dt):
         """
         Compute exp(L dt) v with Arnoldi, splitting dt into substeps short enough for a
@@ -785,32 +955,39 @@ class liouville:
         which is a heuristic rather than a bound, because L is not normal.
         """
         m = self.krylov_m
-        V = np.zeros((self.dimds, m+1))
+        # The basis is stored one vector per ROW so that every V[i] is contiguous. With the
+        # vectors in columns each Gram-Schmidt access is a strided slice, which costs about
+        # an order of magnitude more than the matrix-vector products themselves.
+        V = np.zeros((m+1, self.dimds))
         H = np.zeros((m+1, m))
 
         beta = np.linalg.norm(v)
         if beta == 0.0:
             return v.copy(), 0.0
-        V[:, 0] = v / beta
+        V[0] = v / beta
 
         happy = False
         for j in range(m):
-            w = self.L @ V[:, j] - mu * V[:, j]
-            # Modified Gram-Schmidt against the basis built so far
-            for i in range(j+1):
-                H[i, j] = np.dot(V[:, i], w)
-                w = w - H[i, j] * V[:, i]
+            w = self.L @ V[j] - mu * V[j]
+            # Classical Gram-Schmidt with one reorthogonalization (CGS2). As stable as
+            # modified Gram-Schmidt, but expressed as four matrix-vector products against
+            # the contiguous basis rather than 2*j scalar-level operations.
+            h1 = V[:j+1] @ w
+            w -= h1 @ V[:j+1]
+            h2 = V[:j+1] @ w
+            w -= h2 @ V[:j+1]
+            H[:j+1, j] = h1 + h2
             H[j+1, j] = np.linalg.norm(w)
             if H[j+1, j] <= self.krylov_breakdown_tol * beta:
                 # Happy breakdown: the subspace is invariant and the projection is exact.
                 m = j + 1
                 happy = True
                 break
-            V[:, j+1] = w / H[j+1, j]
+            V[j+1] = w / H[j+1, j]
 
         F = expm(H[:m, :m] * tau)
         scale = np.exp(mu * tau)
-        w = scale * beta * (V[:, :m] @ F[:, 0])
+        w = scale * beta * (F[:m, 0] @ V[:m])
         err = 0.0 if happy else abs(scale) * beta * H[m, m-1] * abs(F[m-1, 0])
         return w, err
 
@@ -829,7 +1006,7 @@ class liouville:
         self.t = self.tmin + it*self.deltat + self.deltat/2
         B = self.Bt(self.t)
         print("it/self.nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, self.nt, self.t, B))
-        self.update_L_under_magnetic_field(B)
+        self.update_L(B)
         self.propagate_risvrho()
 
     def evolve_risvrho_stairs(self):
@@ -1194,6 +1371,10 @@ class liouville:
         if method == "staircase":
             self.evolve_risvrho_stairs()
         elif method == "RK4":
+            if self.sparse_L:
+                raise ValueError(
+                    "The RK4 solver requires a dense L, but propagator = {} builds it sparse. "
+                    "Choose Pade, Taylor or Krylov for method='RK4'.".format(self.propagator))
             # Get the magnetic field pulse for the Runge-Kutta method
             self.nt, self.ts, self.Bs2, self.deltat = get_pulse_RK4_double_grid(self.Bt, self.tmin, self.tmax, self.deltat)
             # Initialize the L matrices
