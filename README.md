@@ -139,6 +139,8 @@ Runs the quantum master equation using the **staircase approximation**. This is 
 lio.evolve_rho(method="staircase")
 ```
 
+The staircase propagator is selected by the optional `exp_Taylor` key in the third `dynamics` block of `input.yaml`. With `exp_Taylor: false` (the default) each stair forms the full matrix exponential `expm(L*deltat)` and applies it to the density matrix; with `exp_Taylor: true` the action `exp(L*deltat) @ risvrho` is evaluated directly with a truncated Taylor series (`scipy.sparse.linalg.expm_multiply`), avoiding the matrix exponential altogether. The choice is resolved once when the `liouville` object is constructed, so it costs nothing inside the time loop.
+
 ### `tool_RK4.py`
 
 Runs the quantum master equation using the **fourth-order Runge–Kutta (RK4)** method. Suitable for short-time, high-accuracy propagation. Shares the same interface as `tool_staircase.py`, including the option to restart from a saved density matrix.

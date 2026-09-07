@@ -6,6 +6,7 @@ import time
 import pandas as pd
 from filelock import FileLock
 from scipy.linalg import expm
+from scipy.sparse.linalg import expm_multiply
 from qdmag.core.constants import const1, Tesla2wavenumber
 from qdmag.core.common import kronecker_delta, create_outdir
 from qdmag.core.common import get_Mv_from_rho, get_Mz_from_rho
@@ -89,6 +90,10 @@ class liouville:
         self.tmin          = dynamics[2]['tmin']          # Initial time in ps
         self.tmax          = dynamics[2]['tmax']          # Finial time in ps
         self.deltat        = dynamics[2]['deltat']        # Time step in ps
+        # Propagator for the staircase solver. If True, the action exp(L*deltat) @ risvrho is
+        # evaluated directly with a truncated Taylor series (scipy expm_multiply); if False,
+        # the full matrix exp(L*deltat) is formed first. Optional, defaults to False.
+        self.exp_Taylor    = dynamics[2].get('exp_Taylor', False)
                       
         # Output controls; the whole block and every key in it are optional
         # and fall back to sensible defaults.
@@ -111,6 +116,11 @@ class liouville:
 
         # Set up the Liouville superoperator
         self.set_up_liouville()
+
+        # Resolve the exp_Taylor choice once here instead of at every one of the
+        # up to ~1e5 time steps: self.propagate_risvrho is bound to the selected
+        # propagator and called with no branching inside the time loop.
+        self.propagate_risvrho = self.propagate_risvrho_Taylor if self.exp_Taylor else self.propagate_risvrho_expm
         
     def set_up_liouville(self):
         """
@@ -652,6 +662,23 @@ class liouville:
         # Save the data to a csv file
         df.to_csv(fobj, header=header, index=False)
 
+    def propagate_risvrho_expm(self):
+        """
+        Apply exp(L deltat) to risvrho by forming the full matrix exponential first.
+        Selected when exp_Taylor is False. Do not call directly; call self.propagate_risvrho,
+        which is bound to this method or to propagate_risvrho_Taylor in __init__.
+        """
+        self.risvrho = expm(self.L * self.deltat) @ self.risvrho
+
+    def propagate_risvrho_Taylor(self):
+        """
+        Apply exp(L deltat) to risvrho with a truncated Taylor series (scipy expm_multiply),
+        which never forms the full matrix exponential.
+        Selected when exp_Taylor is True. Do not call directly; call self.propagate_risvrho,
+        which is bound to this method or to propagate_risvrho_expm in __init__.
+        """
+        self.risvrho = expm_multiply(self.L * self.deltat, self.risvrho)
+
     def evolve_risvrho_onestair(self, it):
         """
         Evolve rho by deltat of constant Bfield using the analytical solution of the quantum master equation
@@ -659,6 +686,7 @@ class liouville:
             rho = np.vstack(rhore, rhoim)
             rho_new = exp(int_t1^t2 L dt) rho = exp(L deltat) rho
         Here, rho is a shortened notation for the RI-separated vectorized density matrix risvrho.
+        The propagator is chosen by the exp_Taylor input option, see __init__.
     
         Input: 
             it: the index of the time step, starting from 0.
@@ -667,7 +695,7 @@ class liouville:
         B = self.Bt(self.t)
         print("it/self.nt = {:9d}/{:9d}, t = {:18.3f}, B = {:15.3e}".format(it, self.nt, self.t, B))
         self.update_L_under_magnetic_field(B)
-        self.risvrho = expm(self.L * self.deltat) @ self.risvrho
+        self.propagate_risvrho()
 
     def evolve_risvrho_stairs(self):
         """
