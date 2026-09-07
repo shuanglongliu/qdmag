@@ -167,7 +167,7 @@ Timings on a laptop vary by 20-30% run to run; the orderings above are stable bu
 
 ### Sparse superoperators
 
-The `_sparse` propagators change how `L` is stored and rebuilt, not the mathematics. `A` has only `2*dim-1` nonzeros per row by construction, so `L` is structurally sparse and its density falls as `~2/dim`. Selecting `Taylor_sparse` or `Krylov_sparse` makes `liouville` build `L0`, `LA`, `LC` and `L` with `scipy.sparse` and skip the dense superoperator entirely, which is what makes large effective bases reachable — a dense `L` for the Mn trimer full space (`dim = 216`, `dimds = 93312`) would need 65 GiB.
+The `_sparse` propagators change how `L` is stored and rebuilt, not the mathematics. Selecting `Taylor_sparse` or `Krylov_sparse` makes `liouville` build `L0`, `LA`, `LC` and `L` with `scipy.sparse` and skip the dense superoperator entirely, which is what makes large effective bases reachable — a dense `L` for the Mn trimer full space (`dim = 216`, `dimds = 93312`) would need 65 GiB.
 
 The rebuild of `L` at every stair is also much cheaper, because the sparse path assembles `A` and `C` from Kronecker products instead of looping in Python, and skips `get_indices_nzC` entirely. Measured in a real stair loop on the 1-spin example (`dimds = 578`, `deltat = 1 ps`, median of 15 interleaved rounds):
 
@@ -179,7 +179,9 @@ The rebuild of `L` at every stair is also much cheaper, because the sparse path 
 | `Taylor_sparse` | **0.0064** | 0.0283 | 0.0347 |
 | `Krylov_sparse` | **0.0066** | 0.0223 | **0.0288** |
 
-All five agree to ~1e-13 after 100 stairs. The sparse rebuild is about 4x faster than the dense one. Note, though, that at this size `L` is still 34% dense, so sparse matrix-vector products lose to dense BLAS: both `_sparse` variants *propagate* more slowly than their dense twins and win only through the cheaper rebuild. The balance tips further towards sparse as `dim` grows and the density falls towards `~2/dim`.
+All five agree to ~1e-13 after 100 stairs. The sparse rebuild is about 4x faster than the dense one here, and the advantage grows with the basis size — 12.8x on `examples/3-spin/staircase/26` (`dim = 26`), since it is the `dims**2` Python loops that are eliminated.
+
+The sparse *propagation*, however, is a loss at these densities: both `_sparse` variants propagate more slowly than their dense twins, because sparse matrix-vector products do not beat dense BLAS until the density falls well below ~5%. And it does not fall with `dim`. Although `A` is sparse (`2*dim-1` nonzeros per row, so `~2/dim`), the dissipator is not: since `C = kron(X Rhbar, Id) - kron(Rhbar, X.T)` and `Rhbar` is essentially dense, the density of `C` — and hence of `L` — tracks the density of the spin-transition operator `X`, not `dim`. Measured across the four staircase examples (`dim` = 4, 16, 17, 26), `L` stays at 22-34% dense with no downward trend. Use the `_sparse` propagators when `L` cannot be stored densely at all, not as a general speed-up.
 
 `method="RK4"` requires a dense `L` and raises if a `_sparse` propagator is selected.
 
