@@ -139,7 +139,29 @@ Runs the quantum master equation using the **staircase approximation**. This is 
 lio.evolve_rho(method="staircase")
 ```
 
-The staircase propagator is selected by the optional `exp_Taylor` key in the third `dynamics` block of `input.yaml`. With `exp_Taylor: false` (the default) each stair forms the full matrix exponential `expm(L*deltat)` and applies it to the density matrix; with `exp_Taylor: true` the action `exp(L*deltat) @ risvrho` is evaluated directly with a truncated Taylor series (`scipy.sparse.linalg.expm_multiply`), avoiding the matrix exponential altogether. The choice is resolved once when the `liouville` object is constructed, so it costs nothing inside the time loop.
+The staircase propagator is selected by the optional `propagator` key in the third `dynamics` block of `input.yaml`, which takes one of three values:
+
+| `propagator` | Method | Cost |
+| --- | --- | --- |
+| `Pade` (default) | Forms the full matrix exponential `expm(L*deltat)` with the scaling-and-squaring Padé approximant, then applies it | Fixed O(n^3), independent of `deltat`, but the matrix must fit in memory |
+| `Taylor` | Evaluates the action `exp(L*deltat) @ risvrho` with a truncated Taylor series (`scipy.sparse.linalg.expm_multiply`) | Proportional to `||L*deltat||` |
+| `Krylov` | Projects onto a Krylov subspace built by Arnoldi and exponentiates the small Hessenberg matrix | Proportional to `||L*deltat||`; uses `L` only through matrix-vector products, so it does not need `L` in dense form |
+
+`Krylov` accepts two further optional keys: `krylov_m` (subspace dimension, default 30) and `krylov_tol` (per-substep error tolerance, default 1e-10, kept tight because the error accumulates over as many as 1e5 stairs). The choice is resolved once when the `liouville` object is constructed, so it costs nothing inside the time loop, and an unrecognized name raises immediately.
+
+Which to use is governed by `||L*deltat||_1`, since only `Pade` is insensitive to it. Measured on the 1-spin example (`dimds = 578`, `krylov_m = 30`), one propagation costs:
+
+| `deltat` (ps) | `\|\|L*deltat\|\|_1` | `Pade` [s] | `Taylor` [s] | `Krylov` [s] |
+| --- | --- | --- | --- | --- |
+| 0.01 | 5.4e-01 | 0.024 | 0.002 | **0.001** |
+| 0.1 | 5.4e+00 | 0.028 | 0.002 | **0.001** |
+| 1 | 5.4e+01 | 0.037 | 0.005 | **0.003** |
+| 10 | 5.4e+02 | 0.055 | 0.061 | **0.033** |
+| 100 | 5.4e+03 | **0.066** | 0.421 | 0.257 |
+
+All three agree to machine precision. `Krylov` is roughly 2x faster than `Taylor` throughout and overtakes `Pade` below `||L*deltat||_1 ~ 1.5e3`; `Taylor` overtakes it below `~5e2`. For long-time pulsed-field runs the time step is large — `deltat = 1e4 ps` gives `||L*deltat||_1 = 5.4e5` — and `Pade` wins by orders of magnitude, which is why it is the default. Check with `np.linalg.norm(lio.L * lio.deltat, 1)` before committing to a long run. The reason to reach for `Krylov` is not speed at these sizes but systems where `L` is too large to exponentiate, or to store densely, at all.
+
+Note: `propagator` replaces the earlier boolean `exp_Taylor` key. Input files that still set `exp_Taylor: true` fall back to the default `Pade` without warning.
 
 ### `tool_RK4.py`
 

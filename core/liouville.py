@@ -55,6 +55,11 @@ Dimensions:
 # ============================================================================ #
 
 class liouville:
+
+    # Internal knobs of the 'Krylov' propagator, deliberately not exposed in input.yaml.
+    krylov_max_halvings  = 10     # Give up after this many substep halvings
+    krylov_breakdown_tol = 1e-12  # Relative threshold for detecting an invariant subspace
+
     def __init__(self, eff, dynamics):
         """
         eff: effective_basis object
@@ -90,10 +95,19 @@ class liouville:
         self.tmin          = dynamics[2]['tmin']          # Initial time in ps
         self.tmax          = dynamics[2]['tmax']          # Finial time in ps
         self.deltat        = dynamics[2]['deltat']        # Time step in ps
-        # Propagator for the staircase solver. If True, the action exp(L*deltat) @ risvrho is
-        # evaluated directly with a truncated Taylor series (scipy expm_multiply); if False,
-        # the full matrix exp(L*deltat) is formed first. Optional, defaults to False.
-        self.exp_Taylor    = dynamics[2].get('exp_Taylor', False)
+
+        # Propagator used by the staircase solver to apply exp(L*deltat) to risvrho.
+        #   'Pade'  : form the full matrix exponential with the scaling-and-squaring Pade
+        #             approximant (scipy expm), then apply it. Cost is independent of
+        #             deltat, but the matrix must fit in memory.
+        #   'Taylor': evaluate the action with a truncated Taylor series (expm_multiply).
+        #   'Krylov': project onto a Krylov subspace with Arnoldi, then exponentiate the
+        #             small Hessenberg matrix. Uses L only through matrix-vector products.
+        # Optional, defaults to 'Pade'. See set_up_propagator.
+        self.propagator    = dynamics[2].get('propagator', 'Pade')
+        # Parameters of the 'Krylov' propagator; ignored by the other two.
+        self.krylov_m      = min(dynamics[2].get('krylov_m', 30), self.dimds)  # Subspace dimension
+        self.krylov_tol    = dynamics[2].get('krylov_tol', 1e-10)              # Per-substep tolerance
                       
         # Output controls; the whole block and every key in it are optional
         # and fall back to sensible defaults.
@@ -117,11 +131,25 @@ class liouville:
         # Set up the Liouville superoperator
         self.set_up_liouville()
 
-        # Resolve the exp_Taylor choice once here instead of at every one of the
-        # up to ~1e5 time steps: self.propagate_risvrho is bound to the selected
-        # propagator and called with no branching inside the time loop.
-        self.propagate_risvrho = self.propagate_risvrho_Taylor if self.exp_Taylor else self.propagate_risvrho_expm
-        
+        # Resolve the propagator choice once here instead of at every one of the
+        # up to ~1e5 time steps.
+        self.set_up_propagator()
+
+    def set_up_propagator(self):
+        """
+        Bind self.propagate_risvrho to the propagator named by the 'propagator' input option.
+
+        Called once from __init__ so that the time loop never branches on the choice, and so
+        that an unrecognized name fails here rather than at the first of ~1e5 time steps.
+        """
+        propagators = {'Pade':   self.propagate_risvrho_Pade,
+                       'Taylor': self.propagate_risvrho_Taylor,
+                       'Krylov': self.propagate_risvrho_Krylov}
+        if self.propagator not in propagators:
+            raise ValueError("Invalid propagator: {}. Choose from {}.".format(
+                self.propagator, sorted(propagators)))
+        self.propagate_risvrho = propagators[self.propagator]
+
     def set_up_liouville(self):
         """
         Set up the Liouville superoperator.
@@ -662,11 +690,12 @@ class liouville:
         # Save the data to a csv file
         df.to_csv(fobj, header=header, index=False)
 
-    def propagate_risvrho_expm(self):
+    def propagate_risvrho_Pade(self):
         """
-        Apply exp(L deltat) to risvrho by forming the full matrix exponential first.
-        Selected when exp_Taylor is False. Do not call directly; call self.propagate_risvrho,
-        which is bound to this method or to propagate_risvrho_Taylor in __init__.
+        Apply exp(L deltat) to risvrho by forming the full matrix exponential first, with the
+        scaling-and-squaring Pade approximant of scipy.linalg.expm.
+        Selected by propagator = 'Pade'. Do not call directly; call self.propagate_risvrho,
+        which set_up_propagator binds to one of the propagators.
         """
         self.risvrho = expm(self.L * self.deltat) @ self.risvrho
 
@@ -674,10 +703,116 @@ class liouville:
         """
         Apply exp(L deltat) to risvrho with a truncated Taylor series (scipy expm_multiply),
         which never forms the full matrix exponential.
-        Selected when exp_Taylor is True. Do not call directly; call self.propagate_risvrho,
-        which is bound to this method or to propagate_risvrho_expm in __init__.
+        Selected by propagator = 'Taylor'. Do not call directly; call self.propagate_risvrho,
+        which set_up_propagator binds to one of the propagators.
         """
         self.risvrho = expm_multiply(self.L * self.deltat, self.risvrho)
+
+    def propagate_risvrho_Krylov(self):
+        """
+        Apply exp(L deltat) to risvrho by projecting onto a Krylov subspace built with Arnoldi.
+        Selected by propagator = 'Krylov'. Do not call directly; call self.propagate_risvrho,
+        which set_up_propagator binds to one of the propagators.
+
+        L is used only through matrix-vector products, so a sparse L can be substituted
+        without changing this code path.
+        """
+        self.risvrho = self.exp_action_Krylov(self.risvrho, self.deltat)
+
+    def exp_action_Krylov(self, v, dt):
+        """
+        Compute exp(L dt) v with Arnoldi, splitting dt into substeps short enough for a
+        Krylov subspace of dimension krylov_m to converge.
+
+        L is constant within one stair, so the splitting is exact:
+            exp(L dt) = [exp(L dt/k)]^k
+
+        Input:
+            v: the vector to propagate, of length dimds.
+            dt: the length of the time interval in ps.
+        """
+        # Spectral shift, exp(L dt) v = exp(mu dt) exp((L - mu I) dt) v. Re-centring the
+        # spectrum reduces the norm seen by the Arnoldi kernel. .diagonal() rather than
+        # np.trace so that a sparse L works unchanged.
+        mu = self.L.diagonal().sum() / self.dimds
+
+        # Number of substeps, chosen so that ||(L - mu I) tau||_1 is of the order of the
+        # Krylov dimension, which is the regime where a degree-m approximation converges.
+        # The shift is bounded by the triangle inequality to avoid forming L - mu I.
+        nrm = abs(self.L).sum(axis=0).max() + abs(mu)
+        theta = max(0.5 * self.krylov_m, 1.0)
+        k = max(1, int(np.ceil(nrm * abs(dt) / theta)))
+
+        tau = dt / k
+        for _ in range(k):
+            v = self.advance_substep_Krylov(v, tau, mu)
+        return v
+
+    def advance_substep_Krylov(self, v, tau, mu, depth=0):
+        """
+        Advance v by tau with one Arnoldi projection, halving the substep and recursing if
+        the a posteriori error estimate exceeds krylov_tol.
+
+        With tau already chosen from the norm of L the halving is a safety net that should
+        rarely trigger, so exceeding krylov_max_halvings is treated as an error rather than
+        silently accepted.
+        """
+        w, err = self.arnoldi_kernel(v, tau, mu)
+        if err <= self.krylov_tol * np.linalg.norm(v):
+            return w
+        if depth >= self.krylov_max_halvings:
+            raise RuntimeError(
+                "Krylov propagator failed to reach krylov_tol = {:.3e} after {:d} halvings "
+                "(error estimate {:.3e}). Increase krylov_m or loosen krylov_tol.".format(
+                    self.krylov_tol, self.krylov_max_halvings, err))
+        half = 0.5 * tau
+        v = self.advance_substep_Krylov(v, half, mu, depth+1)
+        return self.advance_substep_Krylov(v, half, mu, depth+1)
+
+    def arnoldi_kernel(self, v, tau, mu):
+        """
+        One Arnoldi projection: approximate exp((L - mu I) tau) v, rescaled by exp(mu tau),
+        from a Krylov subspace of dimension at most krylov_m.
+
+            V, H = Arnoldi(L - mu I, v),   A V_m = V_m H_m + h_{m+1,m} v_{m+1} e_m^T
+            exp(L tau) v ~ exp(mu tau) * ||v|| * V_m exp(H_m tau) e_1
+
+        L enters only through the product L @ V[:, j]. All arithmetic is real, since both L
+        and risvrho are real.
+
+        Returns the propagated vector and the a posteriori error estimate
+            ||v|| |h_{m+1,m}| |[exp(H_m tau)]_{m-1,0}|
+        which is a heuristic rather than a bound, because L is not normal.
+        """
+        m = self.krylov_m
+        V = np.zeros((self.dimds, m+1))
+        H = np.zeros((m+1, m))
+
+        beta = np.linalg.norm(v)
+        if beta == 0.0:
+            return v.copy(), 0.0
+        V[:, 0] = v / beta
+
+        happy = False
+        for j in range(m):
+            w = self.L @ V[:, j] - mu * V[:, j]
+            # Modified Gram-Schmidt against the basis built so far
+            for i in range(j+1):
+                H[i, j] = np.dot(V[:, i], w)
+                w = w - H[i, j] * V[:, i]
+            H[j+1, j] = np.linalg.norm(w)
+            if H[j+1, j] <= self.krylov_breakdown_tol * beta:
+                # Happy breakdown: the subspace is invariant and the projection is exact.
+                m = j + 1
+                happy = True
+                break
+            V[:, j+1] = w / H[j+1, j]
+
+        F = expm(H[:m, :m] * tau)
+        scale = np.exp(mu * tau)
+        w = scale * beta * (V[:, :m] @ F[:, 0])
+        err = 0.0 if happy else abs(scale) * beta * H[m, m-1] * abs(F[m-1, 0])
+        return w, err
 
     def evolve_risvrho_onestair(self, it):
         """
@@ -686,7 +821,7 @@ class liouville:
             rho = np.vstack(rhore, rhoim)
             rho_new = exp(int_t1^t2 L dt) rho = exp(L deltat) rho
         Here, rho is a shortened notation for the RI-separated vectorized density matrix risvrho.
-        The propagator is chosen by the exp_Taylor input option, see __init__.
+        The propagator is chosen by the propagator input option, see set_up_propagator.
     
         Input: 
             it: the index of the time step, starting from 0.
