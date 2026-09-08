@@ -187,8 +187,6 @@ The sparse *propagation*, however, is a loss at these densities: both `_sparse` 
 
 Independently of the propagator, `construct_A` now has a vectorized twin, `construct_A_vectorized`, which computes the same superoperator as `kron(H, Id) - kron(Id, H.T)` rather than by a Python double loop over `dims**2`. It is bitwise identical and about 80x faster (0.0636 s to 0.0008 s at `dimds = 578`), and it is what the dense path uses; the original loop is kept for reference. This cuts the per-stair rebuild of a dense `L` from about 0.086 s to 0.023 s, so existing `Pade` runs at the production `deltat` get roughly 1.6x faster end to end.
 
-Note: `propagator` replaces the earlier boolean `exp_Taylor` key. Input files that still set `exp_Taylor: true` fall back to the default `Pade` without warning.
-
 ### `tool_RK4.py`
 
 Runs the quantum master equation using the **fourth-order Runge–Kutta (RK4)** method. Suitable for short-time, high-accuracy propagation. Shares the same interface as `tool_staircase.py`, including the option to restart from a saved density matrix.
