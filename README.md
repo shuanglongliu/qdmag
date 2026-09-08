@@ -144,8 +144,8 @@ The staircase propagator is selected by the optional `propagator` key in the thi
 | `propagator` | Method | Cost |
 | --- | --- | --- |
 | `Pade` (default) | Forms the full matrix exponential `expm(L*deltat)` with the scaling-and-squaring Padé approximant, then applies it | Fixed O(n^3), independent of `deltat`, but the matrix must fit in memory |
-| `Taylor` | Evaluates the action `exp(L*deltat) @ risvrho` with a truncated Taylor series (`scipy.sparse.linalg.expm_multiply`) | Proportional to `||L*deltat||` |
-| `Krylov` | Projects onto a Krylov subspace built by Arnoldi and exponentiates the small Hessenberg matrix | Proportional to `||L*deltat||`; uses `L` only through matrix-vector products, so it does not need `L` in dense form |
+| `Taylor` | Evaluates the action `exp(L*deltat) @ risvrho` with a truncated Taylor series (`scipy.sparse.linalg.expm_multiply`) | Proportional to `\|\|L*deltat\|\|` |
+| `Krylov` | Projects onto a Krylov subspace built by Arnoldi and exponentiates the small Hessenberg matrix | Proportional to `\|\|L*deltat\|\|`; uses `L` only through matrix-vector products, so it does not need `L` in dense form |
 | `Taylor_sparse` | As `Taylor`, but `L` is built and held in sparse CSR format | As `Taylor`, with a much cheaper per-stair rebuild of `L` |
 | `Krylov_sparse` | As `Krylov`, but `L` is built and held in sparse CSR format | As `Krylov`, with a much cheaper per-stair rebuild of `L` |
 
