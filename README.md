@@ -150,7 +150,7 @@ The propagator that applies `exp(L*deltat)` at each stair is chosen by the optio
 
 `Krylov` also accepts `krylov_m` (subspace dimension, default 30) and `krylov_tol` (default 1e-10). An unrecognized name raises at construction, and `method="RK4"` requires a dense `L` so it rejects the `_sparse` variants.
 
-Keep the default `Pade` for production runs: the alternatives only overtake it for `||L*deltat||_1` below roughly 1e4, and a typical `deltat = 1e4 ps` is far above that. See [docs/propagators.md](docs/propagators.md) for the measurements, and for when the sparse variants are worth choosing.
+Keep the default `Pade` for production runs: the alternatives only overtake it for `||L*deltat||_1` below roughly 1e4, and a typical `deltat = 1e4 ps` is far above that. 
 
 ### `tool_RK4.py`
 
