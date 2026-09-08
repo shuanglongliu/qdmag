@@ -151,19 +151,23 @@ The staircase propagator is selected by the optional `propagator` key in the thi
 
 `Krylov` accepts two further optional keys: `krylov_m` (subspace dimension, default 30) and `krylov_tol` (per-substep error tolerance, default 1e-10, kept tight because the error accumulates over as many as 1e5 stairs). The choice is resolved once when the `liouville` object is constructed, so it costs nothing inside the time loop, and an unrecognized name raises immediately.
 
-Which to use is governed by `||L*deltat||_1`, since only `Pade` is insensitive to it. Measured on the 1-spin example (`dimds = 578`, `krylov_m = 30`), one propagation costs (median of 5):
+Which to use is governed by `||L*deltat||_1`, since only `Pade` is insensitive to it. Measured on the 1-spin example (`dimds = 578`, `krylov_m = 30`), one propagation costs (median of 3, fastest in bold):
 
 | `deltat` (ps) | `\|\|L*deltat\|\|_1` | `Pade` [s] | `Taylor` [s] | `Krylov` [s] | `max\|Krylov - Pade\|` |
 | --- | --- | --- | --- | --- | --- |
-| 0.01 | 5.4e-01 | 0.0223 | 0.0019 | **0.0004** | 1.1e-16 |
-| 0.1 | 5.4e+00 | 0.0643 | 0.0029 | **0.0006** | 6.1e-16 |
-| 1 | 5.4e+01 | 0.0552 | 0.0118 | **0.0009** | 1.6e-15 |
-| 10 | 5.4e+02 | 0.0746 | 0.1029 | **0.0048** | 1.7e-14 |
-| 100 | 5.4e+03 | 0.1127 | 0.7232 | **0.0360** | 2.9e-13 |
+| 0.01 | 5.4e-01 | 0.0257 | 0.0024 | **0.0006** | 1.1e-16 |
+| 0.1 | 5.4e+00 | 0.0527 | 0.0039 | **0.0007** | 6.1e-16 |
+| 1 | 5.4e+01 | 0.0684 | 0.0129 | **0.0010** | 1.6e-15 |
+| 10 | 5.4e+02 | 0.0955 | 0.1016 | **0.0046** | 1.7e-14 |
+| 100 | 5.4e+03 | 0.0848 | 0.7148 | **0.0365** | 2.9e-13 |
+| 1000 | 5.4e+04 | **0.1512** | 6.8399 | 0.3587 | 9.2e-13 |
+| 10000 | 5.4e+05 | **0.0770** | 39.1419 | 20.2686 | 9.9e-12 |
 
-All three agree to machine precision. `Krylov` is the fastest of the three over this whole range and, extrapolating its linear growth in `||L*deltat||`, overtakes `Pade` only above `||L*deltat||_1 ~ 1e4`. For long-time pulsed-field runs the time step is large — `deltat = 1e4 ps` gives `||L*deltat||_1 = 5.4e5` — and there `Pade` wins by well over an order of magnitude, which is why it remains the default. Check with `np.linalg.norm(lio.L * lio.deltat, 1)` before committing to a long run.
+All three agree to machine precision throughout. `Pade` is essentially flat — its cost does not depend on `deltat` — while `Taylor` and `Krylov` both grow with `||L*deltat||_1`, so the crossover falls between the 100 ps and 1000 ps rows, near `||L*deltat||_1 ~ 1e4`. Below it `Krylov` is the fastest of the three, by up to 40x; above it `Pade` wins, and at the production step of `deltat = 1e4 ps` it is some 260x faster than `Krylov` and 500x faster than `Taylor`. That is why `Pade` is the default. Check with `np.linalg.norm(lio.L * lio.deltat, 1)` before committing to a long run.
 
-Timings on a laptop vary by 20-30% run to run; the orderings above are stable but the individual numbers should be read as indicative.
+Note that `Krylov` grows *faster* than linearly in `||L*deltat||_1` — 56x between the last two rows for a 10x increase in norm. The number of Arnoldi substeps grows linearly, but the substeps also get more expensive: the thermal initial state is close to the steady state, so the early substeps hit a happy breakdown and terminate well short of `krylov_m`, and that discount disappears once the state has evolved. Extrapolating the small-`deltat` rows linearly would therefore understate `Krylov` badly at a production time step.
+
+Timings on a laptop vary substantially with machine load — the `Pade` column here scatters between 0.026 and 0.151 s despite being nominally constant, and a run of this table taken during a heavy 20-process sweep gave 105 s rather than 20 s for the last `Krylov` cell. The orderings and the crossover are stable; the individual numbers should be read as indicative.
 
 ### Sparse superoperators
 
