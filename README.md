@@ -136,25 +136,27 @@ The `tools/` directory contains standalone utility scripts for common tasks. Eac
 Runs the quantum master equation using the **staircase approximation**. This is the primary solver for long-time (millisecond-scale) dynamics. The initial density matrix can be set from thermal equilibrium or loaded from an existing HDF5 file to continue a prior run.
 
 ```python
-lio.evolve_rho(method="staircase")
+lio.evolve_rho()   # scheme taken from the 'method' key of input.yaml
 ```
 
-The propagator that applies `exp(L*deltat)` at each stair is chosen by the optional `propagator` key in the third `dynamics` block of `input.yaml`:
+The time-integration scheme is chosen by the optional `method` key in the third `dynamics` block of `input.yaml`, either `staircase` (default) or `RK4`.
 
-| `propagator` | Method |
+The propagator that applies `exp(L*deltat)` at each stair is chosen by the optional `exp_propagator` key in the same block:
+
+| `exp_propagator` | Method |
 | --- | --- |
 | `Pade` (default) | Full matrix exponential, scaling-and-squaring Padé. Cost independent of `deltat`, but `L` must fit in memory |
 | `Taylor` | Action of the exponential by truncated Taylor series (`expm_multiply`). Cost grows with `\|\|L*deltat\|\|` |
 | `Krylov` | Arnoldi projection onto a Krylov subspace. Cost grows with `\|\|L*deltat\|\|`; uses `L` only through matrix-vector products |
 | `Taylor_sparse`, `Krylov_sparse` | As above, but `L` is built and held in sparse CSR format |
 
-`Krylov` also accepts `krylov_m` (subspace dimension, default 30) and `krylov_tol` (default 1e-10). An unrecognized name raises at construction, and `method="RK4"` requires a dense `L` so it rejects the `_sparse` variants.
+`Krylov` also accepts `krylov_m` (subspace dimension, default 30) and `krylov_tol` (default 1e-10). An unrecognized name raises at construction, and `method: RK4` requires a dense `L` so it rejects the `_sparse` variants.
 
 Keep the default `Pade` for production runs: the alternatives only overtake it for `||L*deltat||_1` below roughly 1e4, and a typical `deltat = 1e4 ps` is far above that. 
 
 ### `tool_RK4.py`
 
-Runs the quantum master equation using the **fourth-order Runge–Kutta (RK4)** method. Suitable for short-time, high-accuracy propagation. Shares the same interface as `tool_staircase.py`, including the option to restart from a saved density matrix.
+Runs the quantum master equation using the **fourth-order Runge–Kutta (RK4)** method. Suitable for short-time, high-accuracy propagation. Shares the same interface as `tool_staircase.py`, including the option to restart from a saved density matrix. Passing `method` explicitly overrides the `method` key of `input.yaml`, so this script always runs RK4.
 
 ```python
 lio.evolve_rho(method="RK4")

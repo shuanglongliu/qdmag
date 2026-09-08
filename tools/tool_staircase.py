@@ -26,5 +26,6 @@ if __name__ == "__main__":
     #      fname="./output/T_0.6K_I0_1.00e-14_lambdaa_10.00/Bt_linear_sweep_rate_5.0e-08/rho/0.000-0.100ps_dt0.001ps.h5",
     #      t_init=lio.tmin)
 
-    # Evolve the density matrix using the staircase method
-    lio.evolve_rho(method="staircase")
+    # Evolve the density matrix. The scheme comes from the 'method' key of the third
+    # dynamics block of input.yaml ('staircase' by default, or 'RK4').
+    lio.evolve_rho()

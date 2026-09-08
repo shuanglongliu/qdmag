@@ -86,16 +86,27 @@ class liouville:
         print("Dimension of superoperators for the RI-separated vectorized density matrix: {:6d}\n".format(self.dimds))
 
         # Control parameters for time evolution
-        self.T             = dynamics[0]['T']             # Temperature in K
-        self.lambdaa       = dynamics[0]['lambdaa']       # Spin phonon coupling constant in cm-1
-        self.I0            = dynamics[0]['I0']            # Prefactor for the phonon density of states in ps
-        self.alpha         = dynamics[0].get('alpha', 2)  # Spectral-density exponent I(w) ~ w^alpha (sub-/Ohmic/super-Ohmic)
+        self.T              = dynamics[0]['T']             # Temperature in K
+        self.lambdaa        = dynamics[0]['lambdaa']       # Spin phonon coupling constant in cm-1
+        self.I0             = dynamics[0]['I0']            # Prefactor for the phonon density of states in ps
+        self.alpha          = dynamics[0].get('alpha', 2)  # Spectral-density exponent I(w) ~ w^alpha (sub-/Ohmic/super-Ohmic)
 
-        self.Bt_params     = dynamics[1]                  # Parameters for the pulsed magnetic field
+        self.Bt_params      = dynamics[1]                  # Parameters for the pulsed magnetic field
 
-        self.tmin          = dynamics[2]['tmin']          # Initial time in ps
-        self.tmax          = dynamics[2]['tmax']          # Finial time in ps
-        self.deltat        = dynamics[2]['deltat']        # Time step in ps
+        self.tmin           = dynamics[2]['tmin']          # Initial time in ps
+        self.tmax           = dynamics[2]['tmax']          # Finial time in ps
+        self.deltat         = dynamics[2]['deltat']        # Time step in ps
+
+        # Time-integration scheme used to evolve risvrho. Optional, defaults to 'staircase'.
+        #   'staircase': replace B(t) by a staircase and apply exp(L*deltat) exactly on
+        #                each stair. Stable for the large deltat that millisecond
+        #                dynamics requires.
+        #   'RK4'      : fourth-order Runge-Kutta on a double time grid. For short-time,
+        #                high-accuracy propagation; requires a dense L.
+        # See evolve_rho.
+        self.method         = dynamics[2].get('method', 'staircase')
+        if self.method not in ('staircase', 'RK4'):
+            raise ValueError("Invalid method: {}. Choose from ['RK4', 'staircase'].".format(self.method))
 
         # Propagator used by the staircase solver to apply exp(L*deltat) to risvrho.
         #   'Pade'  : form the full matrix exponential with the scaling-and-squaring Pade
@@ -104,18 +115,18 @@ class liouville:
         #   'Taylor': evaluate the action with a truncated Taylor series (expm_multiply).
         #   'Krylov': project onto a Krylov subspace with Arnoldi, then exponentiate the
         #             small Hessenberg matrix. Uses L only through matrix-vector products.
-        # Optional, defaults to 'Pade'. See set_up_propagator.
-        self.propagator    = dynamics[2].get('propagator', 'Pade')
+        # Optional, defaults to 'Pade'. See set_up_exp_propagator.
+        self.exp_propagator = dynamics[2].get('exp_propagator', 'Pade')
         # Parameters of the 'Krylov' propagator; ignored by the other two.
-        self.krylov_m      = min(dynamics[2].get('krylov_m', 30), self.dimds)  # Subspace dimension
-        self.krylov_tol    = dynamics[2].get('krylov_tol', 1e-10)              # Per-substep tolerance
+        self.krylov_m       = min(dynamics[2].get('krylov_m', 30), self.dimds)  # Subspace dimension
+        self.krylov_tol     = dynamics[2].get('krylov_tol', 1e-10)              # Per-substep tolerance
                       
         # Output controls; the whole block and every key in it are optional
         # and fall back to sensible defaults.
         output = dynamics[3] if len(dynamics) > 3 else {}
-        self.save_mag      = output.get('save_mag', True)     # Save magnetization ?
-        self.save_rho      = output.get('save_rho', False)    # Save rho ?
-        self.save_drdt     = output.get('save_drdt', False)   # Save drho/dt (diagonal only)?
+        self.save_mag       = output.get('save_mag', True)     # Save magnetization ?
+        self.save_rho       = output.get('save_rho', False)    # Save rho ?
+        self.save_drdt      = output.get('save_drdt', False)   # Save drho/dt (diagonal only)?
         # Default nt_mag so that ~100 magnetization data points are saved over [tmin, tmax].
         ntot = max(round((self.tmax - self.tmin) / self.deltat), 1)
         default_nt_mag = max(round(ntot / 100), 1)
@@ -131,26 +142,26 @@ class liouville:
 
         # Resolve the propagator choice once here instead of at every one of the up to ~1e5
         # time steps. The choice also decides whether the Liouville superoperator is stored
-        # dense or sparse, so it is set up from inside set_up_propagator.
-        self.set_up_propagator()
+        # dense or sparse, so it is set up from inside set_up_exp_propagator.
+        self.set_up_exp_propagator()
 
-    def set_up_propagator(self):
+    def set_up_exp_propagator(self):
         """
-        Bind self.propagate_risvrho to the propagator named by the 'propagator' input option.
+        Bind self.propagate_risvrho to the propagator named by the 'exp_propagator' input option.
 
         Called once from __init__ so that the time loop never branches on the choice, and so
         that an unrecognized name fails here rather than at the first of ~1e5 time steps.
         """
         # name -> (propagator, is L stored sparse?)
-        propagators = {'Pade':          (self.propagate_risvrho_Pade,          False),
-                       'Taylor':        (self.propagate_risvrho_Taylor,        False),
-                       'Krylov':        (self.propagate_risvrho_Krylov,        False),
-                       'Taylor_sparse': (self.propagate_risvrho_Taylor_sparse, True),
-                       'Krylov_sparse': (self.propagate_risvrho_Krylov_sparse, True)}
-        if self.propagator not in propagators:
-            raise ValueError("Invalid propagator: {}. Choose from {}.".format(
-                self.propagator, sorted(propagators)))
-        self.propagate_risvrho, self.sparse_L = propagators[self.propagator]
+        exp_propagators = {'Pade':          (self.propagate_risvrho_Pade,          False),
+                           'Taylor':        (self.propagate_risvrho_Taylor,        False),
+                           'Krylov':        (self.propagate_risvrho_Krylov,        False),
+                           'Taylor_sparse': (self.propagate_risvrho_Taylor_sparse, True),
+                           'Krylov_sparse': (self.propagate_risvrho_Krylov_sparse, True)}
+        if self.exp_propagator not in exp_propagators:
+            raise ValueError("Invalid exp_propagator: {}. Choose from {}.".format(
+                self.exp_propagator, sorted(exp_propagators)))
+        self.propagate_risvrho, self.sparse_L = exp_propagators[self.exp_propagator]
 
         # Build the superoperator in the matching storage format, and bind the per-stair
         # update to the matching routine so the time loop does not branch on the format.
@@ -222,7 +233,7 @@ class liouville:
     def set_up_liouville_sparse(self):
         """
         Sparse counterpart of set_up_liouville: builds L0, C and L in CSR format and never
-        forms a dense superoperator. Selected by the '*_sparse' propagators.
+        forms a dense superoperator. Selected by the '*_sparse' exp_propagator values.
         """
 
         # Row permutation I = i*dim + j -> It = j*dim + i, used by construct_CST_sparse.
@@ -841,8 +852,8 @@ class liouville:
         """
         Apply exp(L deltat) to risvrho by forming the full matrix exponential first, with the
         scaling-and-squaring Pade approximant of scipy.linalg.expm.
-        Selected by propagator = 'Pade'. Do not call directly; call self.propagate_risvrho,
-        which set_up_propagator binds to one of the propagators.
+        Selected by exp_propagator = 'Pade'. Do not call directly; call self.propagate_risvrho,
+        which set_up_exp_propagator binds to one of the propagators.
         """
         self.risvrho = expm(self.L * self.deltat) @ self.risvrho
 
@@ -850,16 +861,16 @@ class liouville:
         """
         Apply exp(L deltat) to risvrho with a truncated Taylor series (scipy expm_multiply),
         which never forms the full matrix exponential.
-        Selected by propagator = 'Taylor'. Do not call directly; call self.propagate_risvrho,
-        which set_up_propagator binds to one of the propagators.
+        Selected by exp_propagator = 'Taylor'. Do not call directly; call self.propagate_risvrho,
+        which set_up_exp_propagator binds to one of the propagators.
         """
         self.risvrho = expm_multiply(self.L * self.deltat, self.risvrho)
 
     def propagate_risvrho_Krylov(self):
         """
         Apply exp(L deltat) to risvrho by projecting onto a Krylov subspace built with Arnoldi.
-        Selected by propagator = 'Krylov'. Do not call directly; call self.propagate_risvrho,
-        which set_up_propagator binds to one of the propagators.
+        Selected by exp_propagator = 'Krylov'. Do not call directly; call self.propagate_risvrho,
+        which set_up_exp_propagator binds to one of the propagators.
 
         L is used only through matrix-vector products, so a sparse L can be substituted
         without changing this code path.
@@ -869,11 +880,11 @@ class liouville:
     def propagate_risvrho_Taylor_sparse(self):
         """
         Apply exp(L deltat) to risvrho with a truncated Taylor series, with L held sparse.
-        Selected by propagator = 'Taylor_sparse'. Do not call directly; call
-        self.propagate_risvrho, which set_up_propagator binds to one of the propagators.
+        Selected by exp_propagator = 'Taylor_sparse'. Do not call directly; call
+        self.propagate_risvrho, which set_up_exp_propagator binds to one of the propagators.
 
         The arithmetic is the same as propagate_risvrho_Taylor; the difference is that
-        set_up_propagator has built L in CSR format, so expm_multiply works on a sparse
+        set_up_exp_propagator has built L in CSR format, so expm_multiply works on a sparse
         operator and no dense superoperator is ever formed.
         """
         self.risvrho = expm_multiply(self.L * self.deltat, self.risvrho)
@@ -881,8 +892,8 @@ class liouville:
     def propagate_risvrho_Krylov_sparse(self):
         """
         Apply exp(L deltat) to risvrho by Arnoldi projection, with L held sparse.
-        Selected by propagator = 'Krylov_sparse'. Do not call directly; call
-        self.propagate_risvrho, which set_up_propagator binds to one of the propagators.
+        Selected by exp_propagator = 'Krylov_sparse'. Do not call directly; call
+        self.propagate_risvrho, which set_up_exp_propagator binds to one of the propagators.
 
         Shares exp_action_Krylov with the dense variant: that code already touches L only
         through matrix-vector products, so it works unchanged on a CSR matrix.
@@ -998,7 +1009,7 @@ class liouville:
             rho = np.vstack(rhore, rhoim)
             rho_new = exp(int_t1^t2 L dt) rho = exp(L deltat) rho
         Here, rho is a shortened notation for the RI-separated vectorized density matrix risvrho.
-        The propagator is chosen by the propagator input option, see set_up_propagator.
+        The propagator is chosen by the exp_propagator input option, see set_up_exp_propagator.
     
         Input: 
             it: the index of the time step, starting from 0.
@@ -1360,21 +1371,23 @@ class liouville:
         # Call get_chimz_from_rho
         return self.get_chimz_from_rho(t, dt=dt)
 
-    def evolve_rho(self, method="staircase"):
+    def evolve_rho(self, method=None):
         """
         Evolve the RI-separated vectorized density matrix using the specified method.
         method: 
             "staircase" for the staircase approximation
             "RK4" for the Runge-Kutta method
+            None (default) to take the 'method' input option, see __init__.
         """
+        method = self.method if method is None else method
         start = time.time()
         if method == "staircase":
             self.evolve_risvrho_stairs()
         elif method == "RK4":
             if self.sparse_L:
                 raise ValueError(
-                    "The RK4 solver requires a dense L, but propagator = {} builds it sparse. "
-                    "Choose Pade, Taylor or Krylov for method='RK4'.".format(self.propagator))
+                    "The RK4 solver requires a dense L, but exp_propagator = {} builds it sparse. "
+                    "Choose Pade, Taylor or Krylov for method='RK4'.".format(self.exp_propagator))
             # Get the magnetic field pulse for the Runge-Kutta method
             self.nt, self.ts, self.Bs2, self.deltat = get_pulse_RK4_double_grid(self.Bt, self.tmin, self.tmax, self.deltat)
             # Initialize the L matrices
