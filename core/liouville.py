@@ -912,15 +912,21 @@ class liouville:
             v: the vector to propagate, of length dimds.
             dt: the length of the time interval in ps.
         """
-        # Spectral shift, exp(L dt) v = exp(mu dt) exp((L - mu I) dt) v. Re-centring the
-        # spectrum reduces the norm seen by the Arnoldi kernel. .diagonal() rather than
-        # np.trace so that a sparse L works unchanged.
+        # Spectral shift, exp(L dt) v = exp(mu dt) exp((L - mu I) dt) v. The shift leaves the
+        # Krylov approximation itself unchanged, since K_m(L - mu I, v) = K_m(L, v) and
+        # H(L - mu I) = H(L) - mu I; what it buys is a smaller ||L - mu I||_1, hence fewer
+        # substeps below, and a better scaled small exponential in arnoldi_kernel.
+        # .diagonal() rather than np.trace so that a sparse L works unchanged.
         mu = self.L.diagonal().sum() / self.dimds
 
         # Number of substeps, chosen so that ||(L - mu I) tau||_1 is of the order of the
         # Krylov dimension, which is the regime where a degree-m approximation converges.
-        # The shift is bounded by the triangle inequality to avoid forming L - mu I.
-        nrm = abs(self.L).sum(axis=0).max() + abs(mu)
+        # ||L - mu I||_1 is assembled from the column sums of |L| by correcting the diagonal
+        # alone, so neither L - mu I nor a dense copy of L is ever formed. Bounding it by
+        # ||L||_1 + |mu| instead would exceed ||L||_1 and so undo the point of the shift.
+        colsum = np.asarray(abs(self.L).sum(axis=0)).ravel()
+        diag = self.L.diagonal()
+        nrm = np.max(colsum - np.abs(diag) + np.abs(diag - mu))
         theta = max(0.5 * self.krylov_m, 1.0)
         k = max(1, int(np.ceil(nrm * abs(dt) / theta)))
 
@@ -962,8 +968,15 @@ class liouville:
         and risvrho are real.
 
         Returns the propagated vector and the a posteriori error estimate
-            ||v|| |h_{m+1,m}| |[exp(H_m tau)]_{m-1,0}|
-        which is a heuristic rather than a bound, because L is not normal.
+            ||v|| |h_{m+1,m}| tau |[phi_1(H_m tau)]_{m-1,0}|,   phi_1(z) = (exp(z) - 1) / z
+        the leading (k = 1) term of Saad's error series. It is the truncation of an exact
+        identity rather than a bound, so it can under-estimate for a strongly non-normal L.
+        Substituting exp(H_m tau) for phi_1(H_m tau), or dropping the factor tau, inflates
+        the estimate by about m and by 1/tau respectively, and costs needless substepping.
+
+        Both exp(H_m tau) and phi_1(H_m tau) e_1 are read off one exponential of the
+        augmented Hessenberg matrix, since
+            expm([[H_m tau, e_1], [0, 0]]) = [[exp(H_m tau), phi_1(H_m tau) e_1], [0, 1]].
         """
         m = self.krylov_m
         # The basis is stored one vector per ROW so that every V[i] is contiguous. With the
@@ -996,10 +1009,15 @@ class liouville:
                 break
             V[j+1] = w / H[j+1, j]
 
-        F = expm(H[:m, :m] * tau)
+        # A single (m+1) x (m+1) exponential yields both exp(H_m tau), as the leading m x m
+        # block, and phi_1(H_m tau) e_1, as the last column, with no ill-conditioned solve.
+        Haug = np.zeros((m+1, m+1))
+        Haug[:m, :m] = H[:m, :m] * tau
+        Haug[0, m] = 1.0
+        E = expm(Haug)
         scale = np.exp(mu * tau)
-        w = scale * beta * (F[:m, 0] @ V[:m])
-        err = 0.0 if happy else abs(scale) * beta * H[m, m-1] * abs(F[m-1, 0])
+        w = scale * beta * (E[:m, 0] @ V[:m])
+        err = 0.0 if happy else abs(scale) * beta * H[m, m-1] * abs(tau) * abs(E[m-1, m])
         return w, err
 
     def evolve_risvrho_onestair(self, it):
