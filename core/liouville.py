@@ -281,6 +281,11 @@ class liouville:
 
     def construct_A(self, H, diagonal_H=False, dtype=np.complex128):
         """
+        Index-level reference implementation, kept for documentation and not called anywhere:
+        every code path builds A through construct_A_vectorized or construct_A_sparse, which
+        return bitwise identical results. The double loop below spells out the definition
+        element by element, and is orders of magnitude slower for that reason.
+
         [H, rho]_I = A_{IJ} rho_J
           I = i * N + j, N = dim(H)
           J = k * N + l, N = dim(H)
@@ -337,7 +342,10 @@ class liouville:
                    = kron(H, Id)_{IJ} - kron(Id, H^T)_{IJ},   I = i*N + j,  J = k*N + l
 
         because kron(H, Id)[I, J] = H_{ik} delta_{jl} and kron(Id, H^T)[I, J] = delta_{ik} H_{lj}.
-        construct_A is kept for reference and gives bitwise identical results.
+        This is the routine the dense code paths call; construct_A is kept only as the
+        index-level reference and gives bitwise identical results. Note that construct_A's
+        diagonal_H=True branch agrees with this one whenever H really is diagonal, and
+        otherwise silently drops the off-diagonal elements, so it adds no capability.
         """
 
         Id = np.eye(self.dim, dtype=dtype)
@@ -501,7 +509,8 @@ class liouville:
             L21 = -const1 * Are - lambdaa**2 pi const1**2 (Cim - CSTim)
             L22 =  const1 * Aim - lambdaa**2 pi const1**2 (Cre - CSTre)
     
-        A: Superoperator for coherent evolution. See the function construct_A.
+        A: Superoperator for coherent evolution. See the function construct_A_vectorized,
+           or construct_A_sparse for the CSR counterpart.
         C: Superoperator for spin-phonon coupling (incoherent evolution). See the function construct_C.
         dim: Dimension of the effective Hamiltonian
         dims: Dimension of superoperators
