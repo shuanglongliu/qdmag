@@ -198,7 +198,7 @@ Transforms the density matrix between representations. Converts $\rho(t)$ from t
 
 ### `tool_quadrature.py`
 
-Generates and saves **Lebedev + Gauss-Legendre quadrature points and weights** for powder averaging. Euler angles (α, β, γ) in degrees and combined weights are written to `points_and_weights.txt`. Optional visualization of the Lebedev sphere points and Gauss-Legendre γ points is available via matplotlib.
+Generates and saves **Lebedev quadrature points and weights** for powder averaging. The average needs only two angles: with the field along the global $z$ axis and an isotropic $g$ tensor, the only geometric variable is the direction $\mathbf{n}$ of the field in the ZFS reference frame, and the first Euler angle $\alpha$ merely rotates the Hamiltonian about the field axis. Each Lebedev point is therefore read as one $\mathbf{n}$ and mapped back onto Euler angles $(\alpha, \beta, \gamma) = (0, \arccos n_z, \mathrm{atan2}(n_y, -n_x))$, which are written in degrees together with the weights to `points_and_weights.txt`. The angles are in degrees both in the file and in the returned array. Optional visualization of the sampled directions is available via matplotlib.
 
 ### `tool_hdf5.py`
 

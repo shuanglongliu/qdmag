@@ -2,8 +2,13 @@ import os
 import subprocess
 import numpy as np
 import pandas as pd
+import yaml
 from scipy.spatial.transform import Rotation as R
 from qdmag.core.common import print_emat_array
+from qdmag.core.common import many_spins, eigen_handy
+from qdmag.core.common import get_h_exchange, get_h_anisotropy, get_h_Zeeman_Mv_eff
+from qdmag.core.common import get_partition_function, get_magnetic_moment_Mv_tot
+from qdmag.core.constants import factor_ex
 
 root_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -152,24 +157,29 @@ class powder:
     def set_directory_name(self, i):
         self.directory = "{:d}".format(i+1)
 
-    def get_emat(self, i):
+    def get_emat_from_angles(self, alpha, beta, gamma):
         """
-        Get the basis vectors for the i-th orientation.
+        Get the basis vectors for the intrinsic ZYZ Euler angles alpha, beta and
+        gamma, all in degrees, as they are stored in points_and_weights.txt.
         emat = [ex, ey, ez] with ex, ey, ez being row-vectors
         """
-        rot = R.from_euler('ZYZ', [self.alphas[i], self.betas[i], self.gammas[i]], degrees=True)
+        rot = R.from_euler('ZYZ', [alpha, beta, gamma], degrees=True)
         rotmat = rot.as_matrix()
         # emat = np.transpose( rotmat * np.eye(3) ) = np.transpose( rotmat )
         self.emat = rotmat.T
         # print_emat_array(self.emat)
 
-    def get_input(self, i):
-        self.get_emat(i)
-        self.set_directory_name(i)
-        os.chdir(self.directory)
-        os.system('pwd')
-        with open("input.yaml", "w") as f:
-            f.write(input.format( \
+    def get_emat(self, i):
+        """
+        Get the basis vectors for the i-th orientation.
+        """
+        self.get_emat_from_angles(self.alphas[i], self.betas[i], self.gammas[i])
+
+    def format_input(self):
+        """
+        The content of input.yaml for the orientation currently held in self.emat.
+        """
+        return input.format( \
                 exx=self.emat[0, 0], exy=self.emat[0, 1], exz=self.emat[0, 2],\
                 eyx=self.emat[1, 0], eyy=self.emat[1, 1], eyz=self.emat[1, 2],\
                 ezx=self.emat[2, 0], ezy=self.emat[2, 1], ezz=self.emat[2, 2],\
@@ -179,7 +189,15 @@ class powder:
                 tmin=self.tmin, tmax=self.tmax, deltat=self.deltat,\
                 save_mag=self.save_mag, nt_mag=self.nt_mag,\
                 save_rho=self.save_rho, nt_rho=self.nt_rho,\
-                n_threads=self.n_threads))
+                n_threads=self.n_threads)
+
+    def get_input(self, i):
+        self.get_emat(i)
+        self.set_directory_name(i)
+        os.chdir(self.directory)
+        os.system('pwd')
+        with open("input.yaml", "w") as f:
+            f.write(self.format_input())
         os.chdir(root_dir)
 
     def create_directories(self):
@@ -339,6 +357,84 @@ class powder:
         df.to_csv("M-B_dy.csv", index=False)
         print("Average dynamical magnetization saved to ./M-B_dy.csv")
 
+    def get_M_eq_one_orientation(self, alpha, beta, gamma, Bs):
+        r"""
+        Thermal-equilibrium magnetization along the field for a single orientation.
+
+        alpha, beta, gamma: intrinsic ZYZ Euler angles in degrees.
+        Bs: magnetic fields in Tesla. The field points along the global z axis,
+            as it does in the BT_Bgrid of the input file (thetaB = phiB = 0).
+        Returns Mz, one entry per field, in units of the Bohr magneton.
+
+        The Hamiltonian is parsed out of the same input template that is written
+        to input.yaml and is built by the same core routines as
+        tool_magnetization.py, so all units are the ones of qdmag.core.constants:
+        Bkqs and eigenvalues in cm-1, B in Tesla (converted by Tesla2wavenumber
+        inside get_h_Zeeman_Mv_eff) and self.T in Kelvin (converted by
+        Kelvin2wavenumber inside get_partition_function).
+        """
+        self.get_emat_from_angles(alpha, beta, gamma)
+        data = yaml.safe_load(self.format_input())
+
+        spins = many_spins(data['spins'], len(data['spins']), data['gfactor'])
+        h0 = get_h_exchange(spins, data.get('exchange', []), factor_ex) \
+           + get_h_anisotropy(spins, data.get('anisotropy', []))
+
+        Mz = np.zeros(len(Bs))
+        for iB in range(len(Bs)):
+            # [B, thetaB, phiB], with the angles in deg
+            h = h0 + get_h_Zeeman_Mv_eff(spins.Mv_tot, [Bs[iB], 0.0, 0.0], "spherical")
+            eigen = eigen_handy(h)
+            Z, _ = get_partition_function(eigen, self.T)
+            Mz[iB] = get_magnetic_moment_Mv_tot(spins.Mv_tot, eigen, self.T, Z)[2]
+        return Mz
+
+    def convergence_test(self, Bs=(2.0, 10.0, 50.0), lebedev_degrees=(5, 9, 15, 21, 31, 47),
+                         save_file=True):
+        """
+        Powder averaged equilibrium magnetization versus the order of the quadrature.
+
+        Bs: fields in Tesla at which the averages are compared.
+        lebedev_degrees: degrees of the Lebedev rules to be tested. A degree that
+            has no Lebedev rule is replaced by the closest one that has, so the
+            rules are labelled by the degree that is actually used.
+        Returns a data frame with one row per rule, which is the table printed.
+
+        Note that this test only covers the thermal equilibrium. The dynamical
+        magnetization is averaged over the same orientations, so a rule that is
+        converged here is not automatically converged there.
+        """
+        # Imported here so that the job-generating part of this script does not
+        # depend on matplotlib.
+        from tool_quadrature import generate_powder_quadrature, closest_lebedev_degree
+
+        # Collect the rules to be compared
+        rules = []
+        for degree in lebedev_degrees:
+            degree = closest_lebedev_degree(degree)
+            rules.append((f"Lebedev {degree:3d}",) + generate_powder_quadrature(degree, save_file=False))
+
+        print(f"\nPowder averaged Mz at T = {self.T:.1f} K, in Bohr magnetons\n")
+        header = f"{'rule':>15} {'points':>7}   " + " ".join(f"{'B = ' + f'{B:g} T':>14}" for B in Bs)
+        print(header)
+        rows = []
+        for name, euler_angles, weights in rules:
+            # Announce the rule before running it, the high orders take a while
+            print(f"{name:>15} {len(weights):>7}   ", end="", flush=True)
+            Ms = np.array([self.get_M_eq_one_orientation(alpha, beta, gamma, Bs) \
+                           for alpha, beta, gamma in euler_angles])
+            # The weights sum up to 1, so this is an average and not an integral
+            Mz_avg = np.dot(weights, Ms)
+            print(" ".join(f"{Mz:14.8f}" for Mz in Mz_avg))
+            rows.append(dict({"rule": name, "points": len(weights)},
+                             **{f"Mz_at_{B:g}T": Mz for B, Mz in zip(Bs, Mz_avg)}))
+        df = pd.DataFrame(rows)
+
+        if save_file:
+            df.to_csv("M-B_convergence.csv", index=False)
+            print("\nConvergence test saved to ./M-B_convergence.csv")
+        return df
+
     def remove_directories(self):
         """
         Remove all directories.
@@ -358,6 +454,9 @@ if __name__ == "__main__":
     # pow.check_all_job_status()
     # pow.get_M_eq_avg()
     # pow.get_M_dy_avg()
+
+    # Check the powder average against the order of the quadrature
+    # pow.convergence_test()
 
 
     # =============================================
