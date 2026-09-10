@@ -336,11 +336,27 @@ class powder:
         # Save the data to a csv file
         df.to_csv("M-B_eq.csv", index=False)
 
+    def get_fmag(self):
+        """
+        The magnetometry file written by the dynamics, relative to the directory
+        of one orientation. It mirrors set_up_outdirs in core/liouville.py, which
+        is where the path is defined, for Bt_type = 'linear'.
+        """
+        if self.Bt_type != 'linear':
+            raise ValueError("Only Bt_type = 'linear' is mirrored here, not '{}'".format(self.Bt_type))
+        outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1e}/'.format( \
+                 self.T, self.I0, self.lambdaa, self.sweep_rate)
+        outdir = outdir.replace('+', '')
+        fmag = outdir + 'magnetometry' + '/t{:.3f}-{:.3f}ps_dt{:.3f}ps.csv'.format( \
+               self.tmin, self.tmax, self.deltat)
+        # Drop the leading './', the path is joined with the directory of the orientation
+        return os.path.normpath(fmag)
+
     def read_M_dy(self, i, take_B=False):
         self.set_directory_name(i)
         # print(self.directory)
-        # read csv file
-        fname = os.path.join(self.directory, f"output/T_{self.T:.1f}K_I0_{self.I0:.2e}_lambdaa_{self.lambdaa:.2f}/Bt_linear_sweep_rate_{self.sweep_rate:.1f}/magnetometry/0.000-{self.tmax:.3f}ps_dt{self.deltat:.3f}ps.csv")
+        # read csv file with the columns t, B, Mx, My and Mz
+        fname = os.path.join(self.directory, self.get_fmag())
         # Check if the file exists
         if not os.path.exists(fname):
             print(f"{i+1:5d} No output file for the dynamical job.")

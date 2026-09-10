@@ -1,6 +1,6 @@
 import os
 import subprocess
-import numpy as np
+import pandas as pd
 from data import input, job_script, job_array, code_1, code_2
 
 root_dir = os.path.dirname(os.path.abspath(__file__))
@@ -70,17 +70,18 @@ class time_slices:
             self.get_a_slice(i)
             os.chdir(self.dir_name)
             subprocess.run(["pwd"])
-            fname = f"output/T_0.6K_I0_1.00e-14_lambdaa_10.00/Bt_linear_sweep_rate_5.0e-08/magnetometry/{self.tmin:.3f}-{self.tmax:.3f}ps_dt{self.deltat:.3f}ps.dat"
+            # The magnetometry file is a csv with the columns t, B, Mx, My and Mz.
+            # See set_up_outdirs in core/liouville.py for the path.
+            fname = f"output/T_0.6K_I0_1.00e-14_lambdaa_10.00/Bt_linear_sweep_rate_5.0e-08/magnetometry/t{self.tmin:.3f}-{self.tmax:.3f}ps_dt{self.deltat:.3f}ps.csv"
             if i == 0:
-                data = np.loadtxt(fname)
+                data = pd.read_csv(fname)
             else:
-                tada = np.loadtxt(fname)
-                data = np.vstack((data, tada))
+                tada = pd.read_csv(fname)
+                data = pd.concat([data, tada], ignore_index=True)
             os.chdir(root_dir)
-        m, n = data.shape
         with open("M-B.dat", "w") as f:
-            for i in range(m):
-                f.write(f"{data[i,0]:15.3f} {data[i,1]:15.6e} {data[i,2]:15.6e} {data[i,3]:15.6e}\n")
+            for t, B, Mx, My, Mz in data[["t", "B", "Mx", "My", "Mz"]].itertuples(index=False):
+                f.write(f"{t:15.3f} {B:15.6e} {Mx:15.6e} {My:15.6e} {Mz:15.6e}\n")
 
 if __name__ == "__main__":
     # Define the number of runs, steps, and time step size

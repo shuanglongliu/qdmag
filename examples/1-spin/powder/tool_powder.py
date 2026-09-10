@@ -90,16 +90,16 @@ class powder:
     def __init__(self):
         self.load_points_and_weights()
 
-        # Parameters for determining the BT_Egrid in the input file
-        self.staticB_max = 50.0 # T
+        # Parameters for determining the BT_Bgrid in the input file
+        self.staticB_max = 10.0 # T
         self.staticB_step = 0.1 # T
 
         # Parameters for automatically determining input parameters for spin dynamics
         # Height of each stair step in T. deltat will be set to dynamicB_step/sweep_rate.
-        self.dynamicB_step = 0.001
+        self.dynamicB_step = 0.0001
         # Maximum magnetic field in T. tmax will be set to dynamicB_max/sweep_rate. 
         # Assuming that the magnetic field is linear in time.
-        self.dynamicB_max = 50.0 
+        self.dynamicB_max = 10.0 
 
         # Magnetic field step in T for saving the magnetization during the dynamics.
         self.dynamicB_step_saveMag = 0.01
@@ -111,7 +111,7 @@ class powder:
         self.lambdaa = 10.0 # cm-1
         self.I0 = 1e-14 # Prefactor for phonon density of states
         self.Bt_type = 'linear' # Type of the magnetic pulse as a function of time
-        self.sweep_rate = 50.0e-09 # T per ps
+        self.sweep_rate = 10.0e-09 # T per ps
         self.tmin = 0.0 # Initial time in ps
         self.tmax = self.dynamicB_max / self.sweep_rate # Final time in ps
         self.deltat = self.dynamicB_step / self.sweep_rate # Time step in ps
@@ -126,7 +126,7 @@ class powder:
         Load points and weights from a file.
         """
         points_and_weights = np.loadtxt('points_and_weights.txt', comments='#', ndmin=2)
-        self.n_points = 3 # points_and_weights.shape[0]
+        self.n_points = points_and_weights.shape[0]
         self.alphas = points_and_weights[:, 0]
         self.betas = points_and_weights[:, 1]
         self.gammas = points_and_weights[:, 2]
@@ -318,24 +318,41 @@ class powder:
         df.to_csv("M-B_eq.csv", index=False)
         print("Average equilibrium magnetization saved to ./M-B_eq.csv")
 
+    def get_fmag(self):
+        """
+        The magnetometry file written by the dynamics, relative to the directory
+        of one orientation. It mirrors set_up_outdirs in core/liouville.py, which
+        is where the path is defined, for Bt_type = 'linear'.
+        """
+        if self.Bt_type != 'linear':
+            raise ValueError("Only Bt_type = 'linear' is mirrored here, not '{}'".format(self.Bt_type))
+        outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1e}/'.format( \
+                 self.T, self.I0, self.lambdaa, self.sweep_rate)
+        outdir = outdir.replace('+', '')
+        fmag = outdir + 'magnetometry' + '/t{:.3f}-{:.3f}ps_dt{:.3f}ps.csv'.format( \
+               self.tmin, self.tmax, self.deltat)
+        # Drop the leading './', the path is joined with the directory of the orientation
+        return os.path.normpath(fmag)
+
     def read_M_dy(self, i, take_B=False):
         self.set_directory_name(i)
         # print(self.directory)
-        # read csv file
-        fname = f"output/T_{self.T:.1f}K_I0_{self.I0:.2e}_lambdaa_{self.lambdaa:.2f}/Bt_linear_sweep_rate_{self.sweep_rate:.1f}/magnetometry/0.000-{self.tmax:.3f}ps_dt{self.deltat:.3f}ps.dat"
-        fname = os.path.join(self.directory, fname)
+        # read csv file with the columns t, B, Mx, My and Mz
+        fname = os.path.join(self.directory, self.get_fmag())
         # Check if the file exists
         if not os.path.exists(fname):
             return None
-        df = pd.read_csv(fname, sep=r'\s+', header=None)
+        # Check if the file is empty
+        if os.path.getsize(fname) == 0:
+            return 'empty'
+        df = pd.read_csv(fname)
         if take_B:
-            # Take the second column and save it to a new data frame with a column name "B"
-            column = df.iloc[:, 1]
-            df = pd.DataFrame({"B": column})
+            # Take the column "B"
+            df = df[["B"]]
         else:
-            # Take the third column and save it to a new data frame with a column name self.directory
-            column = df.iloc[:, 2]
-            df = pd.DataFrame({self.directory: column})
+            # Take the column "Mz" and rename it to self.directory which is a string
+            df = df[["Mz"]]
+            df.rename(columns={"Mz": self.directory}, inplace=True)
         return df
 
     def get_M_dy_avg(self):
