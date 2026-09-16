@@ -14,16 +14,16 @@ Magnetic molecules — including transition metal complexes and lanthanide-based
   - Magnetic exchange interaction (isotropic, anisotropic, antisymmetric, and symmetric parts of the full exchange coupling tensor **J**)
   - Zero-field splitting (ZFS) via extended Stevens operators up to 12th order
   - Zeeman interaction with an external magnetic field
-- **Four supported magnetic field profiles** B(t):
-  - Linear sweep: B(t) = a·t
-  - Piecewise linear
-  - Cubic spline fit to experimental pulse data
-  - Sinusoidal: B(t) = B₀ sin(ωt)
+- **Four supported magnetic field profiles** B(t), selected by the `Bt_type` key:
+  - `linear` — linear sweep: B(t) = a·t
+  - `pwlinear` — piecewise linear
+  - `cspline` — monotone cubic spline fit to experimental pulse data, built by `tool_cspline.py`
+  - `sin` — sinusoidal: B(t) = B₀ sin(ωt)
 - **Two time-propagation methods**:
   - Staircase approximation for numerically stable long-time propagation (millisecond timescales)
   - Fourth-order Runge–Kutta (RK4) for high-accuracy short-time propagation
 - **Effective Hamiltonian** construction for large spin systems, reducing the full Hilbert space dimension N = Πᵢ(2Sᵢ+1) to a computationally feasible subspace of thermally relevant states
-- **Powder averaging** over random molecular orientations using Lebedev + Gauss-Legendre quadrature (up to 1118 orientations)
+- **Powder averaging** over molecular orientations using a Lebedev quadrature over the field direction, which needs two Euler angles rather than three (350 orientations at degree 31)
 - **Liouville form** of the quantum master equation for efficient matrix-based time propagation
 - **HDF5-based I/O** for density matrix storage, retrieval, and file management
 
@@ -33,13 +33,14 @@ Magnetic molecules — including transition metal complexes and lanthanide-based
 git clone https://github.com/shuanglongliu/qdmag.git
 ```
 
-Add the directory that contains qdmag to the evironment variable PYTHONPATH. 
+Add the directory that contains qdmag to the environment variable PYTHONPATH. 
 
 ### Dependencies
 
 - Python 3.x
 - NumPy
-- SciPy (quadrature weights, spline fitting, matrix exponential, and Euler angle transformations)
+- SciPy ≥ 1.15 (quadrature weights, spline fitting, matrix exponential, and Euler angle transformations). The powder averaging calls `scipy.integrate.lebedev_rule`, which was added in 1.15.
+- PyYAML (parsing of `input.yaml`)
 - h5py (HDF5 I/O for density matrix storage and retrieval)
 - pandas (tabular output of magnetization and level population time series)
 - matplotlib (optional; sparsity visualization and quadrature point plots)
@@ -92,11 +93,19 @@ For large multinuclear systems where the full Hilbert space dimension N = Πᵢ(
 
 ### Powder Averaging
 
-For powder samples, the net magnetization is averaged over all molecular orientations:
+For powder samples, the net magnetization is averaged over all molecular orientations. Two angles are enough for this, rather than three. The static field lies along the global $z$ axis and the $g$ tensor is isotropic, so the magnetization depends on the orientation only through the direction $\mathbf{n}$ of the field in the ZFS reference frame,
 
-$$\overline{M} = \frac{1}{8\pi^2}\sum_{i,j,k} w^l_{ij} w^g_k M(\alpha_{ij}, \beta_{ij}, \gamma_k)$$
+$$\mathbf{n}(\beta, \gamma) = (-\sin\beta\cos\gamma, \; \sin\beta\sin\gamma, \; \cos\beta)$$
 
-using Lebedev quadrature for the first two Euler angles (α, β) and Gauss-Legendre quadrature for the third (γ). Quadrature points and weights are saved to a text file for inspection and record.
+which does not contain the first Euler angle $\alpha$. Turning the molecule by $\alpha$ about the field axis maps $H \rightarrow U H U^{\dagger}$ with $U = \exp(-i\alpha \hat{S}_z)$, which leaves the spectrum, $\langle \hat{S}_z \rangle$, the magnetization operator and the $|\Delta M_z| = 1$ phonon-coupling operator unchanged, and therefore leaves both $M(B)$ and $M(t)$ unchanged. The average is then a single Lebedev quadrature over the unit sphere,
+
+$$\overline{M} = \frac{1}{4\pi} \int M(\mathbf{n}) \, d\Omega = \sum_i w_i M(\mathbf{n}_i), \qquad \sum_i w_i = 1$$
+
+and each Lebedev point is mapped back onto the Euler angles that the drivers consume. Quadrature points and weights are saved to a text file for inspection and record.
+
+The redundancy of $\alpha$ relies on the field staying along one global axis and on the $g$ tensor being isotropic, or having its reference frame co-rotated with the ZFS frame. A transverse drive, or any operator in the dissipator that is fixed in the global frame and is not $\hat{S}_z$, brings the third angle back.
+
+Convergence with the Lebedev degree can be checked with `powder.convergence_test` in `tool_powder.py`, which powder averages the equilibrium magnetization over a series of degrees. For Ho(pzdo)₄ at 2 K, degree 31 (350 orientations) reproduces the degree 47 result (770 orientations) to about $2 \times 10^{-3} \, \mu_B$, the largest deviation over B = 2, 10 and 50 T.
 
 ## Case Studies
 
@@ -166,7 +175,7 @@ Both solvers read their output controls from the optional fourth `dynamics` bloc
 
 ### `tool_magnetization.py`
 
-Computes the **equilibrium magnetization M(B)** as a function of applied field. Supports both the full Hilbert space and the reduced effective basis. Output is written to `output/M-B.csv`.
+Computes the **equilibrium magnetization M(B)** as a function of applied field. The `do_full_space` and `do_effective_space` flags at the top of the script choose the space, and each writes its own file: the full Hilbert space goes to `output/M-B.csv` and the reduced effective basis to `output/M-B_eff.csv`. The script as shipped has `do_effective_space = True` and `do_full_space = False`, so it writes `output/M-B_eff.csv` unless the flags are changed.
 
 ### `tool_zeeman.py`
 
@@ -199,6 +208,26 @@ Transforms the density matrix between representations. Converts $\rho(t)$ from t
 ### `tool_quadrature.py`
 
 Generates and saves **Lebedev quadrature points and weights** for powder averaging. The average needs only two angles: with the field along the global $z$ axis and an isotropic $g$ tensor, the only geometric variable is the direction $\mathbf{n}$ of the field in the ZFS reference frame, and the first Euler angle $\alpha$ merely rotates the Hamiltonian about the field axis. Each Lebedev point is therefore read as one $\mathbf{n}$ and mapped back onto Euler angles $(\alpha, \beta, \gamma) = (0, \arccos n_z, \mathrm{atan2}(n_y, -n_x))$, which are written in degrees together with the weights to `points_and_weights.txt`. The angles are in degrees both in the file and in the returned array. Optional visualization of the sampled directions is available via matplotlib.
+
+### `tool_powder.py`
+
+Drives a **powder average** over the orientations generated by `tool_quadrature.py`. It reads `points_and_weights.txt` from the working directory, creates one subdirectory per orientation, and writes an `input.yaml` into each with the ZFS reference frame rotated by that orientation's Euler angles. The `input` template and the parameters set in `powder.__init__` are meant to be edited for the system at hand; as shipped they describe Ho(pzdo)₄.
+
+| Method | Purpose |
+| --- | --- |
+| `create_directories()` | Make the per-orientation subdirectories. Run before `get_inputs()` |
+| `get_inputs()` | Write each `input.yaml`, plus a SLURM job array `spin.job` that runs `tool_magnetization.py` and `tool_staircase.py` in every subdirectory |
+| `submit_job_array()` | `sbatch spin.job` |
+| `check_all_job_status()` | Report which orientations are missing, empty, or incomplete |
+| `get_M_eq_avg()`, `get_M_dy_avg()` | Combine the per-orientation equilibrium and dynamical magnetizations into `M-B_eq.csv` and `M-B_dy.csv`, weighting each orientation by its Lebedev weight |
+| `convergence_test()` | Powder average the equilibrium magnetization over a series of Lebedev degrees, to `M-B_convergence.csv` |
+| `remove_directories()` | Delete every per-orientation subdirectory |
+
+The steps in `__main__` are commented out; uncomment them one at a time, in the order above. `convergence_test()` covers only the thermal equilibrium, which it computes in-process rather than from the job output, so a degree that is converged there is not automatically converged for the dynamics.
+
+### `tool_cspline.py`
+
+Lives in `tools/cspline/`. Fits a monotone cubic spline (`PchipInterpolator`) to the experimental pulse data in `pulse.dat`, converting the time axis from ms to ps, and pickles the interpolant to `cspline.pickle`. That pickle is what `Bt_type: 'cspline'` loads at run time, from the working directory of the calculation.
 
 ### `tool_hdf5.py`
 

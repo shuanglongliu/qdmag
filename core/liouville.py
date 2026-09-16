@@ -4,7 +4,6 @@ import numpy as np
 import h5py
 import time
 import pandas as pd
-from filelock import FileLock
 import scipy.sparse as sp
 from scipy.linalg import expm
 from scipy.sparse.linalg import expm_multiply

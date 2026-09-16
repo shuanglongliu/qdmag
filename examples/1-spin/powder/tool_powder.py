@@ -9,8 +9,15 @@ from qdmag.core.common import many_spins, eigen_handy
 from qdmag.core.common import get_h_exchange, get_h_anisotropy, get_h_Zeeman_Mv_eff
 from qdmag.core.common import get_partition_function, get_magnetic_moment_Mv_tot
 from qdmag.core.constants import factor_ex
+from qdmag import root_dir
 
-root_dir = os.path.dirname(os.path.abspath(__file__))
+# Directory holding tool_magnetization.py and tool_staircase.py, which the job
+# array calls. Taken from the package rather than from __file__, so that a copy
+# of this script placed in a calculation directory still finds them.
+tools_dir = os.path.join(root_dir, 'tools')
+# Directory the calculation is run from, which holds points_and_weights.txt and
+# the per-orientation subdirectories. It is not tools_dir, so the two are kept apart.
+work_dir = os.getcwd()
 
 input = """
 spins:
@@ -63,7 +70,7 @@ job_array = """#!/bin/bash -l
 
 #SBATCH --account=m2qm-efrc
 #SBATCH --qos=m2qm-efrc
-#SBATCH --job-name=qmag_Ho
+#SBATCH --job-name=powder
 #SBATCH --mail-type=None
 #SBATCH --mail-user=shuan.liu@northeastern.edu
 #SBATCH --partition=hpg-default
@@ -80,10 +87,10 @@ job_array = """#!/bin/bash -l
 cd ./$SLURM_ARRAY_TASK_ID || exit 1
 
 # Thermal equilibrium
-python "{root_dir:s}/tool_magnetization.py"
+python "{tools_dir:s}/tool_magnetization.py"
 
 # Dynamics
-python "{root_dir:s}/tool_staircase.py"
+python "{tools_dir:s}/tool_staircase.py"
 """
 
 class powder:
@@ -198,7 +205,7 @@ class powder:
         os.system('pwd')
         with open("input.yaml", "w") as f:
             f.write(self.format_input())
-        os.chdir(root_dir)
+        os.chdir(work_dir)
 
     def create_directories(self):
         """
@@ -217,7 +224,7 @@ class powder:
             self.get_input(i)
 
         with open("spin.job", "w") as f:
-            f.write(job_array.format(n_jobs=self.n_points, root_dir=root_dir))
+            f.write(job_array.format(n_jobs=self.n_points, tools_dir=tools_dir))
         print("Job array script saved as spin.job in the root directory.")
 
     def submit_job_array(self):
@@ -277,13 +284,26 @@ class powder:
                 continue
             self.check_job_status(i)
 
+    def get_feq(self):
+        """
+        The equilibrium magnetometry file written by tool_magnetization.py, relative
+        to the directory of one orientation. That script writes M-B.csv when it runs
+        in the full Hilbert space and M-B_eff.csv when it runs in the effective basis,
+        so both names are tried. Returns None when neither is there.
+        """
+        for basename in ("M-B.csv", "M-B_eff.csv"):
+            fname = os.path.join(self.directory, "output", basename)
+            if os.path.exists(fname):
+                return fname
+        return None
+
     def read_M_eq(self, i, take_B=False):
         self.set_directory_name(i)
         # print(self.directory)
         # read csv file
-        fname = os.path.join(self.directory, "output/M-B.csv")
+        fname = self.get_feq()
         # Check if the file exists
-        if not os.path.exists(fname):
+        if fname is None:
             return None
         # Check if the file is empty
         if os.path.getsize(fname) == 0:
@@ -462,10 +482,12 @@ class powder:
 
 if __name__ == "__main__":
 
-    # print("Root directory: ", root_dir)
+    # print("Tools directory: ", tools_dir)
+    # print("Working directory: ", work_dir)
 
     pow = powder()
-    # pow.create_directories()
+    # The steps below run in this order.
+    pow.create_directories()
     pow.get_inputs()
     # pow.submit_job_array()
     # pow.check_all_job_status()
