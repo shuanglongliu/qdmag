@@ -257,4 +257,4 @@ This work is supported by the Center for Molecular Magnetic Quantum Materials (M
 
 [2] H. Nakano and S. Miyashita, Magnetization Process of Nanoscale Iron Cluster, *J. Phys. Soc. Jpn.* **70**, 2151–2157 (2001).
 
-[3] S. Liu, X. Chen, A. Cupo, J. N. Fry, and H.-P. Cheng, *qdmag*: A Python package for simulating nonequilibrium magnetization using quantum master equations, to be submitted to *J. Comput. Phys.* (2026). 
+[3] S. Liu, X. Chen, A. Cupo, J. N. Fry, and H.-P. Cheng, *qdmag*: A Python package for simulating nonequilibrium magnetization using quantum master equations, to be submitted to *Computer Physics Communications* (2026). 
