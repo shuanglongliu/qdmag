@@ -1200,7 +1200,7 @@ class liouville:
             with h5py.File(self.frho, 'w') as f1, open(self.fmag, 'w') as f2, open(self.fdrdt, 'w') as f3:
                 # Save the initial density matrix, magnetic moment, and drho/dt
                 self.unit_save_rho(f1, self.tmin)
-                self.unit_save_mag(f2, self.tmin)
+                self.unit_save_mag(f2, self.tmin, header=True)
                 self.unit_save_drdt(f3, self.tmin)
                 # Loop over the rounds for saving drho/dt
                 for iround_drdt in range(self.nround_drdt):
@@ -1225,7 +1225,7 @@ class liouville:
             with h5py.File(self.frho, 'w') as f1,  open(self.fmag, 'w') as f2:
                 # Save the initial density matrix, magnetic moment, and the magnetic susceptibility
                 self.unit_save_rho(f1, self.tmin)
-                self.unit_save_mag(f2, self.tmin)
+                self.unit_save_mag(f2, self.tmin, header=True)
                 # Loop over the rounds for saving the RI-separated vectorized density matrix
                 for iround_rho in range(self.nround_rho):
                     # Loop over the rounds for saving the magnetic properties
@@ -1275,7 +1275,7 @@ class liouville:
         elif (not self.save_rho) and self.save_mag and self.save_drdt:
             with open(self.fmag, 'w') as f2, open(self.fdrdt, 'w') as f3:
                 # Save the initial magnetic moment and drho/dt
-                self.unit_save_mag(f2, self.tmin)
+                self.unit_save_mag(f2, self.tmin, header=True)
                 self.unit_save_drdt(f3, self.tmin)
                 # Loop over the rounds for saving drho/dt
                 for iround_drdt in range(self.nround_drdt):
@@ -1294,7 +1294,7 @@ class liouville:
         elif (not self.save_rho) and self.save_mag and (not self.save_drdt):
             with open(self.fmag, 'w') as f2:
                 # Save the initial magnetic moment and the magnetic susceptibility
-                self.unit_save_mag(f2, self.tmin)
+                self.unit_save_mag(f2, self.tmin, header=True)
                 # Loop over the rounds for saving the magnetic moment
                 for iround_mag in range(self.nround_mag):
                     # Loop over the self.nt_mag time steps

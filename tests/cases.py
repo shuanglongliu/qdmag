@@ -109,17 +109,9 @@ def run_case(name, rundir):
     with working_directory(rundir):
         lio.evolve_rho()
         drdt = pd.read_csv(lio.fdrdt) if lio.save_drdt else None
-        mag = read_mag(lio.fmag)
+        mag = pd.read_csv(lio.fmag)
     return {"mag": mag, "risvrho": np.asarray(lio.risvrho), "drdt": drdt,
             "basis": {"h0": lio.h0, "Mz": lio.Mz, "X": lio.X}}
-
-
-def read_mag(fname):
-    """Read a magnetization file; the RK4 solver writes it without a header row."""
-    mag = pd.read_csv(fname)
-    if "t" not in mag.columns:
-        mag = pd.read_csv(fname, header=None, names=["t", "B", "Mx", "My", "Mz"])
-    return mag
 
 
 def save_reference(name, result):
