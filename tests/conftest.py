@@ -27,3 +27,25 @@ def workdir(tmp_path, request):
     path = Path(root) / request.node.name
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def gpu_available():
+    """True if CuPy imports and sees at least one CUDA device."""
+    try:
+        import cupy
+        return cupy.cuda.runtime.getDeviceCount() > 0
+    except Exception:
+        return False
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "gpu: needs CuPy and a CUDA device; skipped otherwise")
+
+
+def pytest_collection_modifyitems(config, items):
+    if gpu_available():
+        return
+    skip = pytest.mark.skip(reason="CuPy or a CUDA device is not available")
+    for item in items:
+        if "gpu" in item.keywords:
+            item.add_marker(skip)

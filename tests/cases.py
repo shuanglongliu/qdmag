@@ -57,13 +57,15 @@ CASES = {
 }
 
 
-def write_input(name, rundir):
-    """Write the input.yaml of case `name` into rundir."""
+def write_input(name, rundir, device=None):
+    """Write the input.yaml of case `name` into rundir, optionally with `device` set."""
     example, overrides = CASES[name]
     with open(EXAMPLES / example / "input.yaml") as f:
         data = yaml.safe_load(f)
     for iblock, options in overrides.items():
         data["dynamics"][iblock].update(options)
+    if device is not None:
+        data["dynamics"][2]["device"] = device
     rundir.mkdir(parents=True, exist_ok=True)
     with open(rundir / "input.yaml", "w") as f:
         yaml.safe_dump(data, f, sort_keys=False)
@@ -79,14 +81,14 @@ def working_directory(path):
         os.chdir(cwd)
 
 
-def set_up_case(name, rundir):
+def set_up_case(name, rundir, device=None):
     """Write the input of case `name` into rundir and return the liouville object at t = tmin."""
     from qdmag.core.common import read_input, many_spins
     from qdmag.core.effective_basis import effective_basis
     from qdmag.core.liouville import liouville
 
     rundir = Path(rundir)
-    write_input(name, rundir)
+    write_input(name, rundir, device)
     with working_directory(rundir):
         Ss, nS, exchange, anisotropy, gfactor, BT_Bgrid, BT_Tgrid, dynamics, states, n_threads = read_input()
         spins = many_spins(Ss, nS, gfactor)
@@ -96,21 +98,23 @@ def set_up_case(name, rundir):
     return lio
 
 
-def run_case(name, rundir):
+def run_case(name, rundir, device=None):
     """
-    Run case `name` in rundir. Returns a dict with
+    Run case `name` in rundir, on `device` if given (else as in the input). Returns a dict with
       'mag'    : DataFrame of t, B, Mx, My, Mz at every save point,
       'risvrho': final RI-separated vectorized density matrix,
       'drdt'   : DataFrame of the saved drho/dt, or None,
       'basis'  : dict of h0, Mz and X in the effective basis.
     """
     rundir = Path(rundir)
-    lio = set_up_case(name, rundir)
+    lio = set_up_case(name, rundir, device)
     with working_directory(rundir):
         lio.evolve_rho()
         drdt = pd.read_csv(lio.fdrdt) if lio.save_drdt else None
         mag = pd.read_csv(lio.fmag)
-    return {"mag": mag, "risvrho": np.asarray(lio.risvrho), "drdt": drdt,
+    # lio.backend does not exist in the code the references are made with (14f7d02)
+    risvrho = lio.backend.to_host(lio.risvrho) if hasattr(lio, "backend") else np.asarray(lio.risvrho)
+    return {"mag": mag, "risvrho": risvrho, "drdt": drdt,
             "basis": {"h0": lio.h0, "Mz": lio.Mz, "X": lio.X}}
 
 
