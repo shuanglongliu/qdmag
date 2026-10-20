@@ -12,7 +12,7 @@ from qdmag.core.common import kronecker_delta, create_outdir
 from qdmag.core.common import get_Mv_from_rho, get_Mz_from_rho
 from qdmag.core.common import eigen_handy, get_h_Zeeman_Mv_eff
 from qdmag.core.common import get_rhoe, back_transform_O
-from qdmag.core.quantum_master import get_Rhbar, update_Rhbar
+from qdmag.core.quantum_master import get_Rhbar
 from qdmag.core.pulse import get_Bt, get_pulse_RK4_double_grid
 from qdmag.core.hdf5 import get_risvrho_from_hdf5
 
@@ -176,40 +176,30 @@ class liouville:
         Set up the Liouville superoperator.
         """
 
+        # Row permutation I = i*dim + j -> It = j*dim + i, used by construct_CST.
+        self.index_transpose = np.arange(self.dims).reshape(self.dim, self.dim).T.ravel()
+
+        # Prefactor of the dissipative part of L
+        self.lam = self.lambdaa**2 * np.pi * const1**2
+
         # h0, A0, and L0 are time independent.
 
         # Construct the superoperator L0 at t = 0 ps without spin-phonon coupling
         self.A0 = self.construct_A_vectorized(self.h0, dtype=np.complex128)
         self.L0 = self.construct_L(self.A0, None)
-    
-        # h_zee, h, A, Rhbar, C, CST, and L will be updated at each time step.
-        # We will reuse them (the memory associated with them) to save time.
-    
-        # Zeeman term at t = tmin ps on the effective basis
-        self.h_zee = -1 * Tesla2wavenumber * self.Bt(self.tmin) * self.Mz
 
-        # Effective Hamiltonian at t = tmin ps, it will be updated at each time step
-        self.h = self.h0 + self.h_zee
+        # The Zeeman superoperator is linear in B, Azee(B) = B * Azee_unit, so the
+        # Zeeman blocks of L are precomputed per tesla; see get_Zeeman_blocks.
+        c1Azee_unit = const1 * self.construct_A_vectorized(-1 * Tesla2wavenumber * self.Mz, dtype=np.complex128)
+        self.c1Azee_unit_re = np.ascontiguousarray(np.real(c1Azee_unit))
+        self.c1Azee_unit_im = np.ascontiguousarray(np.imag(c1Azee_unit))
 
-        # Construct the superoperator A at t = tmin ps, it will be updated at each time step
-        self.A = self.construct_A_vectorized(self.h, dtype=np.complex128)
-    
-        # Construct the superoperator Rhbar in the S representation at t = tmin ps
-        self.Rhbar = get_Rhbar(self.h, self.X, self.I0, self.T, alpha=self.alpha)
-    
-        # Construct the superoperator C which is time dependent due to Rhbar
-        self.C = self.construct_C(self.X, self.Rhbar)
-        self.CST = self.construct_CST(self.C)
+        # h_zee, h, Rhbar, C, CST, and L are updated at each time step.
+        # L is written in place into one preallocated buffer.
+        self.L = np.empty((self.dimds, self.dimds), dtype=np.float64)
 
-        # Get the indices of nonzero matrix elements of C
-        self.n_nzC, self.indices_nzC = self.get_indices_nzC(self.X)
-    
-        # Construct the superoperator L at t = tmin ps with spin-phonon coupling
-        self.L = self.construct_L(self.A, self.C)
-
-        # Construct the superoperators LA and LC for the contributions from A and C, which will be updated at each time step.
-        self.LA = self.construct_L(self.A, None)
-        self.LC = self.construct_L(None, self.C)
+        # h_zee, h, Rhbar, C, CST and L at t = tmin ps
+        self.update_L_under_magnetic_field(self.Bt(self.tmin))
 
     def get_initial_rho(self, from_file=False, fname=None, t_init=None):
         if from_file:
@@ -272,7 +262,7 @@ class liouville:
         self.LA = (self.L0 + self.construct_L_sparse(Azee, None)).tocsr()
 
         # Dissipative part, time dependent through Rhbar
-        self.Rhbar = update_Rhbar(self.Rhbar, self.h, self.X, self.I0, self.T, alpha=self.alpha)
+        self.Rhbar = get_Rhbar(self.h, self.X, self.I0, self.T, alpha=self.alpha)
         self.C = self.construct_C_sparse(self.X, self.Rhbar)
         self.LC = self.construct_L_sparse(None, self.C)
 
@@ -424,6 +414,10 @@ class liouville:
 
     def construct_C(self, X, Rhbar):
         """
+        Index-level reference implementation, kept for documentation and not called anywhere:
+        the dense code paths build C through construct_C_vectorized, the sparse ones through
+        construct_C_sparse. The double loop spells out the definition element by element.
+
         Both X and Rhbar are in the S representation.
     
         [X, Rhbar rho]_{I} = C_{IJ} rho_{J}
@@ -454,49 +448,31 @@ class liouville:
     
         return C
 
+    def construct_C_vectorized(self, X, Rhbar):
+        """
+        Same superoperator as construct_C, written as a pair of Kronecker products, as in
+        construct_A_vectorized and construct_C_sparse:
+
+            C_{IJ} = (X Rhbar)_{ik} delta_{lj} - Rhbar_{ik} X_{lj}
+                   = kron(X Rhbar, Id)_{IJ} - kron(Rhbar, X^T)_{IJ},   I = i*N + j,  J = k*N + l
+
+        Gives the same result as construct_C bit for bit (up to the sign of zeros).
+        """
+
+        XRhbar = np.matmul(X, Rhbar)
+        Id = np.eye(self.dim, dtype=np.complex128)
+        return np.kron(XRhbar, Id) - np.kron(Rhbar, np.asarray(X).T)
+
     def construct_CST(self, C):
         """
         Get super transpose of the superoperator C.
         CST_{I J} = C_{It J}
           I -> ij -> ji -> It
+        That is a permutation of the rows of C, applied with the precomputed index map
+        self.index_transpose (see set_up_liouville).
         """
-    
-        CST = np.zeros((self.dims, self.dims), dtype=np.complex128)
-    
-        for I in range(self.dims):
-            i, j = dec_composite_index(I, self.dim)
-            It = get_composite_index(j, i, self.dim)
-            CST[I] = C[It]
-    
-        return CST
 
-    def get_indices_nzC(self, X):
-        """
-        Get indices of nonzero matrix elements of C
-        X: a matrix of dimension dim x dim for the spin transitions
-        C: an operator of dimension dims due to the interaction with bath
-           see the function construct_C for the definition of C
-        n_nzC: number of nonzero matrix elements of C
-        indices_nzC: indices of the nonzero matrix elements of C
-        """
-    
-        # Get indices of nonzero matrix elements of X
-        indices_nzX = np.nonzero(X)
-    
-        # Convert the list [[i1, i2, ..., in], [j1, j2, ..., jn]] to the set {(i1, j1), (i2, j2), ..., (in, jn)}
-        set_index_tuples_nzX = set( [(indices_nzX[0][i], indices_nzX[1][i]) for i in range(indices_nzX[0].shape[0])] )
-    
-        # Get indices of nonzero matrix elements of C
-        indices_nzC = []
-        for i in range(self.dim):
-            for j in range(self.dim):
-                for k in range(self.dim):
-                    for l in range(self.dim):
-                        if (l == j) or ( (l, j) in set_index_tuples_nzX ):
-                            indices_nzC.append( (i, j, k, l) )
-        n_nzC = len(indices_nzC)
-    
-        return (n_nzC, indices_nzC)
+        return C[self.index_transpose, :]
 
     def construct_L(self, A, C):
         """
@@ -557,23 +533,6 @@ class liouville:
     
         return L
 
-    def update_C_and_CST(self):
-        """
-        Save time by avoiding memory allocation for C.
-        Rhbar is time dependent, and so is C.
-        C and CST are recomputed completely at each time step.
-        """
-    
-        XRhbar = np.matmul(self.X, self.Rhbar)
-    
-        for idx in range(self.n_nzC):
-            i, j, k, l = self.indices_nzC[idx]
-            I = i * self.dim + j
-            J = k * self.dim + l
-            self.C[I, J] = XRhbar[i, k] * kronecker_delta(l, j) - self.Rhbar[i, k] * self.X[l, j]
-            It = j * self.dim + i
-            self.CST[It, J] = self.C[I, J]
-
     def update_L_under_magnetic_field(self,  B):
         r"""
         L: L matrix to be updated.
@@ -597,8 +556,6 @@ class liouville:
             omega_ij = ( E_i - E_j ) / hbar.
             I(omega) = I0 omega^2 theta(omega): spectral density for phonons
             theta(omega) is the step function.
-        n_nzC: number of nonzero matrix elements of C
-        indices_nzC: indices of nonzero matrix elements of C
         lambdaa: spin-phonon coupling constant
         I0: prefactor for the phonon spectral density
         T: Temperature
@@ -606,59 +563,70 @@ class liouville:
         dims  = dim^2  : Dimension of superoperators for the vectorized density matrix
         dimds = 2*dim^2: Dimension of superoperators for the RI-separated vectorized density matrix
         """
-    
+
         # In general, the L operator is as follows
         # L11 =  const1 * Aim - lambdaa**2 * np.pi * const1**2 * (Cre + CSTre)
         # L12 =  const1 * Are + lambdaa**2 * np.pi * const1**2 * (Cim + CSTim)
         # L21 = -const1 * Are - lambdaa**2 * np.pi * const1**2 * (Cim - CSTim)
         # L22 =  const1 * Aim - lambdaa**2 * np.pi * const1**2 * (Cre - CSTre)
-    
-        # If Azee is diagonal and real, which is true when the g tensors are isotropic, 
-        # only the following update is needed. (used in early versions of the code)
-        # L = [[L11, L12], [L21, L22]]
-        #       L12 = L012 + const1 * Azee
-        #       L21 = L021 - const1 * Azee
-    
-        # Calculate the A operator corresponding to the Zeeman interaction
-    
+        # with A = A0 + Azee. Each quadrant is L0 + (Zeeman block) + (dissipative block),
+        # i.e. LA + LC, summed in that order, written in place into self.L.
+
+        # Field of the current L, used by get_LA_LC
+        self.B_L = B
+
+        # Update the Hamiltonian h
         self.h_zee = -1 * Tesla2wavenumber * B * self.Mz
-        Azee = self.construct_A_vectorized(self.h_zee, dtype=np.complex128)
-        c1Azee = const1 * Azee
-        c1Azeere = np.real(c1Azee)
-        c1Azeeim = np.imag(c1Azee)
-    
-        # Update the diagonal elements of the Hamiltonian h
         self.h = self.h0 + self.h_zee
-    
-        # Update the operators C and CST
-        self.Rhbar = update_Rhbar(self.Rhbar, self.h, self.X, self.I0, self.T, alpha=self.alpha)
-        self.update_C_and_CST()
-        factorC = self.lambdaa**2 * np.pi * const1**2 * self.C
-        factorCST = self.lambdaa**2 * np.pi * const1**2 * self.CST
-        factorCre = np.real(factorC)
-        factorCim = np.imag(factorC)
-        factorCSTre = np.real(factorCST)
-        factorCSTim = np.imag(factorCST)
 
-        # Update the L matrixby including the Zeeman interaction and the spin-phonon coupling at the same time  
-        # self.L[        0:self.dims,          0: self.dims] = self.L0[        0:self.dims,          0: self.dims] + c1Azeeim - (factorCre + factorCSTre)
-        # self.L[        0:self.dims,  self.dims:self.dimds] = self.L0[        0:self.dims,  self.dims:self.dimds] + c1Azeere + (factorCim + factorCSTim)
-        # self.L[self.dims:self.dimds,         0: self.dims] = self.L0[self.dims:self.dimds,         0: self.dims] - c1Azeere - (factorCim - factorCSTim)
-        # self.L[self.dims:self.dimds, self.dims:self.dimds] = self.L0[self.dims:self.dimds, self.dims:self.dimds] + c1Azeeim - (factorCre - factorCSTre)
+        # Update the operators Rhbar, C and CST
+        self.Rhbar = get_Rhbar(self.h, self.X, self.I0, self.T, alpha=self.alpha)
+        self.C = self.construct_C_vectorized(self.X, self.Rhbar)
+        self.CST = self.construct_CST(self.C)
 
-        # Update the LA and LC matrices for the contributions from A and C
-        self.LA[        0:self.dims,          0: self.dims] = self.L0[        0:self.dims,          0: self.dims] + c1Azeeim
-        self.LA[        0:self.dims,  self.dims:self.dimds] = self.L0[        0:self.dims,  self.dims:self.dimds] + c1Azeere
-        self.LA[self.dims:self.dimds,         0: self.dims] = self.L0[self.dims:self.dimds,         0: self.dims] - c1Azeere
-        self.LA[self.dims:self.dimds, self.dims:self.dimds] = self.L0[self.dims:self.dimds, self.dims:self.dimds] + c1Azeeim
+        zre, zim = self.get_Zeeman_blocks(B)
+        d11, d12, d21, d22 = self.get_dissipative_blocks()
+        n, N = self.dims, self.dimds
+        for (rows, cols), z, d in (((slice(0, n), slice(0, n)),  zim, d11),
+                                   ((slice(0, n), slice(n, N)),  zre, d12),
+                                   ((slice(n, N), slice(0, n)), -zre, d21),
+                                   ((slice(n, N), slice(n, N)),  zim, d22)):
+            Lq = self.L[rows, cols]
+            np.add(self.L0[rows, cols], z, out=Lq)
+            Lq += d
 
-        self.LC[        0:self.dims,          0: self.dims] = - (factorCre + factorCSTre)
-        self.LC[        0:self.dims,  self.dims:self.dimds] =   (factorCim + factorCSTim)
-        self.LC[self.dims:self.dimds,         0: self.dims] = - (factorCim - factorCSTim)
-        self.LC[self.dims:self.dimds, self.dims:self.dimds] = - (factorCre - factorCSTre)
+    def get_Zeeman_blocks(self, B):
+        """
+        Real and imaginary parts of const1 * Azee at field B, with Azee the superoperator of
+        h_zee = -Tesla2wavenumber * B * Mz. They enter the four quadrants of L as
+        [[+im, +re], [-re, +im]].
+        """
+        return B * self.c1Azee_unit_re, B * self.c1Azee_unit_im
 
-        # Update the L matrix, which includes the Zeeman interaction and the spin-phonon coupling
-        self.L = self.LA + self.LC
+    def get_dissipative_blocks(self):
+        """
+        The four quadrants of LC, the spin-phonon (dissipative) part of L, from the current C and CST.
+        """
+        Cre, Cim = np.real(self.C), np.imag(self.C)
+        CSTre, CSTim = np.real(self.CST), np.imag(self.CST)
+        factorCre, factorCim = self.lam * Cre, self.lam * Cim
+        factorCSTre, factorCSTim = self.lam * CSTre, self.lam * CSTim
+        return (- (factorCre + factorCSTre),
+                  (factorCim + factorCSTim),
+                - (factorCim - factorCSTim),
+                - (factorCre - factorCSTre))
+
+    def get_LA_LC(self):
+        """
+        Coherent (LA, from h0 and the Zeeman term) and dissipative (LC, from spin-phonon
+        coupling) parts of the current dense L, with L = LA + LC. Built on demand, since
+        only unit_save_drdt needs them.
+        """
+        zre, zim = self.get_Zeeman_blocks(self.B_L)
+        d11, d12, d21, d22 = self.get_dissipative_blocks()
+        LA = self.L0 + np.block([[zim, zre], [-zre, zim]])
+        LC = np.block([[d11, d12], [d21, d22]])
+        return LA, LC
 
     def examine_L_max_and_expLdeltat_max(self, Bs, deltats):
         """
@@ -842,8 +810,9 @@ class liouville:
         Save the diagonal elements of drho/dt, which are the population changes, at time t.
         """
         # Calculate drho/dt from the quantum master equation
-        drisvrhodt_LA = self.LA @ self.risvrho
-        drisvrhodt_LC = self.LC @ self.risvrho
+        LA, LC = self.get_LA_LC() if not self.sparse_L else (self.LA, self.LC)
+        drisvrhodt_LA = LA @ self.risvrho
+        drisvrhodt_LC = LC @ self.risvrho
         drisvrhodt = self.L @ self.risvrho
 
         # Empty DataFrame is deprecated, use list of dicts instead
@@ -1391,7 +1360,7 @@ class liouville:
         # Hamiltonian at time t
         self.h = self.h0 - Tesla2wavenumber * self.Bt(t) * self.Mz
         # Rhbar at time t
-        self.Rhbar = update_Rhbar(self.Rhbar, self.h, self.X, self.I0, self.T, alpha=self.alpha)
+        self.Rhbar = get_Rhbar(self.h, self.X, self.I0, self.T, alpha=self.alpha)
         # Get the density matrix rho from the RI-separated vectorized density matrix risvrho
         self.rho = self.convert_risvrho_to_rho(self.risvrho)
         # Call get_chimz_from_rho

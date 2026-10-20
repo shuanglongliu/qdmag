@@ -1,0 +1,47 @@
+{
+  "qdmag": "/blue/m2qm-efrc/shuan.liu.neu/tests/qdmag/phase1/ref_14f7d02/qdmag",
+  "omp_num_threads": "4",
+  "python": "3.11.11",
+  "numpy": "2.2.5",
+  "scipy": "1.15.2",
+  "node": "c0605a-s20.ufhpc",
+  "date": "2026-10-20 00:48:51",
+  "cases": {
+    "1spin_linear_Pade": {
+      "seconds": 11.9,
+      "nsave": 201
+    },
+    "1spin_linear_Taylor": {
+      "seconds": 32.9,
+      "nsave": 11
+    },
+    "1spin_linear_Krylov": {
+      "seconds": 30.2,
+      "nsave": 11
+    },
+    "1spin_linear_Taylor_sparse": {
+      "seconds": 51.4,
+      "nsave": 11
+    },
+    "1spin_linear_Krylov_sparse": {
+      "seconds": 44.3,
+      "nsave": 11
+    },
+    "1spin_sin_RK4": {
+      "seconds": 14.7,
+      "nsave": 51
+    },
+    "2spin_Jzz_Pade": {
+      "seconds": 0.2,
+      "nsave": 201
+    },
+    "3spin_16_Pade": {
+      "seconds": 4.1,
+      "nsave": 101
+    },
+    "3spin_26_Pade": {
+      "seconds": 26.3,
+      "nsave": 51
+    }
+  }
+}
