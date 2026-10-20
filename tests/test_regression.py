@@ -1,7 +1,7 @@
 """
 End-to-end regression against the reference outputs of commit 14f7d02 (see make_reference.py).
 
-Runs on the CPU, and for the Pade and RK4 cases also on the GPU (marked gpu).
+Runs on the CPU, and for the Pade, Krylov and RK4 cases also on the GPU (marked gpu).
 GPU and multithreaded BLAS results are not bitwise reproducible, so the contract is a
 tolerance: 1e-10 muB on the magnetization and 1e-10 on the elements of rho.
 """
@@ -12,7 +12,7 @@ from cases import CASES, run_case, load_reference
 
 # Cases whose exp_propagator / method are available on the GPU
 GPU_CASES = [name for name, (example, overrides) in CASES.items()
-             if overrides[2].get("exp_propagator", "Pade") == "Pade"]
+             if overrides[2].get("exp_propagator", "Pade") in ("Pade", "Krylov")]
 PARAMS = ([pytest.param(name, "cpu", id=name) for name in CASES] +
           [pytest.param(name, "gpu", id=name + "-gpu", marks=pytest.mark.gpu) for name in GPU_CASES])
 

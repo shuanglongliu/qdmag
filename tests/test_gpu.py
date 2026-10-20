@@ -57,7 +57,7 @@ def test_gpu_expm_step_matches_cpu(workdir):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("propagator", ["Taylor", "Krylov", "Taylor_sparse", "Krylov_sparse"])
+@pytest.mark.parametrize("propagator", ["Taylor", "Taylor_sparse", "Krylov_sparse"])
 def test_gpu_rejects_unsupported_propagator(propagator, workdir):
     import yaml
     from cases import write_input, working_directory

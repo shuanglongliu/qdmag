@@ -171,9 +171,9 @@ class liouville:
             raise ValueError("Invalid exp_propagator: {}. Choose from {}.".format(
                 self.exp_propagator, sorted(exp_propagators)))
         self.propagate_risvrho, self.sparse_L = exp_propagators[self.exp_propagator]
-        if self.device == 'gpu' and self.exp_propagator not in ('Pade',):
+        if self.device == 'gpu' and self.exp_propagator not in ('Pade', 'Krylov'):
             raise ValueError("exp_propagator = {} is not available with device = 'gpu'. "
-                             "Use Pade.".format(self.exp_propagator))
+                             "Use Pade or Krylov.".format(self.exp_propagator))
 
         # Build the superoperator in the matching storage format, and bind the per-stair
         # update to the matching routine so the time loop does not branch on the format.
@@ -860,7 +860,7 @@ class liouville:
     def propagate_risvrho_Pade(self):
         """
         Apply exp(L deltat) to risvrho by forming the full matrix exponential first, with the
-        scaling-and-squaring Pade approximant of scipy.linalg.expm (cupyx.scipy.linalg.expm on a GPU).
+        scaling-and-squaring Pade approximant of scipy.linalg.expm (core/expm.py on a GPU).
         Selected by exp_propagator = 'Pade'. Do not call directly; call self.propagate_risvrho,
         which set_up_exp_propagator binds to one of the propagators.
         """
@@ -926,16 +926,17 @@ class liouville:
         # H(L - mu I) = H(L) - mu I; what it buys is a smaller ||L - mu I||_1, hence fewer
         # substeps below, and a better scaled small exponential in arnoldi_kernel.
         # .diagonal() rather than np.trace so that a sparse L works unchanged.
-        mu = self.L.diagonal().sum() / self.dimds
+        xp = self.xp
+        mu = float(self.L.diagonal().sum() / self.dimds)
 
         # Number of substeps, chosen so that ||(L - mu I) tau||_1 is of the order of the
         # Krylov dimension, which is the regime where a degree-m approximation converges.
         # ||L - mu I||_1 is assembled from the column sums of |L| by correcting the diagonal
         # alone, so neither L - mu I nor a dense copy of L is ever formed. Bounding it by
         # ||L||_1 + |mu| instead would exceed ||L||_1 and so undo the point of the shift.
-        colsum = np.asarray(abs(self.L).sum(axis=0)).ravel()
+        colsum = xp.asarray(abs(self.L).sum(axis=0)).ravel()
         diag = self.L.diagonal()
-        nrm = np.max(colsum - np.abs(diag) + np.abs(diag - mu))
+        nrm = float(xp.max(colsum - xp.abs(diag) + xp.abs(diag - mu)))
         theta = max(0.5 * self.krylov_m, 1.0)
         k = max(1, int(np.ceil(nrm * abs(dt) / theta)))
 
@@ -954,7 +955,7 @@ class liouville:
         silently accepted.
         """
         w, err = self.arnoldi_kernel(v, tau, mu)
-        if err <= self.krylov_tol * np.linalg.norm(v):
+        if err <= self.krylov_tol * float(self.xp.linalg.norm(v)):
             return w
         if depth >= self.krylov_max_halvings:
             raise RuntimeError(
@@ -974,7 +975,8 @@ class liouville:
             exp(L tau) v ~ exp(mu tau) * ||v|| * V_m exp(H_m tau) e_1
 
         L enters only through the product L @ V[:, j]. All arithmetic is real, since both L
-        and risvrho are real.
+        and risvrho are real. The basis V lives on the device of L (see core/backend.py);
+        H is moved to the host for the small exponential.
 
         Returns the propagated vector and the a posteriori error estimate
             ||v|| |h_{m+1,m}| tau |[phi_1(H_m tau)]_{m-1,0}|,   phi_1(z) = (exp(z) - 1) / z
@@ -987,14 +989,15 @@ class liouville:
         augmented Hessenberg matrix, since
             expm([[H_m tau, e_1], [0, 0]]) = [[exp(H_m tau), phi_1(H_m tau) e_1], [0, 1]].
         """
+        xp = self.xp
         m = self.krylov_m
         # The basis is stored one vector per ROW so that every V[i] is contiguous. With the
         # vectors in columns each Gram-Schmidt access is a strided slice, which costs about
         # an order of magnitude more than the matrix-vector products themselves.
-        V = np.zeros((m+1, self.dimds))
-        H = np.zeros((m+1, m))
+        V = xp.zeros((m+1, self.dimds))
+        H = xp.zeros((m+1, m))
 
-        beta = np.linalg.norm(v)
+        beta = float(xp.linalg.norm(v))
         if beta == 0.0:
             return v.copy(), 0.0
         V[0] = v / beta
@@ -1010,8 +1013,8 @@ class liouville:
             h2 = V[:j+1] @ w
             w -= h2 @ V[:j+1]
             H[:j+1, j] = h1 + h2
-            H[j+1, j] = np.linalg.norm(w)
-            if H[j+1, j] <= self.krylov_breakdown_tol * beta:
+            H[j+1, j] = xp.linalg.norm(w)
+            if float(H[j+1, j]) <= self.krylov_breakdown_tol * beta:
                 # Happy breakdown: the subspace is invariant and the projection is exact.
                 m = j + 1
                 happy = True
@@ -1020,12 +1023,13 @@ class liouville:
 
         # A single (m+1) x (m+1) exponential yields both exp(H_m tau), as the leading m x m
         # block, and phi_1(H_m tau) e_1, as the last column, with no ill-conditioned solve.
+        H = self.backend.to_host(H)
         Haug = np.zeros((m+1, m+1))
         Haug[:m, :m] = H[:m, :m] * tau
         Haug[0, m] = 1.0
         E = expm(Haug)
         scale = np.exp(mu * tau)
-        w = scale * beta * (E[:m, 0] @ V[:m])
+        w = scale * beta * (self.backend.to_device(E[:m, 0]) @ V[:m])
         err = 0.0 if happy else abs(scale) * beta * H[m, m-1] * abs(tau) * abs(E[m-1, m])
         return w, err
 

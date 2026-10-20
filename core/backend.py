@@ -9,8 +9,12 @@ CuPy is imported only when device = 'gpu' is requested, so the CPU path does not
 need it. On the CPU, to_device and to_host return their argument unchanged, so the
 CPU path performs exactly the same operations as code written directly in NumPy.
 """
+import functools
+
 import numpy as np
 import scipy.linalg
+
+from qdmag.core import expm as _expm
 
 DEVICES = ('cpu', 'gpu')
 
@@ -19,7 +23,8 @@ class Backend:
     """
     name       : 'cpu' or 'gpu'
     xp         : the array module, numpy or cupy
-    expm       : dense matrix exponential, scipy.linalg.expm or cupyx.scipy.linalg.expm
+    expm       : dense matrix exponential, scipy.linalg.expm on the CPU, core/expm.py on
+                 the GPU (more accurate there than cupyx.scipy.linalg.expm; see that file)
     to_device  : host array -> array on the device
     to_host    : array on the device -> NumPy array
     synchronize: wait for the device to finish (for timing); no-op on the CPU
@@ -42,7 +47,6 @@ class Backend:
     def _set_up_gpu(self, gpu_id):
         try:
             import cupy
-            import cupyx.scipy.linalg
         except ImportError as err:
             raise RuntimeError("device = 'gpu' requires CuPy, which could not be imported: {}. "
                                "Install a CuPy build that matches the CUDA version, "
@@ -56,7 +60,7 @@ class Backend:
         cupy.cuda.Device(gpu_id).use()
         self.gpu_id = gpu_id
         self.xp = cupy
-        self.expm = cupyx.scipy.linalg.expm
+        self.expm = functools.partial(_expm.expm, xp=cupy)
         self.to_device = cupy.asarray
         self.to_host = cupy.asnumpy
         self.synchronize = cupy.cuda.Device(gpu_id).synchronize

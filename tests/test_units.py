@@ -65,3 +65,70 @@ def test_L_matches_legacy(name, workdir):
         np.testing.assert_allclose(LA, old.LA, rtol=0, atol=atol)
         np.testing.assert_allclose(lio.L, old.L, rtol=0, atol=atol)
         np.testing.assert_array_equal(lio.L, LA + LC)
+
+
+def expm_extended(A):
+    """exp(A) in 80-bit extended precision (trace shift, scaling, 30-term Taylor, squaring)."""
+    A = A.astype(np.longdouble)
+    n = A.shape[0]
+    mu = np.trace(A) / n
+    A = A - mu * np.eye(n, dtype=np.longdouble)
+    s = max(0, int(np.ceil(np.log2(np.abs(A).sum(axis=0).max() / 0.25))))
+    A = A / np.longdouble(2)**s
+    E = term = np.eye(n, dtype=np.longdouble)
+    for k in range(1, 31):
+        term = term @ A / k
+        E = E + term
+    for _ in range(s):
+        E = E @ E
+    return E * np.exp(mu)
+
+
+@pytest.mark.parametrize("name", ["1spin_linear_Pade", "2spin_Jzz_Pade", "3spin_16_Pade", "3spin_26_Pade"])
+def test_expm_matches_scipy(name, workdir):
+    """
+    core/expm.py (the GPU expm, run here with NumPy) never squares more often than
+    scipy.linalg.expm, and propagates rho as accurately: both are within ~1e-11 of an
+    extended-precision exp(L deltat) rho (journal Section 14). The full matrices can differ
+    far more, up to 6e-8 relative for 3-spin/16 at 5 T, in parts of exp(L deltat) that do
+    not act on density matrices.
+    """
+    import scipy.linalg
+    from scipy.linalg._matfuncs_expm import pick_pade_structure
+    from qdmag.core import expm as qe
+
+    lio = set_up_case(name, workdir)
+    for B in [0.0, 2.5]:
+        lio.update_L(B)
+        A = lio.L * lio.deltat
+        Am = np.empty((5,) + A.shape)
+        Am[0] = A
+        m, s = pick_pade_structure(Am)
+        A2 = A @ A
+        A4 = A2 @ A2
+        assert qe.scaling_exponent(A, np, A4, A2 @ A4) <= s
+        np.testing.assert_allclose(qe.expm(A) @ lio.risvrho, scipy.linalg.expm(A) @ lio.risvrho, rtol=0, atol=1e-10)
+
+
+@pytest.mark.parametrize("B", [0.0, 1.0, 2.5, 5.0])
+def test_expm_vs_extended_precision(B, workdir):
+    """core/expm.py against exp(L deltat) in extended precision, for the small 2-spin system."""
+    from qdmag.core import expm as qe
+
+    lio = set_up_case("2spin_Jzz_Pade", workdir)
+    lio.update_L(B)
+    A = lio.L * lio.deltat
+    exact = expm_extended(A)
+    E = qe.expm(A)
+    assert float(np.abs(E - exact).max() / np.abs(exact).max()) < 1e-11
+    exact_v = (exact @ lio.risvrho.astype(np.longdouble)).astype(np.float64)
+    np.testing.assert_allclose(E @ lio.risvrho, exact_v, rtol=0, atol=1e-12)
+
+
+def test_expm_small_norm():
+    """Without scaling (||A||_1 < theta_13) the approximant is accurate to round-off."""
+    import scipy.linalg
+    from qdmag.core import expm as qe
+    A = np.random.default_rng(0).standard_normal((40, 40)) / 40
+    assert qe.scaling_exponent(A) == 0
+    np.testing.assert_allclose(qe.expm(A), scipy.linalg.expm(A), rtol=1e-13, atol=1e-14)
