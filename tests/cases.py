@@ -57,8 +57,8 @@ CASES = {
 }
 
 
-def write_input(name, rundir, device=None):
-    """Write the input.yaml of case `name` into rundir, optionally with `device` set."""
+def case_input(name, device=None):
+    """The input of case `name` as a dict (as read from input.yaml), optionally with `device` set."""
     example, overrides = CASES[name]
     with open(EXAMPLES / example / "input.yaml") as f:
         data = yaml.safe_load(f)
@@ -66,6 +66,12 @@ def write_input(name, rundir, device=None):
         data["dynamics"][iblock].update(options)
     if device is not None:
         data["dynamics"][2]["device"] = device
+    return data
+
+
+def write_input(name, rundir, device=None):
+    """Write the input.yaml of case `name` into rundir, optionally with `device` set."""
+    data = case_input(name, device)
     rundir.mkdir(parents=True, exist_ok=True)
     with open(rundir / "input.yaml", "w") as f:
         yaml.safe_dump(data, f, sort_keys=False)

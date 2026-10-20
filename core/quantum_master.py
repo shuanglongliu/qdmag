@@ -130,18 +130,21 @@ def get_Rhbar(h, X, I0, T, alpha=2):
     omega_ij = ( E_i - E_j ) / hbar.
     I(omega) = I0 omega^2 theta(omega): spectral density for phonons
     theta(omega) is the step function.
+
+    h may also be a stack of Hamiltonians, shape (..., dim, dim), with X shared; Rhbar
+    then has the same leading axes (used by core/powder_dynamics.py).
     """
     # Diagonalize the Hamiltonian to find eigenvalues and eigenvectors
     eigen = eigen_simple(h)
     # Unitary transformation matrix
     M = eigen.eigenvectors
-    M_dagger = np.conjugate(np.transpose(M))
+    M_dagger = np.conjugate(np.swapaxes(M, -1, -2))
     # Change the basis functions from the eigenstates of the spin operator Sz_tot (S representation)
     # to the eigenstates of the Hamiltonian H (E representation) 
     X_E = np.matmul(M_dagger, np.matmul(X, M))
     # Construct Rhbar in the E representation, with omega_ij = omegas[i] - omegas[j]
     omegas = energy2omega(eigen.eigenvalues)
-    Rhbar = np.asarray(X_E * Phi(T, omegas[:, None] - omegas[None, :], I0, alpha=alpha), dtype=np.complex128)
+    Rhbar = np.asarray(X_E * Phi(T, omegas[..., :, None] - omegas[..., None, :], I0, alpha=alpha), dtype=np.complex128)
     # Change the basis functions from the eigenstates of the Hamiltonian H (E representation)
     # to the eigenstates of the spin operator Sz_tot (S representation)
     Rhbar = np.matmul(M, np.matmul(Rhbar, M_dagger))

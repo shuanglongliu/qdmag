@@ -76,3 +76,18 @@ def test_gpu_rejects_unsupported_propagator(propagator, workdir):
         eff = effective_basis(many_spins(Ss, nS, gfactor), exchange, anisotropy, dynamics, states)
         with pytest.raises(ValueError, match="not available with device = 'gpu'"):
             liouville(eff, dynamics)
+
+
+@pytest.mark.gpu
+def test_expm_stack_gpu_matches_cpu(workdir):
+    """expm_stack on the GPU agrees with expm on the CPU, member by member, on rho."""
+    import cupy
+    from qdmag.core import expm as qe
+    lio = set_up_case("3spin_16_Pade", workdir, "cpu")
+    As = []
+    for B in [0.0, 2.5, 5.0]:
+        lio.update_L(B)
+        As.append(lio.L * lio.deltat)
+    E = cupy.asnumpy(qe.expm_stack(cupy.asarray(np.stack(As)), cupy))
+    for b in range(len(As)):
+        np.testing.assert_allclose(E[b] @ lio.risvrho, qe.expm(As[b]) @ lio.risvrho, rtol=0, atol=1e-10)
