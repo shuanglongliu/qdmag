@@ -72,7 +72,6 @@ job_array = """#!/bin/bash -l
 #SBATCH --qos=m2qm-efrc
 #SBATCH --job-name=powder
 #SBATCH --mail-type=None
-#SBATCH --mail-user=shuan.liu@northeastern.edu
 #SBATCH --partition=hpg-default
 #SBATCH --nodes=1
 #SBATCH --ntasks=1

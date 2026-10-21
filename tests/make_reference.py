@@ -29,13 +29,28 @@ import scipy
 
 from cases import CASES, REFERENCE, run_case, save_reference
 
+# The commit the references are made from (see above)
+REFERENCE_COMMIT = "14f7d02"
+
+
+def cpu_model():
+    """CPU model name from /proc/cpuinfo (the effective basis depends on it, see cases.py)."""
+    try:
+        with open("/proc/cpuinfo") as f:
+            for line in f:
+                if line.startswith("model name"):
+                    return line.split(":", 1)[1].strip()
+    except OSError:
+        pass
+    return platform.processor()
+
+
 if __name__ == "__main__":
-    import qdmag
     names = sys.argv[1:] or list(CASES)
-    meta = {"qdmag": str(Path(qdmag.__file__).resolve().parent),
+    meta = {"commit": REFERENCE_COMMIT,
             "omp_num_threads": OMP_NUM_THREADS,
             "python": platform.python_version(), "numpy": np.__version__, "scipy": scipy.__version__,
-            "node": platform.node(), "date": time.strftime("%Y-%m-%d %H:%M:%S"), "cases": {}}
+            "cpu": cpu_model(), "date": time.strftime("%Y-%m-%d %H:%M:%S"), "cases": {}}
     meta_file = REFERENCE / "meta.json"
     if meta_file.exists():
         meta["cases"] = json.loads(meta_file.read_text())["cases"]

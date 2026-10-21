@@ -1,10 +1,10 @@
 {
-  "qdmag": "/blue/m2qm-efrc/shuan.liu.neu/tests/qdmag/phase1/ref_14f7d02/qdmag",
+  "commit": "14f7d02",
   "omp_num_threads": "4",
   "python": "3.11.11",
   "numpy": "2.2.5",
   "scipy": "1.15.2",
-  "node": "c0605a-s20.ufhpc",
+  "cpu": "AMD EPYC 9655P 96-Core Processor",
   "date": "2026-10-20 00:48:51",
   "cases": {
     "1spin_linear_Pade": {
