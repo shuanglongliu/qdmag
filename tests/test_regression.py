@@ -1,5 +1,6 @@
 """
-End-to-end regression against the reference outputs of commit 14f7d02 (see make_reference.py).
+End-to-end regression against the reference outputs in tests/reference/ (commit 14f7d02,
+or for the 3-spin cases the commit of the Condon-Shortley pool basis; see make_reference.py).
 
 Runs on the CPU, and for the Pade, Krylov and RK4 cases also on the GPU (marked gpu).
 GPU and multithreaded BLAS results are not bitwise reproducible, so the contract is a
@@ -42,11 +43,10 @@ def test_regression(name, device, workdir):
     factor = 1 if device == "cpu" else GPU_FACTOR_PER_STAIR * number_of_stairs(name, result)
 
     # rho is compared in the effective basis, which must then be the same as for the
-    # references; it is not on a CPU whose LAPACK picks another basis within the
-    # degenerate blocks of the pool Hamiltonian (see cases.py).
+    # references. The Condon-Shortley pool basis is unique, so it is on any CPU and
+    # thread count, up to rounding (h0 in cm^-1).
     for key in ("h0", "Mz", "X"):
-        if not np.allclose(result["basis"][key], ref["basis"][key], rtol=0, atol=1e-12):
-            pytest.skip("effective basis differs from the reference ({}); rho cannot be compared".format(key))
+        np.testing.assert_allclose(result["basis"][key], ref["basis"][key], rtol=0, atol=1e-10, err_msg=key)
 
     assert len(result["mag"]) == len(ref["mag"])
     np.testing.assert_allclose(result["mag"]["t"], ref["mag"]["t"], rtol=1e-15, atol=0)

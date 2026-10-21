@@ -1,45 +1,101 @@
 {
-  "commit": "14f7d02",
-  "omp_num_threads": "4",
-  "python": "3.11.11",
-  "numpy": "2.2.5",
-  "scipy": "1.15.2",
-  "cpu": "AMD EPYC 9655P 96-Core Processor",
-  "date": "2026-10-20 00:48:51",
   "cases": {
     "1spin_linear_Pade": {
+      "commit": "14f7d02",
+      "omp_num_threads": "4",
+      "python": "3.11.11",
+      "numpy": "2.2.5",
+      "scipy": "1.15.2",
+      "cpu": "AMD EPYC 9655P 96-Core Processor",
+      "date": "2026-10-20 00:48:51",
       "seconds": 11.9,
       "nsave": 201
     },
     "1spin_linear_Taylor": {
+      "commit": "14f7d02",
+      "omp_num_threads": "4",
+      "python": "3.11.11",
+      "numpy": "2.2.5",
+      "scipy": "1.15.2",
+      "cpu": "AMD EPYC 9655P 96-Core Processor",
+      "date": "2026-10-20 00:48:51",
       "seconds": 32.9,
       "nsave": 11
     },
     "1spin_linear_Krylov": {
+      "commit": "14f7d02",
+      "omp_num_threads": "4",
+      "python": "3.11.11",
+      "numpy": "2.2.5",
+      "scipy": "1.15.2",
+      "cpu": "AMD EPYC 9655P 96-Core Processor",
+      "date": "2026-10-20 00:48:51",
       "seconds": 30.2,
       "nsave": 11
     },
     "1spin_linear_Taylor_sparse": {
+      "commit": "14f7d02",
+      "omp_num_threads": "4",
+      "python": "3.11.11",
+      "numpy": "2.2.5",
+      "scipy": "1.15.2",
+      "cpu": "AMD EPYC 9655P 96-Core Processor",
+      "date": "2026-10-20 00:48:51",
       "seconds": 51.4,
       "nsave": 11
     },
     "1spin_linear_Krylov_sparse": {
+      "commit": "14f7d02",
+      "omp_num_threads": "4",
+      "python": "3.11.11",
+      "numpy": "2.2.5",
+      "scipy": "1.15.2",
+      "cpu": "AMD EPYC 9655P 96-Core Processor",
+      "date": "2026-10-20 00:48:51",
       "seconds": 44.3,
       "nsave": 11
     },
     "1spin_sin_RK4": {
+      "commit": "14f7d02",
+      "omp_num_threads": "4",
+      "python": "3.11.11",
+      "numpy": "2.2.5",
+      "scipy": "1.15.2",
+      "cpu": "AMD EPYC 9655P 96-Core Processor",
+      "date": "2026-10-20 00:48:51",
       "seconds": 14.7,
       "nsave": 51
     },
     "2spin_Jzz_Pade": {
+      "commit": "14f7d02",
+      "omp_num_threads": "4",
+      "python": "3.11.11",
+      "numpy": "2.2.5",
+      "scipy": "1.15.2",
+      "cpu": "AMD EPYC 9655P 96-Core Processor",
+      "date": "2026-10-20 00:48:51",
       "seconds": 0.2,
       "nsave": 201
     },
     "3spin_16_Pade": {
+      "commit": "14f7d02",
+      "omp_num_threads": "4",
+      "python": "3.11.11",
+      "numpy": "2.2.5",
+      "scipy": "1.15.2",
+      "cpu": "AMD EPYC 9655P 96-Core Processor",
+      "date": "2026-10-20 00:48:51",
       "seconds": 4.1,
       "nsave": 101
     },
     "3spin_26_Pade": {
+      "commit": "14f7d02",
+      "omp_num_threads": "4",
+      "python": "3.11.11",
+      "numpy": "2.2.5",
+      "scipy": "1.15.2",
+      "cpu": "AMD EPYC 9655P 96-Core Processor",
+      "date": "2026-10-20 00:48:51",
       "seconds": 26.3,
       "nsave": 51
     }

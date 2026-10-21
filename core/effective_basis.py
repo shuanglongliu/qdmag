@@ -1,7 +1,146 @@
+import copy
 import numpy as np
+from qdmag.core.Operators import Operator
+from qdmag.core.common import get_kronecker_product
 from qdmag.core.common import get_h_exchange, get_h_exchange_iso,  get_h_anisotropy, get_h_Zeeman, get_h_Zeeman_iso, eigen_handy
 from qdmag.core.common import transform_O
 from qdmag.core.constants import factor_ex
+
+# Eigenvalues of the pool Hamiltonian (cm^-1) closer than this are taken as degenerate. The
+# smallest splitting that is not a degeneracy is the Zeeman splitting of the 1e-4 T pool
+# field, ~9e-5 cm^-1.
+TOL_DEGENERATE = 1.0e-9
+
+
+def energy_clusters(E, tol=TOL_DEGENERATE):
+    """Lists of consecutive indices of the ascending values E that are degenerate within tol."""
+    clusters = [[0]]
+    for k in range(1, len(E)):
+        if E[k] - E[k-1] > tol:
+            clusters.append([k])
+        else:
+            clusters[-1].append(k)
+    return clusters
+
+
+def split_subspace(W, ops, tol=1.0e-8):
+    """
+    Split the subspace spanned by the orthonormal columns of W into one-dimensional pieces:
+    diagonalize the projection of ops[0] on it, then that of ops[1] within each degenerate
+    eigenspace, and so on. Returns the vectors in ascending order of the projected eigenvalues.
+    Each vector is unique up to a phase.
+    """
+    if W.shape[1] == 1:
+        return [W[:, 0]]
+    if len(ops) == 0:
+        raise RuntimeError("A degenerate subspace of dimension {} of the pool Hamiltonian "
+                           "cannot be resolved.".format(W.shape[1]))
+    K = W.conj().T @ ops[0] @ W
+    lam, U = np.linalg.eigh((K + K.conj().T) / 2.0)
+    W = W @ U
+    vectors = []
+    for group in energy_clusters(lam, tol):
+        vectors += split_subspace(W[:, group], ops[1:], tol)
+    return vectors
+
+
+def fix_phase(w):
+    """w with its largest component (the first one, within 1e-8, if several) real and positive."""
+    a = np.abs(w)
+    k = np.flatnonzero(a >= a.max() * (1.0 - 1.0e-8))[0]
+    return w * (np.conj(w[k]) / a[k])
+
+
+def canonical_pool_basis(h, eigen, spins):
+    """
+    Replace the eigenvectors of eigen = eigen_handy(h) with a basis that does not depend on the
+    choices of LAPACK (phases, the basis within degenerate eigenspaces, and the mixing of
+    states of different M that are split only by the small pool field), so that the
+    effective basis, and through X the dynamics, are reproducible across BLAS thread counts
+    and CPUs.
+
+    h must conserve Sz and S^2, and h - c Sz must commute with S- (isotropic exchange plus a
+    uniform Zeeman term along z, or Sz alone). Every pool state is then a member |S, M> of a
+    multiplet, and the basis is built in the Condon-Shortley convention:
+      1. Top states (M = S) for each M >= 0: the null space of S+ within the M sector of the
+         product basis (Sz is diagonal there), in which h is diagonalized. Tops of equal
+         energy are separated by the projections of S_12^2, S_123^2, ... in turn. Every
+         vector of such a degenerate space is an eigenvector of h, so this only picks the
+         basis.
+      2. Each top gets its largest component real and positive.
+      3. |S, M - 1> = S-|S, M> / sqrt((S + M)(S - M + 1)).
+    The states are ordered by energy as by eigh, so state indices keep their meaning;
+    within a degenerate cluster they are ordered by S, then by their top states.
+    """
+    Sz = np.real(np.diag(spins.Sv_tot[2]))
+    # S- from the exact ladder matrices (Sx - i Sy has rounding errors in its elements)
+    Sm = spins.zero
+    for i in range(spins.nS):
+        ops = copy.deepcopy(spins.IDs)
+        ops[i] = Operator.Jminus(spins.Ss[i]).O
+        Sm = Sm + get_kronecker_product(ops, spins.nS)
+    Sp = Sm.conj().T
+    chain = []
+    for k in range(2, spins.nS):
+        Sk = [sum(spins.global_spins[i][j] for i in range(k)) for j in range(3)]
+        chain.append(Sk[0] @ Sk[0] + Sk[1] @ Sk[1] + Sk[2] @ Sk[2])
+    n = len(Sz)
+    sector = {}
+    for i, m in enumerate(Sz):
+        sector.setdefault(round(2*m), []).append(i)
+
+    # 1-2. Top states, from the largest M down
+    tops = []
+    for twoM in sorted((k for k in sector if k >= 0), reverse=True):
+        P = sector[twoM]
+        Q = sector.get(twoM + 2, [])
+        n_top = len(P) - len(Q)
+        if n_top == 0:
+            continue
+        # Null space of S+ from sector M to M + 1: S-S+ = S^2 - Sz^2 - Sz has eigenvalues
+        # S(S+1) - M(M+1) >= 2(M+1) on the rest of the sector, so it is well separated.
+        A = Sp[np.ix_(Q, P)]
+        _, U = np.linalg.eigh(A.conj().T @ A)
+        T = np.zeros((n, n_top), dtype=np.complex128)
+        T[P, :] = U[:, :n_top]
+        K = T.conj().T @ h @ T
+        lam, U = np.linalg.eigh((K + K.conj().T) / 2.0)
+        T = T @ U
+        for group in energy_clusters(lam):
+            for w in split_subspace(T[:, group], [c for c in chain]):
+                tops.append((0.5*twoM, fix_phase(w)))
+
+    # 3. Multiplets
+    states = []
+    for rank, (S, w) in enumerate(tops):
+        for step in range(int(round(2*S)) + 1):
+            if step > 0:
+                # ||S-|S, M>||^2 = (S + M)(S - M + 1), as in the elements of Jminus
+                M = S - step + 1
+                # (real and imaginary parts divided separately: NumPy's complex division
+                # is not exact for a real divisor)
+                w = ((Sm @ w).view(np.float64) / np.sqrt((S + M)*(S - M + 1))).view(np.complex128)
+            states.append((np.real(np.vdot(w, h @ w)), S, rank, w))
+    if len(states) != n:
+        raise RuntimeError("The multiplets hold {} states, not {}.".format(len(states), n))
+
+    # Order by energy; ties (degenerate clusters) by S, then by the top state
+    states.sort(key=lambda x: x[0])
+    E = np.array([x[0] for x in states])
+    order = []
+    for c in energy_clusters(E):
+        order += sorted(c, key=lambda k: (states[k][1], states[k][2]))
+    E = E[order]
+    V = np.stack([states[k][3] for k in order], axis=1)
+    scale = max(1.0, np.abs(E).max())
+    if np.abs(h @ V - V * E).max() > 1.0e-8*scale or np.abs(E - eigen.eigenvalues).max() > 1.0e-8*scale:
+        raise RuntimeError("The pool Hamiltonian does not conserve the total spin; "
+                           "the Condon-Shortley pool basis cannot be built.")
+    eigen.eigenvalues = E
+    eigen.eigenvalues_offset = E - E[0]
+    eigen.eigenvectors = V
+    return eigen
+
 
 class effective_basis:
     """
@@ -19,6 +158,7 @@ class effective_basis:
         self.anisotropy = anisotropy
         self.dynamics = dynamics
         self.get_pool_and_pick_states(states)
+        self.check_degenerate_selection()
         self.construct_X_eff()
         self.get_effective_Sv()
         self.get_effective_Mv()
@@ -52,7 +192,7 @@ class effective_basis:
             # h_zee_iso = get_h_Zeeman_iso(self.spins, [0.,0.,1e-4], 'cartesian')
             # self.eigen_S = eigen_handy(h_zee_iso)
             # 2. Use the eigenstates of Sz. (Same as the first choice.)
-            self.eigen_S = eigen_handy(self.spins.Sv_tot[2])
+            self.eigen_S = canonical_pool_basis(self.spins.Sv_tot[2], eigen_handy(self.spins.Sv_tot[2]), self.spins)
             self.Sz_pool = transform_O(self.spins.Sv_tot[2], self.eigen_S)
             self.Sz_pool = np.real(self.Sz_pool)
             # It dodes not solve the divergence problem to use the eigenstates of Sn = en_x*Sx + en_y*Sy + en_z*Sz as the basis for time evolution.
@@ -69,7 +209,7 @@ class effective_basis:
             h_ex_iso = get_h_exchange_iso(self.spins, self.exchange, factor_ex)
             h_zee_iso = get_h_Zeeman_iso(self.spins, [0.0, 0.0, 1e-4], 'cartesian')
             h = h_ex_iso + h_zee_iso
-            self.eigen_S = eigen_handy(h)
+            self.eigen_S = canonical_pool_basis(h, eigen_handy(h), self.spins)
             self.Sz_pool = transform_O(self.spins.Sv_tot[2], self.eigen_S)
             self.Sz_pool = np.real(self.Sz_pool)
         else:
@@ -81,7 +221,7 @@ class effective_basis:
             h_zee_iso = get_h_Zeeman_iso(self.spins, [0.0, 0.0, 1e-4], 'cartesian')
             h = h_ex_iso + h_zee_iso
             # h = h_ex_iso + h_zee_iso + 1e-6 * self.spins.S2_tot  # Add a small S^2 term to lift the degeneracy of S.
-            self.eigen_S = eigen_handy(h)
+            self.eigen_S = canonical_pool_basis(h, eigen_handy(h), self.spins)
             if len(states) == 0 or (isinstance(states, str) and (states == "default")):
                 print("Using the default effective basis.")
                 # If no indices are provided, use the minimal basis.
@@ -104,6 +244,18 @@ class effective_basis:
             else:
                 print("Error: Invalid states input. It should be a list of indices, an empty list (same as 'default'), 'default', or 'all'/'full'. Stopping ...")
                 exit(1)
+
+    def check_degenerate_selection(self):
+        """
+        Warn if the selected states contain only part of a degenerate eigenspace of the pool
+        Hamiltonian: which part is selected is then set by the convention of
+        canonical_pool_basis, not by the physics.
+        """
+        selected = set(self.states)
+        for c in energy_clusters(self.eigen_S.eigenvalues):
+            n = len(selected.intersection(c))
+            if 0 < n < len(c):
+                print("Warning: the selected states contain {} of the {} degenerate pool states {}.".format(n, len(c), c))
 
     def construct_X_eff(self):
         """

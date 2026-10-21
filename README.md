@@ -104,6 +104,8 @@ This maintains numerical stability for time steps orders of magnitude larger tha
 
 For large multinuclear systems where the full Hilbert space dimension N = Πᵢ(2Sᵢ+1) is too large, an effective Hamiltonian of dimension n ≪ N is constructed by selecting thermally relevant basis states. The basis states are chosen as the lowest-energy eigenstates of isotropic exchange interaction with a perturbative Zeeman term for each value of the total $S_z$ projection by default. The small perturbative Zeeman field ensures the eigenstates are also eigenstates of the total $\hat{S}_z$ operator.
 
+The pool of candidate states is built in a unique basis, so that the effective basis does not depend on the linear-algebra library, the number of threads or the CPU. The pool Hamiltonian conserves the total spin, so each pool state is a member $|S, M\rangle$ of a spin multiplet. The top state $M = S$ of each multiplet is taken from the $M$ sector of the product basis (where $\hat{S}_z$ is diagonal), with its largest component real and positive, and the other members follow from the Condon–Shortley convention, $|S, M-1\rangle = \hat{S}_-|S, M\rangle / \sqrt{(S+M)(S-M+1)}$. Multiplets of equal energy and equal $S$ are told apart by the intermediate spins $\hat{S}_{12}^2$, $\hat{S}_{123}^2$, …. This matters because the operator $X$ that couples the spins to the phonons is defined in this basis ($X_{ij} = 1$ for states with $|M_i - M_j| = 1$): a different phase or a different basis within a degenerate level would change the relaxation. A warning is printed when `states:` contains only part of a degenerate level.
+
 ### Powder Averaging
 
 For powder samples, the net magnetization is averaged over all molecular orientations. Two angles are enough for this, rather than three. The external field lies along the global $z$ axis, so the magnetization depends on the orientation only through the direction $\mathbf{n}$ of the field in the ZFS reference frame,
@@ -337,15 +339,14 @@ Utility for **convergence testing of the staircase time step**. Automatically ge
 
 ## Tests
 
-The `tests/` directory has a pytest suite: unit tests of the Liouville superoperator, the propagators and the matrix exponential, and regression tests that compare short runs of the examples against reference outputs in `tests/reference/` (made from the CPU code at commit `14f7d02` by `tests/make_reference.py`). Run it from the repository, pointing `QDMAG_TEST_DIR` at a directory for the files the runs write (the default is a temporary directory):
+The `tests/` directory has a pytest suite: unit tests of the Liouville superoperator, the propagators and the matrix exponential, and regression tests that compare short runs of the examples against reference outputs in `tests/reference/` (made by `tests/make_reference.py` from the CPU code at commit `14f7d02`, and for the 3-spin cases at the commit that introduced the Condon–Shortley pool basis; `tests/reference/meta.json` records the commit of each case). Run it from the repository, pointing `QDMAG_TEST_DIR` at a directory for the files the runs write (the default is a temporary directory):
 
 ```bash
 QDMAG_TEST_DIR=/path/to/scratch python -m pytest tests
 ```
 
-- The suite sets the number of BLAS threads to 4, the value the references were made with, before NumPy is imported.
+- The suite sets the number of BLAS threads to 4, the value the references were made with, before NumPy is imported. The effective basis does not depend on it (`tests/test_effective_basis.py` checks 1 against 4 threads); only the rounding does.
 - Tests marked `gpu` (`tests/test_gpu.py`, and the GPU variants of the regression tests) run only if CuPy imports and a CUDA device is visible; otherwise they are skipped. GPU results are compared with tolerances, not bitwise.
-- The effective basis is not unique inside degenerate blocks, and LAPACK returns different bases on different CPUs, thread counts and even nodes. Regression cases whose effective basis differs from the reference are skipped with a message rather than failed.
 
 ## Acknowledgments
 

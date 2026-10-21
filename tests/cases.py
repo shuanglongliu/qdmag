@@ -18,11 +18,12 @@ import yaml
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 REFERENCE = Path(__file__).resolve().parent / "reference"
 
-# BLAS threads used for the references. The effective basis comes from eigh of a
-# Hamiltonian with exact degeneracies, and LAPACK's choice of basis inside a
-# degenerate block depends on the threading (and on the CPU), so rho in the
-# effective basis is reproducible only at the same thread count and CPU type.
-# The thread count must be set before NumPy is imported; see conftest.py.
+# BLAS threads used for the references. Before the Condon-Shortley pool basis
+# (effective_basis.canonical_pool_basis), the effective basis depended on LAPACK's
+# choice of basis, which changes with the threading and the CPU; the 14f7d02
+# references were made at this thread count. Since then the basis is unique, and
+# the count only fixes the rounding. It must be set before NumPy is imported; see
+# conftest.py.
 OMP_NUM_THREADS = "4"
 
 # name -> (example directory, {index of the dynamics block: {key: value}})
