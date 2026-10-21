@@ -65,33 +65,36 @@ def spectral_density(omega, I0=1e-4, alpha=2):
 def Phi(T, omega, I0, alpha=2):
     """
     Construct the function Phi in the quantum master equation.
+    omega is a scalar or an array; Phi is evaluated element by element and has the
+    shape of omega. Each element takes one of three branches, chosen by beta*energy.
     """
     beta = 1/(Kelvin2wavenumber * T)
-    energy = omega2energy(omega)
-    if abs( beta*energy ) < 1e-3:
-        # Use Taylor expansion to avoid divergence. For the spectral density
-        # I(omega) = I0 * |omega|^alpha * sgn(omega), the small beta*energy limit
-        # of (I(omega) - I(-omega)) / (exp(beta*energy) - 1) is
-        #   I0*const1*|omega|^(alpha-1)/beta - I0*sgn(omega)*|omega|^alpha/2.
-        # This reduces to the original ω^2 expression at alpha = 2. No abs():
-        # the exact Phi is non-negative and the leading |omega|^(alpha-1) term
-        # dominates here, so a wrong sign should surface rather than be masked.
-        result = ( I0*const1*np.abs(omega)**(alpha-1)/beta
-                   - I0*np.sign(omega)*np.abs(omega)**alpha/2 )
-    elif beta * energy > 700:
-        # Large positive beta*energy: exp(beta*energy) overflows float64
-        # (max exponent ~709) and the Bose-Einstein factor 1/(exp(beta*energy)-1)
-        # underflows to 0. The transition requires absorbing more energy than the
-        # bath can supply at this temperature, so Phi -> 0. Return 0 directly to
-        # avoid the harmless overflow warning from exp.
-        result = 0.0 * omega  # preserve scalar/array shape of omega
-    else:
-        numerator = spectral_density(omega, I0=I0, alpha=alpha) - spectral_density(-omega, I0=I0, alpha=alpha)
-        # Print beta, energy, and their product to check the divergence
-        # print("beta, energy, beta*energy = {:12.4e} {:12.4e} {:12.4e}".format(beta, energy, beta*energy))
-        denominator = np.expm1(beta * energy)
-        result = numerator / denominator
-    return result
+    omega = np.asarray(omega, dtype=np.float64)
+    x = beta * omega2energy(omega)
+    small = np.abs(x) < 1e-3
+    large = x > 700
+    other = ~(small | large)
+    result = np.zeros(omega.shape)
+    # Use Taylor expansion to avoid divergence. For the spectral density
+    # I(omega) = I0 * |omega|^alpha * sgn(omega), the small beta*energy limit
+    # of (I(omega) - I(-omega)) / (exp(beta*energy) - 1) is
+    #   I0*const1*|omega|^(alpha-1)/beta - I0*sgn(omega)*|omega|^alpha/2.
+    # This reduces to the original ω^2 expression at alpha = 2. No abs():
+    # the exact Phi is non-negative and the leading |omega|^(alpha-1) term
+    # dominates here, so a wrong sign should surface rather than be masked.
+    w = omega[small]
+    result[small] = ( I0*const1*np.abs(w)**(alpha-1)/beta
+                      - I0*np.sign(w)*np.abs(w)**alpha/2 )
+    # Large positive beta*energy: exp(beta*energy) overflows float64
+    # (max exponent ~709) and the Bose-Einstein factor 1/(exp(beta*energy)-1)
+    # underflows to 0. The transition requires absorbing more energy than the
+    # bath can supply at this temperature, so Phi -> 0, which result already holds.
+    # Computing it would only raise a harmless overflow warning from exp.
+    w = omega[other]
+    numerator = spectral_density(w, I0=I0, alpha=alpha) - spectral_density(-w, I0=I0, alpha=alpha)
+    denominator = np.expm1(x[other])
+    result[other] = numerator / denominator
+    return result[()] if result.ndim == 0 else result
 
 def construct_X(Sz_tot):
     """
@@ -127,61 +130,21 @@ def get_Rhbar(h, X, I0, T, alpha=2):
     omega_ij = ( E_i - E_j ) / hbar.
     I(omega) = I0 omega^2 theta(omega): spectral density for phonons
     theta(omega) is the step function.
+
+    h may also be a stack of Hamiltonians, shape (..., dim, dim), with X shared; Rhbar
+    then has the same leading axes (used by core/powder_dynamics.py).
     """
     # Diagonalize the Hamiltonian to find eigenvalues and eigenvectors
     eigen = eigen_simple(h)
     # Unitary transformation matrix
     M = eigen.eigenvectors
-    M_dagger = np.conjugate(np.transpose(M))
+    M_dagger = np.conjugate(np.swapaxes(M, -1, -2))
     # Change the basis functions from the eigenstates of the spin operator Sz_tot (S representation)
     # to the eigenstates of the Hamiltonian H (E representation) 
     X_E = np.matmul(M_dagger, np.matmul(X, M))
-    # Construct Rhbar in the E representation
-    Rhbar = np.zeros(X.shape, dtype=np.complex128)
+    # Construct Rhbar in the E representation, with omega_ij = omegas[i] - omegas[j]
     omegas = energy2omega(eigen.eigenvalues)
-    for i in range(X.shape[0]):
-        for j in range(X.shape[1]):
-            omega_ij = omegas[i] - omegas[j]
-            Rhbar[i, j] = X_E[i, j] * Phi(T, omega_ij, I0, alpha=alpha)
-    # Change the basis functions from the eigenstates of the Hamiltonian H (E representation)
-    # to the eigenstates of the spin operator Sz_tot (S representation)
-    Rhbar = np.matmul(M, np.matmul(Rhbar, M_dagger))
-    return Rhbar
-
-def update_Rhbar(Rhbar, h, X, I0, T, alpha=2):
-    """
-    Construct the auxiliary operator R multiplied by hbar in both the E and S representations.
-    The E representation is spanned by the eigenstates of the Hamiltonian. 
-    The S representation is spanned by the eigenstates of the spin operator Sz_tot.
-
-    h: Hamiltonian at a certain time in the S representation.
-    X: the operator in the spin space in the S representation, which couples to phonons. 
-    I0: prefactor for the spectral density for phonons. 
-    T: temperature in Kelvin.
-
-    In the E representation,
-      Rhbar_E_{ij} = X_E_{ij} * Phi_{ij}
-      Phi_{ij} = ( I(omega_ij) - I(-omega_ij) ) / ( exp(beta * hbar * omega_ij ) - 1 )
-      omega_ij = ( E_i - E_j ) / hbar.
-      I(omega) = I0 omega^2 theta(omega): spectral density for phonons
-      theta(omega) is the step function.
-    """
-    # Diagonalize the Hamiltonian to find eigenvalues and eigenvectors
-    eigen = eigen_simple(h)
-    # Unitary transformation matrix
-    M = eigen.eigenvectors
-    M_dagger = np.conjugate(np.transpose(M))
-    # Change the basis functions from the eigenstates of the spin operator Sz_tot (S representation)
-    # to the eigenstates of the Hamiltonian H (E representation) 
-    # using the unitary transformation matrix M
-    # for the X_eff operator.
-    X_E = np.matmul(M_dagger, np.matmul(X, M))
-    # Construct Rhbar in the E representation
-    omegas = energy2omega(eigen.eigenvalues)
-    for i in range(X.shape[0]):
-        for j in range(X.shape[1]):
-            omega_ij = omegas[i] - omegas[j]
-            Rhbar[i, j] = X_E[i, j] * Phi(T, omega_ij, I0, alpha=alpha)
+    Rhbar = np.asarray(X_E * Phi(T, omegas[..., :, None] - omegas[..., None, :], I0, alpha=alpha), dtype=np.complex128)
     # Change the basis functions from the eigenstates of the Hamiltonian H (E representation)
     # to the eigenstates of the spin operator Sz_tot (S representation)
     Rhbar = np.matmul(M, np.matmul(Rhbar, M_dagger))

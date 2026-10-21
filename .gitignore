@@ -164,3 +164,13 @@ cython_debug/
 .dat
 output/
 
+
+# Slurm
+/alloc.sh
+slurm-*.out
+
+# Notes for working with Claude Code, kept local
+/journals/
+/CLAUDE.md
+/ROADMAP.md
+/HANDOFF.md

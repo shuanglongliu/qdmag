@@ -5,7 +5,7 @@ import pandas as pd
 import yaml
 from scipy.spatial.transform import Rotation as R
 from qdmag.core.common import print_emat_array
-from qdmag.core.common import many_spins, eigen_handy
+from qdmag.core.common import many_spins, eigen_handy, rotate_frames
 from qdmag.core.common import get_h_exchange, get_h_anisotropy, get_h_Zeeman_Mv_eff
 from qdmag.core.common import get_partition_function, get_magnetic_moment_Mv_tot
 from qdmag.core.constants import factor_ex
@@ -182,21 +182,36 @@ class powder:
         """
         self.get_emat_from_angles(self.alphas[i], self.betas[i], self.gammas[i])
 
-    def format_input(self):
+    def get_input_data(self):
         """
-        The content of input.yaml for the orientation currently held in self.emat.
+        The input (a dict) for the orientation currently held in self.emat.
+
+        The template is filled in for the reference orientation (the {exx}, ... placeholders
+        of the anisotropy frame set to the identity), and then every tensor of the molecule
+        is rotated with it (rotate_frames): the anisotropy, and also the g tensors and the
+        exchange, which earlier versions left unrotated. That was only correct when g and
+        the exchange are isotropic.
         """
-        return input.format( \
-                exx=self.emat[0, 0], exy=self.emat[0, 1], exz=self.emat[0, 2],\
-                eyx=self.emat[1, 0], eyy=self.emat[1, 1], eyz=self.emat[1, 2],\
-                ezx=self.emat[2, 0], ezy=self.emat[2, 1], ezz=self.emat[2, 2],\
+        I = np.eye(3)
+        data = yaml.safe_load(input.format( \
+                exx=I[0, 0], exy=I[0, 1], exz=I[0, 2],\
+                eyx=I[1, 0], eyy=I[1, 1], eyz=I[1, 2],\
+                ezx=I[2, 0], ezy=I[2, 1], ezz=I[2, 2],\
                 staticB_max=self.staticB_max, staticB_step=self.staticB_step,\
                 T=self.T, lambdaa=self.lambdaa, I0=self.I0,\
                 Bt_type=self.Bt_type, sweep_rate=self.sweep_rate,\
                 tmin=self.tmin, tmax=self.tmax, deltat=self.deltat,\
                 save_mag=self.save_mag, nt_mag=self.nt_mag,\
                 save_rho=self.save_rho, nt_rho=self.nt_rho,\
-                n_threads=self.n_threads)
+                n_threads=self.n_threads))
+        return rotate_frames(data, self.emat)
+
+    def format_input(self):
+        """
+        The content of input.yaml for the orientation currently held in self.emat. The
+        comments of the template are not carried over.
+        """
+        return yaml.safe_dump(self.get_input_data(), sort_keys=False, default_flow_style=None, width=120)
 
     def get_input(self, i):
         self.get_emat(i)
@@ -403,15 +418,15 @@ class powder:
             as it does in the BT_Bgrid of the input file (thetaB = phiB = 0).
         Returns Mz, one entry per field, in units of the Bohr magneton.
 
-        The Hamiltonian is parsed out of the same input template that is written
-        to input.yaml and is built by the same core routines as
+        The Hamiltonian is built from the same input that is written to input.yaml
+        (get_input_data) and by the same core routines as
         tool_magnetization.py, so all units are the ones of qdmag.core.constants:
         Bkqs and eigenvalues in cm-1, B in Tesla (converted by Tesla2wavenumber
         inside get_h_Zeeman_Mv_eff) and self.T in Kelvin (converted by
         Kelvin2wavenumber inside get_partition_function).
         """
         self.get_emat_from_angles(alpha, beta, gamma)
-        data = yaml.safe_load(self.format_input())
+        data = self.get_input_data()
 
         spins = many_spins(data['spins'], len(data['spins']), data['gfactor'])
         h0 = get_h_exchange(spins, data.get('exchange', []), factor_ex) \

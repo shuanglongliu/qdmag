@@ -12,9 +12,10 @@ from qdmag.core.common import kronecker_delta, create_outdir
 from qdmag.core.common import get_Mv_from_rho, get_Mz_from_rho
 from qdmag.core.common import eigen_handy, get_h_Zeeman_Mv_eff
 from qdmag.core.common import get_rhoe, back_transform_O
-from qdmag.core.quantum_master import get_Rhbar, update_Rhbar
+from qdmag.core.quantum_master import get_Rhbar
 from qdmag.core.pulse import get_Bt, get_pulse_RK4_double_grid
 from qdmag.core.hdf5 import get_risvrho_from_hdf5
+from qdmag.core.backend import Backend
 
 r"""
 Codes for solving the quantum master equation described in the Eq. 2.7 of
@@ -59,6 +60,10 @@ class liouville:
     # Internal knobs of the 'Krylov' propagator, deliberately not exposed in input.yaml.
     krylov_max_halvings  = 10     # Give up after this many substep halvings
     krylov_breakdown_tol = 1e-12  # Relative threshold for detecting an invariant subspace
+
+    # Appended to the magnetometry output directory (see set_up_outdirs); subclasses that
+    # write another kind of magnetization set it, so as not to overwrite a single run.
+    mag_dir_suffix = ''
 
     def __init__(self, eff, dynamics):
         """
@@ -119,6 +124,15 @@ class liouville:
         # Parameters of the 'Krylov' propagator; ignored by the other two.
         self.krylov_m       = min(dynamics[2].get('krylov_m', 30), self.dimds)  # Subspace dimension
         self.krylov_tol     = dynamics[2].get('krylov_tol', 1e-10)              # Per-substep tolerance
+
+        # Device for the time evolution: 'cpu' (default, NumPy/SciPy) or 'gpu' (CuPy), and
+        # which GPU. Optional. The effective basis, the eigenproblems of the dim x dim
+        # Hamiltonian and the output stay on the host; L and risvrho live on the device.
+        # See core/backend.py.
+        self.device         = dynamics[2].get('device', 'cpu')
+        self.backend        = Backend(self.device, dynamics[2].get('gpu_id', 0))
+        self.xp             = self.backend.xp
+        print("Time evolution on {}\n".format(self.backend.description))
                       
         # Output controls; the whole block and every key in it are optional
         # and fall back to sensible defaults.
@@ -161,6 +175,9 @@ class liouville:
             raise ValueError("Invalid exp_propagator: {}. Choose from {}.".format(
                 self.exp_propagator, sorted(exp_propagators)))
         self.propagate_risvrho, self.sparse_L = exp_propagators[self.exp_propagator]
+        if self.device == 'gpu' and self.exp_propagator not in ('Pade', 'Krylov'):
+            raise ValueError("exp_propagator = {} is not available with device = 'gpu'. "
+                             "Use Pade or Krylov.".format(self.exp_propagator))
 
         # Build the superoperator in the matching storage format, and bind the per-stair
         # update to the matching routine so the time loop does not branch on the format.
@@ -176,40 +193,35 @@ class liouville:
         Set up the Liouville superoperator.
         """
 
+        to_device = self.backend.to_device
+
+        # Row permutation I = i*dim + j -> It = j*dim + i, used by construct_CST.
+        self.index_transpose = to_device(np.arange(self.dims).reshape(self.dim, self.dim).T.ravel())
+
+        # X on the device, for C; get_Rhbar uses the host copy self.X.
+        self.X_dev = to_device(self.X)
+
+        # Prefactor of the dissipative part of L
+        self.lam = self.lambdaa**2 * np.pi * const1**2
+
         # h0, A0, and L0 are time independent.
 
         # Construct the superoperator L0 at t = 0 ps without spin-phonon coupling
         self.A0 = self.construct_A_vectorized(self.h0, dtype=np.complex128)
-        self.L0 = self.construct_L(self.A0, None)
-    
-        # h_zee, h, A, Rhbar, C, CST, and L will be updated at each time step.
-        # We will reuse them (the memory associated with them) to save time.
-    
-        # Zeeman term at t = tmin ps on the effective basis
-        self.h_zee = -1 * Tesla2wavenumber * self.Bt(self.tmin) * self.Mz
+        self.L0 = to_device(self.construct_L(self.A0, None))
 
-        # Effective Hamiltonian at t = tmin ps, it will be updated at each time step
-        self.h = self.h0 + self.h_zee
+        # The Zeeman superoperator is linear in B, Azee(B) = B * Azee_unit, so the
+        # Zeeman blocks of L are precomputed per tesla; see get_Zeeman_blocks.
+        c1Azee_unit = const1 * self.construct_A_vectorized(-1 * Tesla2wavenumber * self.Mz, dtype=np.complex128)
+        self.c1Azee_unit_re = to_device(np.ascontiguousarray(np.real(c1Azee_unit)))
+        self.c1Azee_unit_im = to_device(np.ascontiguousarray(np.imag(c1Azee_unit)))
 
-        # Construct the superoperator A at t = tmin ps, it will be updated at each time step
-        self.A = self.construct_A_vectorized(self.h, dtype=np.complex128)
-    
-        # Construct the superoperator Rhbar in the S representation at t = tmin ps
-        self.Rhbar = get_Rhbar(self.h, self.X, self.I0, self.T, alpha=self.alpha)
-    
-        # Construct the superoperator C which is time dependent due to Rhbar
-        self.C = self.construct_C(self.X, self.Rhbar)
-        self.CST = self.construct_CST(self.C)
+        # h_zee, h, Rhbar, C, CST, and L are updated at each time step.
+        # L is written in place into one preallocated buffer.
+        self.L = self.xp.empty((self.dimds, self.dimds), dtype=np.float64)
 
-        # Get the indices of nonzero matrix elements of C
-        self.n_nzC, self.indices_nzC = self.get_indices_nzC(self.X)
-    
-        # Construct the superoperator L at t = tmin ps with spin-phonon coupling
-        self.L = self.construct_L(self.A, self.C)
-
-        # Construct the superoperators LA and LC for the contributions from A and C, which will be updated at each time step.
-        self.LA = self.construct_L(self.A, None)
-        self.LC = self.construct_L(None, self.C)
+        # h_zee, h, Rhbar, C, CST and L at t = tmin ps
+        self.update_L_under_magnetic_field(self.Bt(self.tmin))
 
     def get_initial_rho(self, from_file=False, fname=None, t_init=None):
         if from_file:
@@ -228,6 +240,8 @@ class liouville:
             self.rho = back_transform_O(self.rho, eigen)
             # Convert the density matrix to the double super density matrix
             self.risvrho = self.convert_rho_to_risvrho(self.rho)
+        # risvrho stays on the device for the whole time evolution
+        self.risvrho = self.backend.to_device(self.risvrho)
 
     def set_up_liouville_sparse(self):
         """
@@ -272,7 +286,7 @@ class liouville:
         self.LA = (self.L0 + self.construct_L_sparse(Azee, None)).tocsr()
 
         # Dissipative part, time dependent through Rhbar
-        self.Rhbar = update_Rhbar(self.Rhbar, self.h, self.X, self.I0, self.T, alpha=self.alpha)
+        self.Rhbar = get_Rhbar(self.h, self.X, self.I0, self.T, alpha=self.alpha)
         self.C = self.construct_C_sparse(self.X, self.Rhbar)
         self.LC = self.construct_L_sparse(None, self.C)
 
@@ -424,6 +438,10 @@ class liouville:
 
     def construct_C(self, X, Rhbar):
         """
+        Index-level reference implementation, kept for documentation and not called anywhere:
+        the dense code paths build C through construct_C_vectorized, the sparse ones through
+        construct_C_sparse. The double loop spells out the definition element by element.
+
         Both X and Rhbar are in the S representation.
     
         [X, Rhbar rho]_{I} = C_{IJ} rho_{J}
@@ -454,49 +472,34 @@ class liouville:
     
         return C
 
+    def construct_C_vectorized(self, X, Rhbar):
+        """
+        Same superoperator as construct_C, written as a pair of Kronecker products, as in
+        construct_A_vectorized and construct_C_sparse:
+
+            C_{IJ} = (X Rhbar)_{ik} delta_{lj} - Rhbar_{ik} X_{lj}
+                   = kron(X Rhbar, Id)_{IJ} - kron(Rhbar, X^T)_{IJ},   I = i*N + j,  J = k*N + l
+
+        Gives the same result as construct_C bit for bit (up to the sign of zeros).
+        X and Rhbar are arrays on the device (see core/backend.py). Rhbar may be a stack,
+        shape (..., dim, dim); C then has the same leading axes.
+        """
+
+        xp = self.xp
+        XRhbar = xp.matmul(X, Rhbar)
+        Id = xp.eye(self.dim, dtype=np.complex128)
+        return kron(XRhbar, Id) - kron(Rhbar, X.T)
+
     def construct_CST(self, C):
         """
         Get super transpose of the superoperator C.
         CST_{I J} = C_{It J}
           I -> ij -> ji -> It
+        That is a permutation of the rows of C, applied with the precomputed index map
+        self.index_transpose (see set_up_liouville). C may be a stack, shape (..., dims, dims).
         """
-    
-        CST = np.zeros((self.dims, self.dims), dtype=np.complex128)
-    
-        for I in range(self.dims):
-            i, j = dec_composite_index(I, self.dim)
-            It = get_composite_index(j, i, self.dim)
-            CST[I] = C[It]
-    
-        return CST
 
-    def get_indices_nzC(self, X):
-        """
-        Get indices of nonzero matrix elements of C
-        X: a matrix of dimension dim x dim for the spin transitions
-        C: an operator of dimension dims due to the interaction with bath
-           see the function construct_C for the definition of C
-        n_nzC: number of nonzero matrix elements of C
-        indices_nzC: indices of the nonzero matrix elements of C
-        """
-    
-        # Get indices of nonzero matrix elements of X
-        indices_nzX = np.nonzero(X)
-    
-        # Convert the list [[i1, i2, ..., in], [j1, j2, ..., jn]] to the set {(i1, j1), (i2, j2), ..., (in, jn)}
-        set_index_tuples_nzX = set( [(indices_nzX[0][i], indices_nzX[1][i]) for i in range(indices_nzX[0].shape[0])] )
-    
-        # Get indices of nonzero matrix elements of C
-        indices_nzC = []
-        for i in range(self.dim):
-            for j in range(self.dim):
-                for k in range(self.dim):
-                    for l in range(self.dim):
-                        if (l == j) or ( (l, j) in set_index_tuples_nzX ):
-                            indices_nzC.append( (i, j, k, l) )
-        n_nzC = len(indices_nzC)
-    
-        return (n_nzC, indices_nzC)
+        return C[..., self.index_transpose, :]
 
     def construct_L(self, A, C):
         """
@@ -557,23 +560,6 @@ class liouville:
     
         return L
 
-    def update_C_and_CST(self):
-        """
-        Save time by avoiding memory allocation for C.
-        Rhbar is time dependent, and so is C.
-        C and CST are recomputed completely at each time step.
-        """
-    
-        XRhbar = np.matmul(self.X, self.Rhbar)
-    
-        for idx in range(self.n_nzC):
-            i, j, k, l = self.indices_nzC[idx]
-            I = i * self.dim + j
-            J = k * self.dim + l
-            self.C[I, J] = XRhbar[i, k] * kronecker_delta(l, j) - self.Rhbar[i, k] * self.X[l, j]
-            It = j * self.dim + i
-            self.CST[It, J] = self.C[I, J]
-
     def update_L_under_magnetic_field(self,  B):
         r"""
         L: L matrix to be updated.
@@ -597,8 +583,6 @@ class liouville:
             omega_ij = ( E_i - E_j ) / hbar.
             I(omega) = I0 omega^2 theta(omega): spectral density for phonons
             theta(omega) is the step function.
-        n_nzC: number of nonzero matrix elements of C
-        indices_nzC: indices of nonzero matrix elements of C
         lambdaa: spin-phonon coupling constant
         I0: prefactor for the phonon spectral density
         T: Temperature
@@ -606,59 +590,81 @@ class liouville:
         dims  = dim^2  : Dimension of superoperators for the vectorized density matrix
         dimds = 2*dim^2: Dimension of superoperators for the RI-separated vectorized density matrix
         """
-    
+
         # In general, the L operator is as follows
         # L11 =  const1 * Aim - lambdaa**2 * np.pi * const1**2 * (Cre + CSTre)
         # L12 =  const1 * Are + lambdaa**2 * np.pi * const1**2 * (Cim + CSTim)
         # L21 = -const1 * Are - lambdaa**2 * np.pi * const1**2 * (Cim - CSTim)
         # L22 =  const1 * Aim - lambdaa**2 * np.pi * const1**2 * (Cre - CSTre)
-    
-        # If Azee is diagonal and real, which is true when the g tensors are isotropic, 
-        # only the following update is needed. (used in early versions of the code)
-        # L = [[L11, L12], [L21, L22]]
-        #       L12 = L012 + const1 * Azee
-        #       L21 = L021 - const1 * Azee
-    
-        # Calculate the A operator corresponding to the Zeeman interaction
-    
+        # with A = A0 + Azee. Each quadrant is L0 + (Zeeman block) + (dissipative block),
+        # i.e. LA + LC, summed in that order, written in place into self.L.
+        # Every array here may carry leading batch axes (core/powder_dynamics.py), so
+        # slices address the last two axes only.
+
+        # Field of the current L, used by get_LA_LC
+        self.B_L = B
+
+        # Update the Hamiltonian h
         self.h_zee = -1 * Tesla2wavenumber * B * self.Mz
-        Azee = self.construct_A_vectorized(self.h_zee, dtype=np.complex128)
-        c1Azee = const1 * Azee
-        c1Azeere = np.real(c1Azee)
-        c1Azeeim = np.imag(c1Azee)
-    
-        # Update the diagonal elements of the Hamiltonian h
         self.h = self.h0 + self.h_zee
-    
-        # Update the operators C and CST
-        self.Rhbar = update_Rhbar(self.Rhbar, self.h, self.X, self.I0, self.T, alpha=self.alpha)
-        self.update_C_and_CST()
-        factorC = self.lambdaa**2 * np.pi * const1**2 * self.C
-        factorCST = self.lambdaa**2 * np.pi * const1**2 * self.CST
-        factorCre = np.real(factorC)
-        factorCim = np.imag(factorC)
-        factorCSTre = np.real(factorCST)
-        factorCSTim = np.imag(factorCST)
 
-        # Update the L matrixby including the Zeeman interaction and the spin-phonon coupling at the same time  
-        # self.L[        0:self.dims,          0: self.dims] = self.L0[        0:self.dims,          0: self.dims] + c1Azeeim - (factorCre + factorCSTre)
-        # self.L[        0:self.dims,  self.dims:self.dimds] = self.L0[        0:self.dims,  self.dims:self.dimds] + c1Azeere + (factorCim + factorCSTim)
-        # self.L[self.dims:self.dimds,         0: self.dims] = self.L0[self.dims:self.dimds,         0: self.dims] - c1Azeere - (factorCim - factorCSTim)
-        # self.L[self.dims:self.dimds, self.dims:self.dimds] = self.L0[self.dims:self.dimds, self.dims:self.dimds] + c1Azeeim - (factorCre - factorCSTre)
+        # Update the operators Rhbar, C and CST
+        # Rhbar comes from the eigenproblem of the dim x dim Hamiltonian, solved on the host;
+        # C, CST and L are built on the device.
+        self.Rhbar = get_Rhbar(self.h, self.X, self.I0, self.T, alpha=self.alpha)
+        self.C = self.construct_C_vectorized(self.X_dev, self.backend.to_device(self.Rhbar))
+        self.CST = self.construct_CST(self.C)
 
-        # Update the LA and LC matrices for the contributions from A and C
-        self.LA[        0:self.dims,          0: self.dims] = self.L0[        0:self.dims,          0: self.dims] + c1Azeeim
-        self.LA[        0:self.dims,  self.dims:self.dimds] = self.L0[        0:self.dims,  self.dims:self.dimds] + c1Azeere
-        self.LA[self.dims:self.dimds,         0: self.dims] = self.L0[self.dims:self.dimds,         0: self.dims] - c1Azeere
-        self.LA[self.dims:self.dimds, self.dims:self.dimds] = self.L0[self.dims:self.dimds, self.dims:self.dimds] + c1Azeeim
+        zre, zim = self.get_Zeeman_blocks(B)
+        d11, d12, d21, d22 = self.get_dissipative_blocks()
+        n, N = self.dims, self.dimds
+        for (rows, cols), z, d in (((slice(0, n), slice(0, n)),  zim, d11),
+                                   ((slice(0, n), slice(n, N)),  zre, d12),
+                                   ((slice(n, N), slice(0, n)), -zre, d21),
+                                   ((slice(n, N), slice(n, N)),  zim, d22)):
+            Lq = self.L[..., rows, cols]
+            self.xp.add(self.L0[..., rows, cols], z, out=Lq)
+            Lq += d
 
-        self.LC[        0:self.dims,          0: self.dims] = - (factorCre + factorCSTre)
-        self.LC[        0:self.dims,  self.dims:self.dimds] =   (factorCim + factorCSTim)
-        self.LC[self.dims:self.dimds,         0: self.dims] = - (factorCim - factorCSTim)
-        self.LC[self.dims:self.dimds, self.dims:self.dimds] = - (factorCre - factorCSTre)
+    def get_Zeeman_blocks(self, B):
+        """
+        Real and imaginary parts of const1 * Azee at field B, with Azee the superoperator of
+        h_zee = -Tesla2wavenumber * B * Mz. They enter the four quadrants of L as
+        [[+im, +re], [-re, +im]].
+        """
+        return B * self.c1Azee_unit_re, B * self.c1Azee_unit_im
 
-        # Update the L matrix, which includes the Zeeman interaction and the spin-phonon coupling
-        self.L = self.LA + self.LC
+    def get_dissipative_blocks(self):
+        """
+        The four quadrants of LC, the spin-phonon (dissipative) part of L, from the current C and CST.
+        """
+        Cre, Cim = self.C.real, self.C.imag
+        CSTre, CSTim = self.CST.real, self.CST.imag
+        factorCre, factorCim = self.lam * Cre, self.lam * Cim
+        factorCSTre, factorCSTim = self.lam * CSTre, self.lam * CSTim
+        return (- (factorCre + factorCSTre),
+                  (factorCim + factorCSTim),
+                - (factorCim - factorCSTim),
+                - (factorCre - factorCSTre))
+
+    def get_LA_LC(self):
+        """
+        Coherent (LA, from h0 and the Zeeman term) and dissipative (LC, from spin-phonon
+        coupling) parts of the current dense L, with L = LA + LC. Built on demand, since
+        only unit_save_drdt needs them.
+        """
+        zre, zim = self.get_Zeeman_blocks(self.B_L)
+        d11, d12, d21, d22 = self.get_dissipative_blocks()
+        LA = self.xp.empty_like(self.L)
+        LC = self.xp.empty_like(self.L)
+        n, N = self.dims, self.dimds
+        for (rows, cols), z, d in (((slice(0, n), slice(0, n)),  zim, d11),
+                                   ((slice(0, n), slice(n, N)),  zre, d12),
+                                   ((slice(n, N), slice(0, n)), -zre, d21),
+                                   ((slice(n, N), slice(n, N)),  zim, d22)):
+            self.xp.add(self.L0[..., rows, cols], z, out=LA[..., rows, cols])
+            LC[..., rows, cols] = d
+        return LA, LC
 
     def examine_L_max_and_expLdeltat_max(self, Bs, deltats):
         """
@@ -675,10 +681,10 @@ class liouville:
         # Get the maximum of the absolute values of the elements of L and exp(L * deltat)
         for i in range(m):
             self.update_L_under_magnetic_field(Bs[i])
-            L_max[i] = np.max(np.abs(self.L))
+            L_max[i] = float(self.xp.max(self.xp.abs(self.L)))
             for j in range(n):
                 print("Examining B = {:15.6f} T, deltat = {:15.3f} ps ...".format(Bs[i], deltats[j]))
-                expLdeltat_max[i, j] = np.max(np.abs(expm(self.L*deltats[j])))
+                expLdeltat_max[i, j] = float(self.xp.max(self.xp.abs(self.backend.expm(self.L*deltats[j]))))
         # Check if the output directory exists, if not, create it.
         create_outdir()
         # Save L_max in the file L_max.dat
@@ -720,11 +726,11 @@ class liouville:
         """
         if RK4:
             dir_rho = "rho_RK4"
-            dir_mag = "magnetometry_RK4"
+            dir_mag = "magnetometry_RK4" + self.mag_dir_suffix
             dir_drdt = "drdt_RK4"
         else:
             dir_rho = "rho"
-            dir_mag = "magnetometry"
+            dir_mag = "magnetometry" + self.mag_dir_suffix
             dir_drdt = "drdt"
         if self.Bt_params['Bt_type'] == 'linear':
             outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1e}/'.format(self.T, self.I0, self.lambdaa, self.Bt_params['sweep_rate'])
@@ -824,7 +830,7 @@ class liouville:
             raise ValueError("tmax - tmin is not a multiple of deltat")
 
     def unit_save_rho(self, fobj, t):
-        dset = fobj.create_dataset("{:.3f}".format(t), data=self.risvrho)
+        dset = fobj.create_dataset("{:.3f}".format(t), data=self.backend.to_host(self.risvrho))
 
     def unit_save_mag(self, fobj, t, header=False):
         Mv = self.get_Mv_from_risvrho()
@@ -842,9 +848,11 @@ class liouville:
         Save the diagonal elements of drho/dt, which are the population changes, at time t.
         """
         # Calculate drho/dt from the quantum master equation
-        drisvrhodt_LA = self.LA @ self.risvrho
-        drisvrhodt_LC = self.LC @ self.risvrho
-        drisvrhodt = self.L @ self.risvrho
+        LA, LC = self.get_LA_LC() if not self.sparse_L else (self.LA, self.LC)
+        to_host = self.backend.to_host
+        drisvrhodt_LA = to_host(LA @ self.risvrho)
+        drisvrhodt_LC = to_host(LC @ self.risvrho)
+        drisvrhodt = to_host(self.L @ self.risvrho)
 
         # Empty DataFrame is deprecated, use list of dicts instead
         df = pd.DataFrame()
@@ -859,11 +867,11 @@ class liouville:
     def propagate_risvrho_Pade(self):
         """
         Apply exp(L deltat) to risvrho by forming the full matrix exponential first, with the
-        scaling-and-squaring Pade approximant of scipy.linalg.expm.
+        scaling-and-squaring Pade approximant of scipy.linalg.expm (core/expm.py on a GPU).
         Selected by exp_propagator = 'Pade'. Do not call directly; call self.propagate_risvrho,
         which set_up_exp_propagator binds to one of the propagators.
         """
-        self.risvrho = expm(self.L * self.deltat) @ self.risvrho
+        self.risvrho = self.backend.expm(self.L * self.deltat) @ self.risvrho
 
     def propagate_risvrho_Taylor(self):
         """
@@ -925,16 +933,17 @@ class liouville:
         # H(L - mu I) = H(L) - mu I; what it buys is a smaller ||L - mu I||_1, hence fewer
         # substeps below, and a better scaled small exponential in arnoldi_kernel.
         # .diagonal() rather than np.trace so that a sparse L works unchanged.
-        mu = self.L.diagonal().sum() / self.dimds
+        xp = self.xp
+        mu = float(self.L.diagonal().sum() / self.dimds)
 
         # Number of substeps, chosen so that ||(L - mu I) tau||_1 is of the order of the
         # Krylov dimension, which is the regime where a degree-m approximation converges.
         # ||L - mu I||_1 is assembled from the column sums of |L| by correcting the diagonal
         # alone, so neither L - mu I nor a dense copy of L is ever formed. Bounding it by
         # ||L||_1 + |mu| instead would exceed ||L||_1 and so undo the point of the shift.
-        colsum = np.asarray(abs(self.L).sum(axis=0)).ravel()
+        colsum = xp.asarray(abs(self.L).sum(axis=0)).ravel()
         diag = self.L.diagonal()
-        nrm = np.max(colsum - np.abs(diag) + np.abs(diag - mu))
+        nrm = float(xp.max(colsum - xp.abs(diag) + xp.abs(diag - mu)))
         theta = max(0.5 * self.krylov_m, 1.0)
         k = max(1, int(np.ceil(nrm * abs(dt) / theta)))
 
@@ -953,7 +962,7 @@ class liouville:
         silently accepted.
         """
         w, err = self.arnoldi_kernel(v, tau, mu)
-        if err <= self.krylov_tol * np.linalg.norm(v):
+        if err <= self.krylov_tol * float(self.xp.linalg.norm(v)):
             return w
         if depth >= self.krylov_max_halvings:
             raise RuntimeError(
@@ -973,7 +982,8 @@ class liouville:
             exp(L tau) v ~ exp(mu tau) * ||v|| * V_m exp(H_m tau) e_1
 
         L enters only through the product L @ V[:, j]. All arithmetic is real, since both L
-        and risvrho are real.
+        and risvrho are real. The basis V lives on the device of L (see core/backend.py);
+        H is moved to the host for the small exponential.
 
         Returns the propagated vector and the a posteriori error estimate
             ||v|| |h_{m+1,m}| tau |[phi_1(H_m tau)]_{m-1,0}|,   phi_1(z) = (exp(z) - 1) / z
@@ -986,14 +996,15 @@ class liouville:
         augmented Hessenberg matrix, since
             expm([[H_m tau, e_1], [0, 0]]) = [[exp(H_m tau), phi_1(H_m tau) e_1], [0, 1]].
         """
+        xp = self.xp
         m = self.krylov_m
         # The basis is stored one vector per ROW so that every V[i] is contiguous. With the
         # vectors in columns each Gram-Schmidt access is a strided slice, which costs about
         # an order of magnitude more than the matrix-vector products themselves.
-        V = np.zeros((m+1, self.dimds))
-        H = np.zeros((m+1, m))
+        V = xp.zeros((m+1, self.dimds))
+        H = xp.zeros((m+1, m))
 
-        beta = np.linalg.norm(v)
+        beta = float(xp.linalg.norm(v))
         if beta == 0.0:
             return v.copy(), 0.0
         V[0] = v / beta
@@ -1009,8 +1020,8 @@ class liouville:
             h2 = V[:j+1] @ w
             w -= h2 @ V[:j+1]
             H[:j+1, j] = h1 + h2
-            H[j+1, j] = np.linalg.norm(w)
-            if H[j+1, j] <= self.krylov_breakdown_tol * beta:
+            H[j+1, j] = xp.linalg.norm(w)
+            if float(H[j+1, j]) <= self.krylov_breakdown_tol * beta:
                 # Happy breakdown: the subspace is invariant and the projection is exact.
                 m = j + 1
                 happy = True
@@ -1019,12 +1030,13 @@ class liouville:
 
         # A single (m+1) x (m+1) exponential yields both exp(H_m tau), as the leading m x m
         # block, and phi_1(H_m tau) e_1, as the last column, with no ill-conditioned solve.
+        H = self.backend.to_host(H)
         Haug = np.zeros((m+1, m+1))
         Haug[:m, :m] = H[:m, :m] * tau
         Haug[0, m] = 1.0
         E = expm(Haug)
         scale = np.exp(mu * tau)
-        w = scale * beta * (E[:m, 0] @ V[:m])
+        w = scale * beta * (self.backend.to_device(E[:m, 0]) @ V[:m])
         err = 0.0 if happy else abs(scale) * beta * H[m, m-1] * abs(tau) * abs(E[m-1, m])
         return w, err
 
@@ -1188,12 +1200,13 @@ class liouville:
                Lb = L(ts[it] + deltat/2)
                Lc = L(ts[it] + deltat)
         """
-        self.La = np.zeros((self.dimds, self.dimds), dtype=np.float64)
-        self.Lb = np.zeros((self.dimds, self.dimds), dtype=np.float64)
-        self.Lc = np.zeros((self.dimds, self.dimds), dtype=np.float64)
-        self.update_L_under_magnetic_field(self.Bs2[2*it  ]); np.copyto(self.La, self.L)
-        self.update_L_under_magnetic_field(self.Bs2[2*it+1]); np.copyto(self.Lb, self.L)
-        self.update_L_under_magnetic_field(self.Bs2[2*it+2]); np.copyto(self.Lc, self.L)
+        xp = self.xp
+        self.La = xp.zeros((self.dimds, self.dimds), dtype=np.float64)
+        self.Lb = xp.zeros((self.dimds, self.dimds), dtype=np.float64)
+        self.Lc = xp.zeros((self.dimds, self.dimds), dtype=np.float64)
+        self.update_L_under_magnetic_field(self.Bs2[2*it  ]); xp.copyto(self.La, self.L)
+        self.update_L_under_magnetic_field(self.Bs2[2*it+1]); xp.copyto(self.Lb, self.L)
+        self.update_L_under_magnetic_field(self.Bs2[2*it+2]); xp.copyto(self.Lc, self.L)
     
     def update_Labc(self, it):
         """
@@ -1201,9 +1214,10 @@ class liouville:
                Lb = L(ts[it] + deltat/2)
                Lc = L(ts[it] + deltat)
         """
-        np.copyto(self.La, self.Lc)
-        self.update_L_under_magnetic_field(self.Bs2[2*it+1]); np.copyto(self.Lb, self.L)
-        self.update_L_under_magnetic_field(self.Bs2[2*it+2]); np.copyto(self.Lc, self.L)
+        xp = self.xp
+        xp.copyto(self.La, self.Lc)
+        self.update_L_under_magnetic_field(self.Bs2[2*it+1]); xp.copyto(self.Lb, self.L)
+        self.update_L_under_magnetic_field(self.Bs2[2*it+2]); xp.copyto(self.Lc, self.L)
     
     def evolve_risvrho_onestep(self, it):
         """
@@ -1231,7 +1245,7 @@ class liouville:
             with h5py.File(self.frho, 'w') as f1, open(self.fmag, 'w') as f2, open(self.fdrdt, 'w') as f3:
                 # Save the initial density matrix, magnetic moment, and drho/dt
                 self.unit_save_rho(f1, self.tmin)
-                self.unit_save_mag(f2, self.tmin)
+                self.unit_save_mag(f2, self.tmin, header=True)
                 self.unit_save_drdt(f3, self.tmin)
                 # Loop over the rounds for saving drho/dt
                 for iround_drdt in range(self.nround_drdt):
@@ -1256,7 +1270,7 @@ class liouville:
             with h5py.File(self.frho, 'w') as f1,  open(self.fmag, 'w') as f2:
                 # Save the initial density matrix, magnetic moment, and the magnetic susceptibility
                 self.unit_save_rho(f1, self.tmin)
-                self.unit_save_mag(f2, self.tmin)
+                self.unit_save_mag(f2, self.tmin, header=True)
                 # Loop over the rounds for saving the RI-separated vectorized density matrix
                 for iround_rho in range(self.nround_rho):
                     # Loop over the rounds for saving the magnetic properties
@@ -1306,7 +1320,7 @@ class liouville:
         elif (not self.save_rho) and self.save_mag and self.save_drdt:
             with open(self.fmag, 'w') as f2, open(self.fdrdt, 'w') as f3:
                 # Save the initial magnetic moment and drho/dt
-                self.unit_save_mag(f2, self.tmin)
+                self.unit_save_mag(f2, self.tmin, header=True)
                 self.unit_save_drdt(f3, self.tmin)
                 # Loop over the rounds for saving drho/dt
                 for iround_drdt in range(self.nround_drdt):
@@ -1325,7 +1339,7 @@ class liouville:
         elif (not self.save_rho) and self.save_mag and (not self.save_drdt):
             with open(self.fmag, 'w') as f2:
                 # Save the initial magnetic moment and the magnetic susceptibility
-                self.unit_save_mag(f2, self.tmin)
+                self.unit_save_mag(f2, self.tmin, header=True)
                 # Loop over the rounds for saving the magnetic moment
                 for iround_mag in range(self.nround_mag):
                     # Loop over the self.nt_mag time steps
@@ -1358,14 +1372,14 @@ class liouville:
         """
         Get the magnetic moment vector from the RI-separated vectorized density matrix.
         """
-        self.rho = self.convert_risvrho_to_rho(self.risvrho)
+        self.rho = self.convert_risvrho_to_rho(self.backend.to_host(self.risvrho))
         return get_Mv_from_rho(self.rho, self.Mv)
     
     def get_Mz_from_risvrho(self):
         """
         Get the z component of the magnetic moment from the RI-separated vectorized density matrix.
         """
-        self.rho = self.convert_risvrho_to_rho(self.risvrho)
+        self.rho = self.convert_risvrho_to_rho(self.backend.to_host(self.risvrho))
         return get_Mz_from_rho(self.rho, self.Mz)
     
     def get_chimz_from_rho(self, t, dt=1e+3):
@@ -1391,9 +1405,9 @@ class liouville:
         # Hamiltonian at time t
         self.h = self.h0 - Tesla2wavenumber * self.Bt(t) * self.Mz
         # Rhbar at time t
-        self.Rhbar = update_Rhbar(self.Rhbar, self.h, self.X, self.I0, self.T, alpha=self.alpha)
+        self.Rhbar = get_Rhbar(self.h, self.X, self.I0, self.T, alpha=self.alpha)
         # Get the density matrix rho from the RI-separated vectorized density matrix risvrho
-        self.rho = self.convert_risvrho_to_rho(self.risvrho)
+        self.rho = self.convert_risvrho_to_rho(self.backend.to_host(self.risvrho))
         # Call get_chimz_from_rho
         return self.get_chimz_from_rho(t, dt=dt)
 
@@ -1427,6 +1441,18 @@ class liouville:
 # ============================================================================ #
 # Auxilliary functions for constructing the Liouville superoperator.
 # ============================================================================ #
+
+def kron(A, B):
+    """
+    Kronecker product over the last two axes, with any leading (batch) axes of A and B
+    broadcast: kron(A, B)[..., i*n + j, k*m + l] = A[..., i, k] * B[..., j, l], where B is
+    n x m. For 2D arrays it is np.kron (the same products, so the same values); written
+    with broadcasting because np.kron and cupy.kron do not treat leading axes as a batch.
+    """
+    n1, m1 = A.shape[-2:]
+    n2, m2 = B.shape[-2:]
+    out = A[..., :, None, :, None] * B[..., None, :, None, :]
+    return out.reshape(out.shape[:-4] + (n1 * n2, m1 * m2))
 
 def get_composite_index(i, j, N):
     I = i * N + j
