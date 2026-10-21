@@ -78,25 +78,25 @@
       "nsave": 201
     },
     "3spin_16_Pade": {
-      "commit": "14f7d02",
+      "commit": "73b5570",
       "omp_num_threads": "4",
       "python": "3.11.11",
       "numpy": "2.2.5",
       "scipy": "1.15.2",
       "cpu": "AMD EPYC 9655P 96-Core Processor",
-      "date": "2026-10-20 00:48:51",
-      "seconds": 4.1,
+      "date": "2026-10-21 13:20:05",
+      "seconds": 3.7,
       "nsave": 101
     },
     "3spin_26_Pade": {
-      "commit": "14f7d02",
+      "commit": "73b5570",
       "omp_num_threads": "4",
       "python": "3.11.11",
       "numpy": "2.2.5",
       "scipy": "1.15.2",
       "cpu": "AMD EPYC 9655P 96-Core Processor",
-      "date": "2026-10-20 00:48:51",
-      "seconds": 26.3,
+      "date": "2026-10-21 13:20:05",
+      "seconds": 18.0,
       "nsave": 51
     }
   }
