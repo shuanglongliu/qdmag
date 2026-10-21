@@ -26,6 +26,7 @@ Magnetic molecules — including transition metal complexes and lanthanide-based
 - **Powder averaging** over molecular orientations using a Lebedev quadrature over the field direction, which needs two Euler angles rather than three (350 orientations at degree 31)
 - **Liouville form** of the quantum master equation for efficient matrix-based time propagation
 - **HDF5-based I/O** for density matrix storage, retrieval, and file management
+- **Optional GPU backend** (CuPy) for the time evolution on CUDA GPUs, selected by the `device` key; the CPU stays the default and does not need CuPy
 
 ## Installation
 
@@ -44,6 +45,18 @@ Add the directory that contains qdmag to the environment variable PYTHONPATH.
 - h5py (HDF5 I/O for density matrix storage and retrieval)
 - pandas (tabular output of magnetization and level population time series)
 - matplotlib (optional; sparsity visualization and quadrature point plots)
+- CuPy (optional; only for `device: gpu`, see **Running on a GPU**)
+- pytest (optional; for the test suite in `tests/`)
+
+### GPU support (optional)
+
+Install a CuPy build that matches the CUDA version of the driver, for example for CUDA 12:
+
+```bash
+pip install cupy-cuda12x
+```
+
+(`cupy-cuda13x` for CUDA 13.) On a cluster, load a matching CUDA module before a GPU run, e.g. `module load cuda/12.9.1` on HiPerGator. CuPy is imported only when `device: gpu` is requested, so CPU runs work without it. CuPy compiles its kernels on first use and caches them in `~/.cupy`, so the first run on a new GPU model is slower.
 
 ## Theory
 
@@ -129,6 +142,48 @@ python tool_staircase.py
 ```
 
 The `tool_staircase.py` script must be run in the same directory as the input file. This script and other useful scripts can be found in the `tools/` directory. See the **Tools** section below for brief descriptions of each script. 
+
+### Running on a GPU
+
+The time evolution runs on a CUDA GPU when the third `dynamics` block of `input.yaml` sets `device: gpu`:
+
+```yaml
+    - tmin: 0.0e+00
+      tmax: 2.0e+08
+      deltat: 2.0e+04
+      device: gpu   # cpu (default) or gpu
+      gpu_id: 0     # which CUDA device, default 0
+```
+
+Both keys are optional; without them the run is on the CPU, unchanged. On the GPU live the Liouville superoperator L, the matrix exponential, and the vectorized density matrix for the whole run. The effective basis, the diagonalization of the Hamiltonian at each stair, and the output stay on the host, so `n_threads` still matters. The output files are the same as for a CPU run.
+
+| Supported with `device: gpu` | Not supported (raises an error) |
+| --- | --- |
+| `method: staircase` with `exp_propagator: Pade` (recommended) or `Krylov`; `method: RK4` | `exp_propagator: Taylor`, `Taylor_sparse`, `Krylov_sparse` |
+
+`Krylov` works on the GPU but is slower there than on the CPU, since each substep is a chain of small matrix-vector products; use `Pade`.
+
+**Accuracy.** GPU and CPU results are not bitwise identical (different BLAS), but agree to about 1e-10 μB per stair. Over a production-length run (`examples/3-spin/staircase/26`, 10⁴ stairs, B = 0 → 10 T) the magnetizations differ by at most 3e-8 μB, and the trace of ρ drifts no more than on the CPU. The GPU uses its own Padé matrix exponential (`core/expm.py`), which follows SciPy's choice of scaling; it drifts 3-6 times less in the trace of ρ than `cupyx.scipy.linalg.expm`.
+
+**Memory.** A GPU run holds about 18 arrays of dimds × dimds float64 numbers, where dimds = 2 dim² is the size of L and dim is the dimension of the (effective) Hilbert space: about 0.26 GB at dim 26, 1.5 GB at dim 40, 58 GB at dim 100, 121 GB at dim 120. dim is limited to about 110 on a 96 GB GPU (RTX PRO 6000) and to about 134 on a B200 (180 GB).
+
+**Which device to use.** The time per stair is set by double-precision (FP64) matrix products, so what counts is a GPU's FP64 rate. Measured time per stair (Pade, ||L Δt||₁ ≈ 3.5e5), compared with AMD EPYC 9655P (Zen 5) cores with OpenBLAS:
+
+| dim | 4 cores | 16 cores | NVIDIA L4 | NVIDIA RTX PRO 6000 | NVIDIA B200 |
+| --- | --- | --- | --- | --- | --- |
+| 17 | 0.046 s | 0.038 s | 0.038 s | 0.020 s | 0.0044 s |
+| 26 | 0.41 s | 0.18 s | 0.32 s | 0.11 s | 0.011 s |
+| 40 | 4.5 s | 1.50 s | 4.0 s | 1.10 s | 0.064 s |
+| 64 | 72 s | 22 s | - | 18 s | 0.82 s |
+| 100 | - | 277 s | - | 259 s | 11 s |
+| 120 | - | - | - | out of memory | 33 s |
+
+- Consumer and inference GPUs with low FP64 rates (e.g., the L4) are worth about 4 CPU cores for one run: fine for development and testing, no gain for production.
+- An RTX PRO 6000 is worth about 16 Zen 5 cores at large dim, and up to 2 times that at small dim, where the CPU does not use its threads well.
+- For a single run these two GPUs therefore pay off only if they are free while the CPU cores are not.
+- A data-center GPU with a full FP64 rate (B200, about 20 times the RTX PRO 6000) is worth about 9 times 16 Zen 5 cores at dim 17, 17 times at dim 26 and about 25 times from dim 40 on. Use it for production runs from dim ~26 on, and for dim above ~110, where only it has the memory.
+
+`tools/tool_benchmark.py` measures the time per stair on a given machine.
 
 ### Convergence
 
@@ -227,6 +282,17 @@ The steps in `__main__` are commented out; uncomment them one at a time, in the 
 
 Lives in `tools/cspline/`. Fits a monotone cubic spline (`PchipInterpolator`) to the experimental pulse data in `pulse.dat`, converting the time axis from ms to ps, and pickles the interpolant to `cspline.pickle`. That pickle is what `Bt_type: 'cspline'` loads at run time, from the working directory of the calculation.
 
+### `tool_benchmark.py`
+
+Times the staircase solver per stair (`update_L` and one application of exp(L Δt), separately) on the CPU or a GPU, for single spins of a chosen dimension, with the zero-field splitting scaled so that ||L Δt|| stays comparable across dimensions. Also times the host and device diagonalization (`eigh`) and prints the hardware and library versions (`info`). The number of BLAS threads must be set before NumPy is imported, so use one process per thread count:
+
+```bash
+OMP_NUM_THREADS=16 python tool_benchmark.py stairs --device cpu --dims 17 26 40 --reps 3
+python tool_benchmark.py stairs --device gpu --dims 17 26 40 64 100 --reps 3
+```
+
+Results go to stdout, as CSV (`stairs`, `eigh`) or JSON (`info`).
+
 ### `tool_hdf5.py`
 
 HDF5 file utilities: estimates the **file size** for a given simulation (time duration, time step, and density matrix dimension), **combines** two sequential HDF5 output files into one, and **inspects** the contents of an existing HDF5 file.
@@ -246,6 +312,18 @@ Evolves the spin state using a **classical rate equation** (transition rate matr
 ### `tool_time_step.py`
 
 Utility for **convergence testing of the staircase time step**. Automatically generates `input.yaml` files and SLURM job scripts for a series of calculations with systematically varied step sizes $\Delta B$. Also provides methods for collecting and comparing equilibrium and dynamical magnetization results across step sizes.
+
+## Tests
+
+The `tests/` directory has a pytest suite: unit tests of the Liouville superoperator, the propagators and the matrix exponential, and regression tests that compare short runs of the examples against reference outputs in `tests/reference/` (made from the CPU code at commit `14f7d02` by `tests/make_reference.py`). Run it from the repository, pointing `QDMAG_TEST_DIR` at a directory for the files the runs write (the default is a temporary directory):
+
+```bash
+QDMAG_TEST_DIR=/path/to/scratch python -m pytest tests
+```
+
+- The suite sets the number of BLAS threads to 4, the value the references were made with, before NumPy is imported.
+- Tests marked `gpu` (`tests/test_gpu.py`, and the GPU variants of the regression tests) run only if CuPy imports and a CUDA device is visible; otherwise they are skipped. GPU results are compared with tolerances, not bitwise.
+- The effective basis is not unique inside degenerate blocks, and LAPACK returns different bases on different CPUs, thread counts and even nodes. Regression cases whose effective basis differs from the reference are skipped with a message rather than failed.
 
 ## Acknowledgments
 
