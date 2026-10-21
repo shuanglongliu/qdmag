@@ -173,6 +173,7 @@ slurm-*.out
 /journals/
 /CLAUDE.md
 /ROADMAP.md
+/ROADMAP_history.md
 /HANDOFF.md
 
 # Scratch scripts, kept local
