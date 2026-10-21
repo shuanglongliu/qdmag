@@ -132,3 +132,27 @@ def test_expm_small_norm():
     A = np.random.default_rng(0).standard_normal((40, 40)) / 40
     assert qe.scaling_exponent(A) == 0
     np.testing.assert_allclose(qe.expm(A), scipy.linalg.expm(A), rtol=1e-13, atol=1e-14)
+
+
+def test_kron_matches_numpy():
+    """liouville.kron is np.kron for 2D arrays, bit for bit, and a batch of np.kron for stacks."""
+    from qdmag.core.liouville import kron
+    rng = np.random.default_rng(0)
+    A = rng.standard_normal((3, 5, 4)) + 1j * rng.standard_normal((3, 5, 4))
+    B = rng.standard_normal((2, 6))
+    np.testing.assert_array_equal(kron(A[0], B), np.kron(A[0], B))
+    np.testing.assert_array_equal(kron(A, B), np.stack([np.kron(a, B) for a in A]))
+
+
+def test_expm_stack_matches_expm(workdir):
+    """expm_stack equals expm of each member, for L deltat of several fields (different s)."""
+    from qdmag.core import expm as qe
+    lio = set_up_case("2spin_Jzz_Pade", workdir)
+    As = []
+    for B in [0.0, 1.0, 2.5, 5.0]:
+        lio.update_L(B)
+        As.append(lio.L * lio.deltat)
+    A = np.stack(As)
+    E = qe.expm_stack(A)
+    for b in range(len(As)):
+        np.testing.assert_allclose(E[b], qe.expm(As[b]), rtol=0, atol=1e-13 * np.abs(E[b]).max())

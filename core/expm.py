@@ -100,3 +100,29 @@ def expm(A, xp=np):
     for _ in range(s):
         E = E @ E
     return E
+
+
+def expm_stack(A, xp=np):
+    """
+    exp(A[b]) for a stack A of shape (nb, n, n), as expm does for each matrix: the same s
+    for each member (from its own norms), and the members that share an s evaluated
+    together with batched products and one batched solve.
+    """
+    n = A.shape[-1]
+    A2 = A @ A
+    A4 = A2 @ A2
+    A6 = A2 @ A4
+    ss = np.array([scaling_exponent(A[b], xp, A4[b], A6[b]) for b in range(A.shape[0])])
+    E = xp.empty_like(A)
+    b = _b13
+    Id = xp.eye(n, dtype=A.dtype)
+    for s in np.unique(ss):
+        idx = xp.asarray(np.nonzero(ss == s)[0])
+        X, X2, X4, X6 = A[idx] * 2.0**-s, A2[idx] * 4.0**-s, A4[idx] * 16.0**-s, A6[idx] * 64.0**-s
+        U = X @ (X6 @ (b[13]*X6 + b[11]*X4 + b[9]*X2) + b[7]*X6 + b[5]*X4 + b[3]*X2 + b[1]*Id)
+        V = X6 @ (b[12]*X6 + b[10]*X4 + b[8]*X2) + b[6]*X6 + b[4]*X4 + b[2]*X2 + b[0]*Id
+        Es = xp.linalg.solve(V - U, V + U)
+        for _ in range(int(s)):
+            Es = Es @ Es
+        E[idx] = Es
+    return E

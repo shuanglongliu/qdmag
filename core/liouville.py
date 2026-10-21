@@ -61,6 +61,10 @@ class liouville:
     krylov_max_halvings  = 10     # Give up after this many substep halvings
     krylov_breakdown_tol = 1e-12  # Relative threshold for detecting an invariant subspace
 
+    # Appended to the magnetometry output directory (see set_up_outdirs); subclasses that
+    # write another kind of magnetization set it, so as not to overwrite a single run.
+    mag_dir_suffix = ''
+
     def __init__(self, eff, dynamics):
         """
         eff: effective_basis object
@@ -477,13 +481,14 @@ class liouville:
                    = kron(X Rhbar, Id)_{IJ} - kron(Rhbar, X^T)_{IJ},   I = i*N + j,  J = k*N + l
 
         Gives the same result as construct_C bit for bit (up to the sign of zeros).
-        X and Rhbar are arrays on the device (see core/backend.py).
+        X and Rhbar are arrays on the device (see core/backend.py). Rhbar may be a stack,
+        shape (..., dim, dim); C then has the same leading axes.
         """
 
         xp = self.xp
         XRhbar = xp.matmul(X, Rhbar)
         Id = xp.eye(self.dim, dtype=np.complex128)
-        return xp.kron(XRhbar, Id) - xp.kron(Rhbar, X.T)
+        return kron(XRhbar, Id) - kron(Rhbar, X.T)
 
     def construct_CST(self, C):
         """
@@ -491,10 +496,10 @@ class liouville:
         CST_{I J} = C_{It J}
           I -> ij -> ji -> It
         That is a permutation of the rows of C, applied with the precomputed index map
-        self.index_transpose (see set_up_liouville).
+        self.index_transpose (see set_up_liouville). C may be a stack, shape (..., dims, dims).
         """
 
-        return C[self.index_transpose, :]
+        return C[..., self.index_transpose, :]
 
     def construct_L(self, A, C):
         """
@@ -593,6 +598,8 @@ class liouville:
         # L22 =  const1 * Aim - lambdaa**2 * np.pi * const1**2 * (Cre - CSTre)
         # with A = A0 + Azee. Each quadrant is L0 + (Zeeman block) + (dissipative block),
         # i.e. LA + LC, summed in that order, written in place into self.L.
+        # Every array here may carry leading batch axes (core/powder_dynamics.py), so
+        # slices address the last two axes only.
 
         # Field of the current L, used by get_LA_LC
         self.B_L = B
@@ -615,8 +622,8 @@ class liouville:
                                    ((slice(0, n), slice(n, N)),  zre, d12),
                                    ((slice(n, N), slice(0, n)), -zre, d21),
                                    ((slice(n, N), slice(n, N)),  zim, d22)):
-            Lq = self.L[rows, cols]
-            self.xp.add(self.L0[rows, cols], z, out=Lq)
+            Lq = self.L[..., rows, cols]
+            self.xp.add(self.L0[..., rows, cols], z, out=Lq)
             Lq += d
 
     def get_Zeeman_blocks(self, B):
@@ -655,8 +662,8 @@ class liouville:
                                    ((slice(0, n), slice(n, N)),  zre, d12),
                                    ((slice(n, N), slice(0, n)), -zre, d21),
                                    ((slice(n, N), slice(n, N)),  zim, d22)):
-            self.xp.add(self.L0[rows, cols], z, out=LA[rows, cols])
-            LC[rows, cols] = d
+            self.xp.add(self.L0[..., rows, cols], z, out=LA[..., rows, cols])
+            LC[..., rows, cols] = d
         return LA, LC
 
     def examine_L_max_and_expLdeltat_max(self, Bs, deltats):
@@ -719,11 +726,11 @@ class liouville:
         """
         if RK4:
             dir_rho = "rho_RK4"
-            dir_mag = "magnetometry_RK4"
+            dir_mag = "magnetometry_RK4" + self.mag_dir_suffix
             dir_drdt = "drdt_RK4"
         else:
             dir_rho = "rho"
-            dir_mag = "magnetometry"
+            dir_mag = "magnetometry" + self.mag_dir_suffix
             dir_drdt = "drdt"
         if self.Bt_params['Bt_type'] == 'linear':
             outdir = './output/T_{:.1f}K_I0_{:.2e}_lambdaa_{:.2f}/Bt_linear_sweep_rate_{:.1e}/'.format(self.T, self.I0, self.lambdaa, self.Bt_params['sweep_rate'])
@@ -1434,6 +1441,18 @@ class liouville:
 # ============================================================================ #
 # Auxilliary functions for constructing the Liouville superoperator.
 # ============================================================================ #
+
+def kron(A, B):
+    """
+    Kronecker product over the last two axes, with any leading (batch) axes of A and B
+    broadcast: kron(A, B)[..., i*n + j, k*m + l] = A[..., i, k] * B[..., j, l], where B is
+    n x m. For 2D arrays it is np.kron (the same products, so the same values); written
+    with broadcasting because np.kron and cupy.kron do not treat leading axes as a batch.
+    """
+    n1, m1 = A.shape[-2:]
+    n2, m2 = B.shape[-2:]
+    out = A[..., :, None, :, None] * B[..., None, :, None, :]
+    return out.reshape(out.shape[:-4] + (n1 * n2, m1 * m2))
 
 def get_composite_index(i, j, N):
     I = i * N + j
