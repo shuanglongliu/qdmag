@@ -27,7 +27,7 @@ import pandas as pd
 from scipy.spatial.transform import Rotation
 
 from qdmag.core.constants import const1, Tesla2wavenumber
-from qdmag.core.common import many_spins, eigen_handy, get_rhoe, back_transform_O, get_Mv_from_rho
+from qdmag.core.common import many_spins, eigen_handy, get_rhoe, back_transform_O, get_Mv_from_rho, rotate_frames
 from qdmag.core.effective_basis import effective_basis
 from qdmag.core.liouville import liouville
 from qdmag.core import expm as _expm
@@ -38,19 +38,12 @@ def rotate_molecule(data, euler_angles):
     The input (a dict as read from input.yaml) for the molecule rotated by the intrinsic ZYZ
     Euler angles (alpha, beta, gamma), in degrees, as in points_and_weights.txt.
 
-    Every tensor of the molecule rotates with it: each reference_frame F, whose rows are the
-    local axes in the global frame, becomes F R^T with R the rotation matrix, for the
-    anisotropy, the g tensors and the exchange. For F = 1 this is the frame R^T that
-    tools/tool_powder.py writes for the anisotropy. (tool_powder.py leaves the g tensors and
-    the exchange unrotated, which is the same thing only when they are isotropic.)
+    Every tensor of the molecule rotates with it (common.rotate_frames with emat = R^T, R
+    the rotation matrix): each reference_frame F becomes F R^T, for the anisotropy, the g
+    tensors and the exchange, as in tools/tool_powder.py. data itself is left unchanged.
     """
     R = Rotation.from_euler('ZYZ', euler_angles, degrees=True).as_matrix()
-    out = copy.deepcopy(data)
-    for key in ('anisotropy', 'gfactor', 'exchange'):
-        for item in out.get(key) or []:
-            F = np.array(item['reference_frame'], dtype=np.float64).reshape(3, 3)
-            item['reference_frame'] = (F @ R.T).ravel().tolist()
-    return out
+    return rotate_frames(copy.deepcopy(data), R.T)
 
 
 def get_effective_basis(data):

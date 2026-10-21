@@ -198,6 +198,20 @@ def sph2cart_deg(sph):
     y = sph[0] * math.sin( sph[1] ) * math.sin( sph[2] )
     return np.array( [x, y, z] )
 
+def rotate_frames(data, emat):
+    """
+    Rotate every tensor of the molecule in an input (a dict as read from input.yaml), in
+    place: each reference_frame F, whose rows are the local axes in the global frame,
+    becomes F emat, for the anisotropy, the g tensors and the exchange. For the rotation R
+    of the molecule, emat = R^T (so F = 1 becomes R^T, whose rows are the rotated axes).
+    Used by tools/tool_powder.py and core/powder_dynamics.rotate_molecule.
+    """
+    for key in ('anisotropy', 'gfactor', 'exchange'):
+        for item in data.get(key) or []:
+            F = np.array(item['reference_frame'], dtype=np.float64).reshape(3, 3)
+            item['reference_frame'] = (F @ emat).ravel().tolist()
+    return data
+
 def get_Sprime(A, S):
     # Get spin operators in the local reference frame. 
     # e_x^prime = A[0, :]

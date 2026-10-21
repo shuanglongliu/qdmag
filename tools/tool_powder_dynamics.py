@@ -20,8 +20,8 @@ points_and_weights.txt (as the directories of tool_powder.py are).
 --batch-size: orientations evolved together (default: all on the CPU, as many as fit into
 70% of the free memory on a GPU). Larger batches use the GPU better.
 
-Every tensor rotates with the molecule (anisotropy, g and exchange frames); tool_powder.py
-rotates the anisotropy only, which agrees when g and the exchange are isotropic.
+Every tensor rotates with the molecule (anisotropy, g and exchange frames), as in
+tool_powder.py (core/common.rotate_frames).
 """
 import os
 import sys

@@ -5,7 +5,7 @@ import pandas as pd
 import yaml
 from scipy.spatial.transform import Rotation as R
 from qdmag.core.common import print_emat_array
-from qdmag.core.common import many_spins, eigen_handy
+from qdmag.core.common import many_spins, eigen_handy, rotate_frames
 from qdmag.core.common import get_h_exchange, get_h_anisotropy, get_h_Zeeman_Mv_eff
 from qdmag.core.common import get_partition_function, get_magnetic_moment_Mv_tot
 from qdmag.core.constants import factor_ex
@@ -92,21 +92,6 @@ python "{tools_dir:s}/tool_magnetization.py"
 # Dynamics
 python "{tools_dir:s}/tool_staircase.py"
 """
-
-def rotate_frames(data, emat):
-    """
-    Rotate every tensor of the molecule in an input (a dict as read from input.yaml):
-    each reference_frame F, whose rows are the local axes in the global frame, becomes
-    F emat, for the anisotropy, the g tensors and the exchange. emat = R^T for the rotation
-    R of the molecule (get_emat_from_angles), so this is F R^T, the convention of
-    core/powder_dynamics.rotate_molecule (branch gpu-batched). For F = 1 the anisotropy frame
-    is emat itself.
-    """
-    for key in ('anisotropy', 'gfactor', 'exchange'):
-        for item in data.get(key) or []:
-            F = np.array(item['reference_frame'], dtype=np.float64).reshape(3, 3)
-            item['reference_frame'] = (F @ emat).ravel().tolist()
-    return data
 
 class powder:
     def __init__(self):
