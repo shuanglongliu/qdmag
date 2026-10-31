@@ -32,9 +32,11 @@ Magnetic molecules — including transition metal complexes and lanthanide-based
 
 ```bash
 git clone https://github.com/shuanglongliu/qdmag.git
+cd qdmag
+pip install .
 ```
 
-Add the directory that contains qdmag to the environment variable PYTHONPATH. 
+This also installs the required dependencies. Optional extras: `pip install ".[plot]"` (matplotlib), `".[gpu]"` (CuPy for CUDA 12), and `".[test]"` (pytest). Alternatively, add the directory that contains qdmag to the environment variable PYTHONPATH. 
 
 ### Dependencies
 
@@ -135,15 +137,15 @@ Three case studies are included to demonstrate the package:
 
 ### Input file
 
-All input parameters are loaded from an `input.yaml` file in the working directory. Example input files can be found in the `examples/` folder. 
+All input parameters are loaded from an `input.yaml` file in the working directory. Example input files can be found in the `examples/` folder. All keys, their units, and the conventions for reference frames and indices are listed in [docs/input.md](docs/input.md).
 
 ### Run the code
 
 ```bash
-python tool_staircase.py 
+python -m qdmag.tools.tool_staircase
 ```
 
-The `tool_staircase.py` script must be run in the same directory as the input file. This script and other useful scripts can be found in the `tools/` directory. See the **Tools** section below for brief descriptions of each script. 
+or, without installation, `python /path/to/qdmag/tools/tool_staircase.py`. The script must be run in the same directory as the input file. This script and other useful scripts can be found in the `tools/` directory. See the **Tools** section below for brief descriptions of each script. 
 
 ### Running on a GPU
 

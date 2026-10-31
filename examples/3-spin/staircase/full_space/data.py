@@ -61,7 +61,7 @@ BT_Tgrid:
 dynamics:
     - T: 0.600          # Temperature in K
       lambdaa: 10.00   # Spin phonon coupling constant in cm-1
-      I0: 1.0e-14     # Prefactor for phonon density of states. 1e-4
+      I0: 1.0e-14     # Prefactor I0 of the phonon spectral density, in ps^(alpha+1) rad^(-alpha)
 
     - Bt_type: 'linear'  # Type of the magnetic pulse as a function of time. Options: 'linear', 'pwlinear', 'sin', 'pulse'
       sweep_rate: 50.0e-09  # Slope of the magnetic field vs time. Unit: T per ps. Used only when Bt = 'linear'.

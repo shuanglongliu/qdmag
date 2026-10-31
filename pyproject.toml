@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qdmag"
+version = "1.2.0"
+description = "Nonequilibrium magnetization of magnetic molecules from a generalized Lindblad quantum master equation"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.9"
+dependencies = ["numpy", "scipy>=1.15", "pyyaml", "h5py", "pandas"]
+
+[project.optional-dependencies]
+plot = ["matplotlib"]
+gpu = ["cupy-cuda12x"]
+test = ["pytest"]
+
+[tool.setuptools]
+package-dir = {"qdmag" = "."}
+packages = ["qdmag", "qdmag.core", "qdmag.tools"]

@@ -41,8 +41,9 @@ Units:
     ps for time
 
     cm-1 for the spin-phonon coupling constant lambdaa
-    ps for spectral density I and and its prefactor I0
-    ps-1 for frequency omega
+    ps for spectral density I
+    ps^(alpha+1) rad^(-alpha) for its prefactor I0 (ps^3 rad^-2 for alpha = 2)
+    rad ps-1 for angular frequency omega
     X and Rhbar are unitless
 
 Dimensions:
