@@ -13,5 +13,5 @@ The quantum master equation is that of
 
 ```{include} ../README.md
 :start-after: "## Acknowledgments"
-:end-before: "## References"
+:end-before: "## License"
 ```

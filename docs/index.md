@@ -1,8 +1,8 @@
 # qdmag
 
 ```{include} ../README.md
-:start-after: "# qdmag"
-:end-before: "## Installation"
+:start-after: "<!-- start-overview -->"
+:end-before: "<!-- end-overview -->"
 :relative-docs: docs/
 ```
 

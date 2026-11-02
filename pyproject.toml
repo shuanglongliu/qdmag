@@ -8,7 +8,7 @@ version = "1.2.0"
 description = "Nonequilibrium magnetization of magnetic molecules from a generalized Lindblad quantum master equation"
 readme = "README.md"
 license = {file = "LICENSE"}
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = ["numpy", "scipy>=1.15", "pyyaml", "h5py", "pandas"]
 
 [project.optional-dependencies]
