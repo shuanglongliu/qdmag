@@ -15,6 +15,11 @@ dependencies = ["numpy", "scipy>=1.15", "pyyaml", "h5py", "pandas"]
 plot = ["matplotlib"]
 gpu = ["cupy-cuda12x"]
 test = ["pytest"]
+docs = ["sphinx", "myst-parser", "furo", "sphinx-copybutton", "matplotlib"]
+
+[project.urls]
+Documentation = "https://shuanglongliu.github.io/qdmag"
+Source = "https://github.com/shuanglongliu/qdmag"
 
 [tool.setuptools]
 package-dir = {"qdmag" = "."}

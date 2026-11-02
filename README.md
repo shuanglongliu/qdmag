@@ -2,6 +2,8 @@
 
 A Python package for simulating nonequilibrium magnetization of magnetic molecules under a time-varying external magnetic field, based on a generalized Lindblad quantum master equation.
 
+Documentation: https://shuanglongliu.github.io/qdmag
+
 ## Overview
 
 Magnetic molecules — including transition metal complexes and lanthanide-based complexes — are open quantum systems due to their coupling to lattice vibrations (phonons). This spin-phonon coupling governs magnetization relaxation and limits quantum coherence times. Under a time-varying external magnetic field, as in pulsed-field magnetometry, the spin system is driven out of thermal equilibrium and its dynamics cannot be captured by equilibrium methods alone.

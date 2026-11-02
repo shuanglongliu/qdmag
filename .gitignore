@@ -178,3 +178,6 @@ slurm-*.out
 
 # Scratch scripts, kept local
 /whiteboard/
+
+# Sphinx autosummary pages, generated at build time
+docs/_autosummary/
