@@ -1,13 +1,24 @@
 [build-system]
-requires = ["setuptools>=64"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "qdmag"
-version = "1.2.0"
+dynamic = ["version"]
 description = "Nonequilibrium magnetization of magnetic molecules from a generalized Lindblad quantum master equation"
 readme = "README.md"
-license = {file = "LICENSE"}
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [{name = "Shuanglong Liu", email = "shuan.liu@northeastern.edu"}]
+keywords = ["quantum master equation", "Lindblad", "molecular magnetism", "single-molecule magnets", "spin dynamics", "pulsed magnetic field", "spin-phonon coupling"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Chemistry",
+]
 requires-python = ">=3.10"
 dependencies = ["numpy", "scipy>=1.15", "pyyaml", "h5py", "pandas"]
 
@@ -24,3 +35,6 @@ Source = "https://github.com/shuanglongliu/qdmag"
 [tool.setuptools]
 package-dir = {"qdmag" = "."}
 packages = ["qdmag", "qdmag.core", "qdmag.tools"]
+
+[tool.setuptools.dynamic]
+version = {attr = "qdmag.__version__"}

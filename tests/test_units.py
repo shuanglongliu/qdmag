@@ -94,7 +94,8 @@ def test_expm_matches_scipy(name, workdir):
     not act on density matrices.
     """
     import scipy.linalg
-    from scipy.linalg._matfuncs_expm import pick_pade_structure
+    # A private SciPy helper; it moved in SciPy 1.18, so skip where it is missing.
+    pick_pade_structure = pytest.importorskip("scipy.linalg._matfuncs_expm").pick_pade_structure
     from qdmag.core import expm as qe
 
     lio = set_up_case(name, workdir)

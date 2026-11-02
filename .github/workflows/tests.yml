@@ -1,0 +1,27 @@
+# Run the test suite on every push and pull request. The NumPy, SciPy, and Python
+# versions are those the regression references in tests/reference/ were made with
+# (see tests/reference/meta.json), since the regression tolerances are tight.
+# Tests marked gpu are skipped (no CUDA device on the runner).
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install qdmag with the reference NumPy and SciPy
+        run: pip install "numpy==2.2.5" "scipy==1.15.2" ".[test,plot]"
+      - name: Run pytest
+        run: python -m pytest tests -ra

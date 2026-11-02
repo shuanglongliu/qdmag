@@ -53,7 +53,7 @@ cd examples/1-spin/linear
 python -m qdmag.tools.tool_staircase
 ```
 
-As shipped, this run sweeps the field from 0 to 50 T in 10⁵ stairs, which takes hours on one core. For a test of about a minute, set `tmax: 1.0e+07` in `input.yaml`.
+As shipped, this run sweeps the field from 0 to 50 T in 5 × 10⁵ stairs, which takes hours on one core. For a test of about a minute, set `tmax: 2.0e+06` in `input.yaml`.
 
 ## Documentation
 
@@ -82,7 +82,7 @@ This work is supported by the Center for Molecular Magnetic Quantum Materials (M
 
 ## License
 
-GNU General Public License v3.0; see [LICENSE](https://github.com/shuanglongliu/qdmag/blob/main/LICENSE).
+qdmag is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. See [LICENSE](https://github.com/shuanglongliu/qdmag/blob/main/LICENSE).
 
 ## References
 

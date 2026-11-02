@@ -59,6 +59,17 @@ Computes the **state composition** of the eigenstates in terms of the effective 
 
 Computes the **thermal equilibrium occupation probabilities** of the effective basis states over a range of magnetic field values at a given temperature.
 
+## `tool_basis.py`
+
+Suggests an **effective basis** for a multispin system: the pool states whose energy $E_i + g\mu_B B m_{s,i}$ comes within a cutoff of the instantaneous ground state for some field of the sweep (step 1 of the procedure for choosing an effective basis in the paper). The energies are those of the pool Hamiltonian, i.e., the isotropic exchange plus the Zeeman term of the actual $g$ tensors along $z$; the zero-field splitting is not included. Degenerate pool states are kept together.
+
+```bash
+python -m qdmag.tools.tool_basis --ecut 25            # cutoff in cm-1; field range from BT_Bgrid
+python -m qdmag.tools.tool_basis --ecut 25 --bmin 0 --bmax 10
+```
+
+It prints the selected states with their energy, $S$, $m_s$, and smallest gap to the ground state, followed by a `states:` list to paste into `input.yaml`. For `examples/3-spin/staircase/26`, a cutoff of 25 cm⁻¹ gives the 26 states of that example plus the $S = 9/2$, $m_s = -9/2$ state. Check the suggestion against the full Hamiltonian (Zeeman diagram and equilibrium magnetization), and enlarge the basis until the nonequilibrium magnetization no longer changes.
+
 ## `tool_conditions_rho.py`
 
 Validates the **physical conditions of the density matrix** $\rho(t)$ stored in an HDF5 file: normalization (Tr ρ = 1), Hermiticity, positive semidefiniteness, and the Cauchy–Schwarz inequality. Reads every `skip`-th time point to reduce I/O overhead.

@@ -56,7 +56,16 @@ Both keys are optional; without them the run is on the CPU, unchanged. On the GP
 
 ## Convergence
 
-The time step `dt` should be chosen to converge the magnetization. A practical starting point is `dt = 0.0001 T / sweep_rate`. Decreasing `dt` until the result no longer changes is recommended. 
+The staircase propagator is exact on each stair, so the time-step error comes mostly from avoided level crossings, where the eigenstates change within a narrow field window. For two levels whose energy difference changes with the field at a rate $\Delta k$ (in cm⁻¹/T) and whose minimal gap is $\Delta$, the window has a width $\delta B = \Delta / \Delta k$.
+
+- Choose `deltat` so that the field step per stair, `sweep_rate * deltat`, is no larger than about $2\,\delta B$ of the narrowest avoided crossing between the populated levels. $\delta B$ can be estimated in advance from the Zeeman diagram (`tool_zeeman.py`). For a pulse that is not linear, use the local sweep rate at each crossing.
+- `deltat` should also be much shorter than the period of an oscillating field (`Bt_type: sin`) and of any Rabi oscillation of interest.
+- Always confirm convergence by repeating the calculation with `deltat` halved. `tool_time_step.py` sets up such a series.
+
+Examples from the paper:
+
+- Ho(pzdo)₄: a field step of $10^{-4}$ T per stair reproduces the Landau–Zener probabilities of the avoided crossings at 2.71 T and 6.09 T at 10 and 50 T/ms, whereas $10^{-3}$ T per stair makes the passages artificially diabatic. At 50 T/ms this is `deltat = 2e3` ps, as in `examples/1-spin/linear`.
+- (CH₆N₃)₂MnCl₄, 16 states, 50 T/ms: a field step of $5 \times 10^{-5}$ T per stair (`deltat = 1e3` ps) agrees with half that step to 0.015 μB, whereas $10^{-3}$ T per stair is off by up to about 0.14 μB.
 
 ## Tests
 
