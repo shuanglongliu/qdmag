@@ -3,101 +3,110 @@
     "1spin_linear_Pade": {
       "commit": "14f7d02",
       "omp_num_threads": "4",
-      "python": "3.11.11",
+      "python": "3.11.0",
       "numpy": "2.2.5",
       "scipy": "1.15.2",
-      "cpu": "AMD EPYC 9655P 96-Core Processor",
-      "date": "2026-10-20 00:48:51",
-      "seconds": 11.9,
-      "nsave": 201
+      "cpu": "Intel(R) Core(TM) i5-8500 CPU @ 3.00GHz",
+      "date": "2026-11-03 12:45:07",
+      "seconds": 2.3,
+      "nsave": 21,
+      "pandas": "2.2.3"
     },
     "1spin_linear_Taylor": {
       "commit": "14f7d02",
       "omp_num_threads": "4",
-      "python": "3.11.11",
+      "python": "3.11.0",
       "numpy": "2.2.5",
       "scipy": "1.15.2",
-      "cpu": "AMD EPYC 9655P 96-Core Processor",
-      "date": "2026-10-20 00:48:51",
-      "seconds": 32.9,
-      "nsave": 11
+      "cpu": "Intel(R) Core(TM) i5-8500 CPU @ 3.00GHz",
+      "date": "2026-11-03 12:43:06",
+      "seconds": 1.0,
+      "nsave": 11,
+      "pandas": "2.2.3"
     },
     "1spin_linear_Krylov": {
       "commit": "14f7d02",
       "omp_num_threads": "4",
-      "python": "3.11.11",
+      "python": "3.11.0",
       "numpy": "2.2.5",
       "scipy": "1.15.2",
-      "cpu": "AMD EPYC 9655P 96-Core Processor",
-      "date": "2026-10-20 00:48:51",
-      "seconds": 30.2,
-      "nsave": 11
+      "cpu": "Intel(R) Core(TM) i5-8500 CPU @ 3.00GHz",
+      "date": "2026-11-03 12:43:06",
+      "seconds": 0.8,
+      "nsave": 11,
+      "pandas": "2.2.3"
     },
     "1spin_linear_Taylor_sparse": {
       "commit": "14f7d02",
       "omp_num_threads": "4",
-      "python": "3.11.11",
+      "python": "3.11.0",
       "numpy": "2.2.5",
       "scipy": "1.15.2",
-      "cpu": "AMD EPYC 9655P 96-Core Processor",
-      "date": "2026-10-20 00:48:51",
-      "seconds": 51.4,
-      "nsave": 11
+      "cpu": "Intel(R) Core(TM) i5-8500 CPU @ 3.00GHz",
+      "date": "2026-11-03 12:43:06",
+      "seconds": 1.5,
+      "nsave": 11,
+      "pandas": "2.2.3"
     },
     "1spin_linear_Krylov_sparse": {
       "commit": "14f7d02",
       "omp_num_threads": "4",
-      "python": "3.11.11",
+      "python": "3.11.0",
       "numpy": "2.2.5",
       "scipy": "1.15.2",
-      "cpu": "AMD EPYC 9655P 96-Core Processor",
-      "date": "2026-10-20 00:48:51",
-      "seconds": 44.3,
-      "nsave": 11
+      "cpu": "Intel(R) Core(TM) i5-8500 CPU @ 3.00GHz",
+      "date": "2026-11-03 12:43:06",
+      "seconds": 1.0,
+      "nsave": 11,
+      "pandas": "2.2.3"
     },
     "1spin_sin_RK4": {
       "commit": "14f7d02",
       "omp_num_threads": "4",
-      "python": "3.11.11",
+      "python": "3.11.0",
       "numpy": "2.2.5",
       "scipy": "1.15.2",
-      "cpu": "AMD EPYC 9655P 96-Core Processor",
-      "date": "2026-10-20 00:48:51",
-      "seconds": 14.7,
-      "nsave": 51
+      "cpu": "Intel(R) Core(TM) i5-8500 CPU @ 3.00GHz",
+      "date": "2026-11-03 12:45:57",
+      "seconds": 2.8,
+      "nsave": 9,
+      "pandas": "2.2.3"
     },
     "2spin_Jzz_Pade": {
       "commit": "14f7d02",
       "omp_num_threads": "4",
-      "python": "3.11.11",
+      "python": "3.11.0",
       "numpy": "2.2.5",
       "scipy": "1.15.2",
-      "cpu": "AMD EPYC 9655P 96-Core Processor",
-      "date": "2026-10-20 00:48:51",
+      "cpu": "Intel(R) Core(TM) i5-8500 CPU @ 3.00GHz",
+      "date": "2026-11-03 12:43:06",
       "seconds": 0.2,
-      "nsave": 201
+      "nsave": 201,
+      "pandas": "2.2.3"
     },
     "3spin_16_Pade": {
       "commit": "73b5570",
       "omp_num_threads": "4",
-      "python": "3.11.11",
+      "python": "3.11.0",
       "numpy": "2.2.5",
       "scipy": "1.15.2",
-      "cpu": "AMD EPYC 9655P 96-Core Processor",
-      "date": "2026-10-21 13:20:05",
-      "seconds": 3.7,
-      "nsave": 101
+      "cpu": "Intel(R) Core(TM) i5-8500 CPU @ 3.00GHz",
+      "date": "2026-11-03 12:43:33",
+      "seconds": 1.6,
+      "nsave": 21,
+      "pandas": "2.2.3"
     },
     "3spin_26_Pade": {
       "commit": "73b5570",
       "omp_num_threads": "4",
-      "python": "3.11.11",
+      "python": "3.11.0",
       "numpy": "2.2.5",
       "scipy": "1.15.2",
-      "cpu": "AMD EPYC 9655P 96-Core Processor",
-      "date": "2026-10-21 13:20:05",
-      "seconds": 18.0,
-      "nsave": 51
+      "cpu": "Intel(R) Core(TM) i5-8500 CPU @ 3.00GHz",
+      "date": "2026-11-03 12:43:33",
+      "seconds": 3.1,
+      "nsave": 6,
+      "pandas": "2.2.3"
     }
   }
 }

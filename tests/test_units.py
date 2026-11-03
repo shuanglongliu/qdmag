@@ -98,7 +98,10 @@ def test_expm_matches_scipy(name, workdir):
     pick_pade_structure = pytest.importorskip("scipy.linalg._matfuncs_expm").pick_pade_structure
     from qdmag.core import expm as qe
 
-    lio = set_up_case(name, workdir)
+    # At the time step of the production runs: the regression case 1spin_linear_Pade uses
+    # 1e5 ps to reach 0.1 T in 20 stairs, where ||L deltat|| is 10x larger than here.
+    extra = {2: {"deltat": 1.0e+04}} if name == "1spin_linear_Pade" else None
+    lio = set_up_case(name, workdir, extra=extra)
     for B in [0.0, 2.5]:
         lio.update_L(B)
         A = lio.L * lio.deltat

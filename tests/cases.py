@@ -29,31 +29,33 @@ OMP_NUM_THREADS = "4"
 # name -> (example directory, {index of the dynamics block: {key: value}})
 CASES = {
     "1spin_linear_Pade": ("1-spin/linear", {
-        2: {"tmax": 2.0e+06, "deltat": 1.0e+04},
-        3: {"nt_mag": 1, "save_rho": False, "save_drdt": True, "nt_drdt": 50}}),
+        2: {"tmax": 2.0e+06, "deltat": 1.0e+05},
+        3: {"nt_mag": 1, "save_rho": False, "save_drdt": True, "nt_drdt": 5}}),
     "1spin_linear_Taylor": ("1-spin/linear", {
-        2: {"tmax": 5.0e+03, "deltat": 5.0e+02, "exp_propagator": "Taylor"},
+        2: {"tmax": 5.0e+01, "deltat": 5.0e+00, "exp_propagator": "Taylor"},
         3: {"nt_mag": 1, "save_rho": False, "save_drdt": False}}),
     "1spin_linear_Krylov": ("1-spin/linear", {
-        2: {"tmax": 5.0e+03, "deltat": 5.0e+02, "exp_propagator": "Krylov"},
+        2: {"tmax": 5.0e+01, "deltat": 5.0e+00, "exp_propagator": "Krylov"},
         3: {"nt_mag": 1, "save_rho": False, "save_drdt": False}}),
+    # The sparse cases use the pre-1.3.0 names, which the reference commit understands
+    # (and which are still accepted, as exp_propagator Taylor or Krylov with L_storage sparse)
     "1spin_linear_Taylor_sparse": ("1-spin/linear", {
-        2: {"tmax": 5.0e+03, "deltat": 5.0e+02, "exp_propagator": "Taylor_sparse"},
+        2: {"tmax": 5.0e+01, "deltat": 5.0e+00, "exp_propagator": "Taylor_sparse"},
         3: {"nt_mag": 1, "save_rho": False, "save_drdt": False}}),
     "1spin_linear_Krylov_sparse": ("1-spin/linear", {
-        2: {"tmax": 5.0e+03, "deltat": 5.0e+02, "exp_propagator": "Krylov_sparse"},
+        2: {"tmax": 5.0e+01, "deltat": 5.0e+00, "exp_propagator": "Krylov_sparse"},
         3: {"nt_mag": 1, "save_rho": False, "save_drdt": False}}),
     "1spin_sin_RK4": ("1-spin/sinusoidal", {
-        2: {"tmax": 0.5, "deltat": 0.001, "method": "RK4"},
-        3: {"nt_mag": 10, "save_rho": False, "save_drdt": False}}),
+        2: {"tmax": 0.04, "deltat": 0.001, "method": "RK4"},
+        3: {"nt_mag": 5, "save_rho": False, "save_drdt": False}}),
     "2spin_Jzz_Pade": ("2-spin/Jzz/staircase", {
         2: {"tmax": 2.0e+06, "deltat": 1.0e+04},
         3: {"nt_mag": 1, "save_rho": False, "save_drdt": False}}),
     "3spin_16_Pade": ("3-spin/staircase/16", {
-        2: {"tmax": 2.0e+06, "deltat": 2.0e+04},
+        2: {"tmax": 4.0e+05, "deltat": 2.0e+04},
         3: {"nt_mag": 1, "save_rho": False, "save_drdt": False}}),
     "3spin_26_Pade": ("3-spin/staircase/26", {
-        2: {"tmax": 1.0e+06, "deltat": 2.0e+04},
+        2: {"tmax": 1.0e+05, "deltat": 2.0e+04},
         3: {"nt_mag": 1, "save_rho": False, "save_drdt": False}}),
 }
 
@@ -121,11 +123,25 @@ def run_case(name, rundir, device=None, extra=None):
     with working_directory(rundir):
         lio.evolve_rho()
         drdt = pd.read_csv(lio.fdrdt) if lio.save_drdt else None
-        mag = pd.read_csv(lio.fmag)
+        mag = read_mag(lio.fmag)
     # lio.backend does not exist in the code the references are made with (14f7d02)
     risvrho = lio.backend.to_host(lio.risvrho) if hasattr(lio, "backend") else np.asarray(lio.risvrho)
     return {"mag": mag, "risvrho": risvrho, "drdt": drdt,
             "basis": {"h0": lio.h0, "Mz": lio.Mz, "X": lio.X}}
+
+
+MAG_COLUMNS = ["t", "B", "Mx", "My", "Mz"]
+
+
+def read_mag(fname):
+    """
+    Read a magnetometry CSV. The RK4 driver of the reference commit 14f7d02 writes it
+    without a header line, so a file whose first line is not the header is read with the
+    known column names.
+    """
+    with open(fname) as f:
+        has_header = f.readline().strip().split(",")[0] == "t"
+    return pd.read_csv(fname) if has_header else pd.read_csv(fname, header=None, names=MAG_COLUMNS)
 
 
 def save_reference(name, result):

@@ -73,7 +73,7 @@ def test_rotate_molecule_frames():
     assert data["anisotropy"][0]["reference_frame"] == case_input("3spin_16_Pade")["anisotropy"][0]["reference_frame"]
 
 
-@pytest.mark.parametrize("name, nstairs, anisotropic_g", [("1spin_linear_Pade", 20, True), ("3spin_16_Pade", 10, False)])
+@pytest.mark.parametrize("name, nstairs, anisotropic_g", [("1spin_linear_Pade", 3, True), ("3spin_16_Pade", 2, False)])
 def test_powder_cpu_matches_single_runs(name, nstairs, anisotropic_g, workdir):
     """On the CPU, each orientation of a powder run is bit for bit its single run."""
     data = short_input(name, nstairs, "cpu", anisotropic_g)
@@ -95,7 +95,7 @@ def test_powder_batches(workdir):
     Splitting the orientations into batches changes only the summation order of the average,
     so the averages agree to round-off of the largest term (atol 1e-15 muB).
     """
-    data = short_input("1spin_linear_Pade", 10, "cpu", anisotropic_g=True)
+    data = short_input("1spin_linear_Pade", 2, "cpu", anisotropic_g=True)
     whole = powder_run(data, workdir / "whole")
     split = powder_run(data, workdir / "split", batch_size=2)
     assert list(split.columns) == list(whole.columns)

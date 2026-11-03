@@ -88,9 +88,9 @@ class powder_liouville(liouville):
 
     def set_up_exp_propagator(self):
         """Called by liouville.__init__: set up the batched dense L and bind the propagator."""
-        if self.method != 'staircase' or self.exp_propagator != 'Pade':
-            raise ValueError("The powder driver supports method = staircase with exp_propagator = Pade only, "
-                             "not {} / {}.".format(self.method, self.exp_propagator))
+        if self.method != 'staircase' or self.exp_propagator != 'Pade' or self.L_storage != 'dense':
+            raise ValueError("The powder driver supports method = staircase with exp_propagator = Pade "
+                             "(dense L) only, not {} / {} / {}.".format(self.method, self.exp_propagator, self.L_storage))
         if self.save_rho or self.save_drdt:
             raise ValueError("The powder driver saves the magnetization only; set save_rho and save_drdt to false.")
         self.sparse_L = False

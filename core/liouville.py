@@ -125,6 +125,16 @@ class liouville:
         #             formed, so it fits bases far beyond the reach of the other propagators.
         # Optional, defaults to 'Pade'. See set_up_exp_propagator.
         self.exp_propagator = dynamics[2].get('exp_propagator', 'Pade')
+        # Storage of L for Taylor and Krylov: 'dense' (default) or 'sparse' (CSR). Pade needs
+        # a dense L, and Strang forms none. Before 1.3.0, the sparse variants were selected
+        # as exp_propagator = 'Taylor_sparse' or 'Krylov_sparse'; these are still accepted.
+        self.L_storage      = dynamics[2].get('L_storage', 'dense')
+        legacy = {'Taylor_sparse': 'Taylor', 'Krylov_sparse': 'Krylov'}
+        if self.exp_propagator in legacy:
+            if self.L_storage != 'sparse' and 'L_storage' in dynamics[2]:
+                raise ValueError("exp_propagator = {} implies L_storage = sparse, not {}.".format(
+                    self.exp_propagator, self.L_storage))
+            self.exp_propagator, self.L_storage = legacy[self.exp_propagator], 'sparse'
         # Parameters of the 'Strang' propagator; ignored by the others.
         self.strang_order    = dynamics[2].get('strang_order', 2)  # Taylor order of the dissipative step
         self.strang_nsub     = dynamics[2].get('strang_nsub', 1)   # Substeps of the dissipative step; 0 = automatic
@@ -167,27 +177,43 @@ class liouville:
 
     def set_up_exp_propagator(self):
         """
-        Bind self.propagate_risvrho to the propagator named by the 'exp_propagator' input option.
+        Bind self.propagate_risvrho to the propagator named by the 'exp_propagator' input option,
+        with L stored as given by 'L_storage'.
 
         Called once from __init__ so that the time loop never branches on the choice, and so
         that an unrecognized name fails here rather than at the first of ~1e5 time steps.
+
+        All propagators evaluate exp(L deltat) rho on a stair of constant field:
+          exactly     : Pade (forms exp(L deltat); dense L only)
+          to tolerance: Taylor, Krylov (action only; dense or sparse L)
+          approximate : Strang (splitting of the coherent and dissipative parts; forms no L)
         """
-        # name -> (propagator, is L stored sparse?)
+        names = ('Pade', 'Taylor', 'Krylov', 'Strang')
+        if self.exp_propagator not in names:
+            raise ValueError("Invalid exp_propagator: {}. Choose from {}.".format(
+                self.exp_propagator, sorted(names)))
+        if self.L_storage not in ('dense', 'sparse'):
+            raise ValueError("Invalid L_storage: {}. Choose from ['dense', 'sparse'].".format(self.L_storage))
         if self.exp_propagator == 'Strang':
+            if self.L_storage == 'sparse':
+                raise ValueError("exp_propagator = Strang forms no L, so L_storage = sparse does not apply.")
             self.set_up_strang()
             return
-        exp_propagators = {'Pade':          (self.propagate_risvrho_Pade,          False),
-                           'Taylor':        (self.propagate_risvrho_Taylor,        False),
-                           'Krylov':        (self.propagate_risvrho_Krylov,        False),
-                           'Taylor_sparse': (self.propagate_risvrho_Taylor_sparse, True),
-                           'Krylov_sparse': (self.propagate_risvrho_Krylov_sparse, True)}
-        if self.exp_propagator not in exp_propagators:
-            raise ValueError("Invalid exp_propagator: {}. Choose from {}.".format(
-                self.exp_propagator, sorted(list(exp_propagators) + ['Strang'])))
-        self.propagate_risvrho, self.sparse_L = exp_propagators[self.exp_propagator]
-        if self.device == 'gpu' and self.exp_propagator not in ('Pade', 'Krylov'):
-            raise ValueError("exp_propagator = {} is not available with device = 'gpu'. "
-                             "Use Pade or Krylov.".format(self.exp_propagator))
+        # (name, L_storage) -> propagator
+        exp_propagators = {('Pade',   'dense'):  self.propagate_risvrho_Pade,
+                           ('Taylor', 'dense'):  self.propagate_risvrho_Taylor,
+                           ('Krylov', 'dense'):  self.propagate_risvrho_Krylov,
+                           ('Taylor', 'sparse'): self.propagate_risvrho_Taylor_sparse,
+                           ('Krylov', 'sparse'): self.propagate_risvrho_Krylov_sparse}
+        key = (self.exp_propagator, self.L_storage)
+        if key not in exp_propagators:
+            raise ValueError("exp_propagator = Pade forms the full matrix exponential and needs "
+                             "L_storage = dense.")
+        self.propagate_risvrho = exp_propagators[key]
+        self.sparse_L = self.L_storage == 'sparse'
+        if self.device == 'gpu' and key not in (('Pade', 'dense'), ('Krylov', 'dense')):
+            raise ValueError("exp_propagator = {} with L_storage = {} is not available with device = 'gpu'. "
+                             "Use Pade or Krylov with a dense L.".format(*key))
 
         # Build the superoperator in the matching storage format, and bind the per-stair
         # update to the matching routine so the time loop does not branch on the format.
@@ -355,7 +381,7 @@ class liouville:
     def set_up_liouville_sparse(self):
         """
         Sparse counterpart of set_up_liouville: builds L0, C and L in CSR format and never
-        forms a dense superoperator. Selected by the '*_sparse' exp_propagator values.
+        forms a dense superoperator. Selected by L_storage = 'sparse'.
         """
 
         # Row permutation I = i*dim + j -> It = j*dim + i, used by construct_CST_sparse.
@@ -1007,7 +1033,7 @@ class liouville:
     def propagate_risvrho_Taylor_sparse(self):
         """
         Apply exp(L deltat) to risvrho with a truncated Taylor series, with L held sparse.
-        Selected by exp_propagator = 'Taylor_sparse'. Do not call directly; call
+        Selected by exp_propagator = 'Taylor' with L_storage = 'sparse'. Do not call directly; call
         self.propagate_risvrho, which set_up_exp_propagator binds to one of the propagators.
 
         The arithmetic is the same as propagate_risvrho_Taylor; the difference is that
@@ -1019,7 +1045,7 @@ class liouville:
     def propagate_risvrho_Krylov_sparse(self):
         """
         Apply exp(L deltat) to risvrho by Arnoldi projection, with L held sparse.
-        Selected by exp_propagator = 'Krylov_sparse'. Do not call directly; call
+        Selected by exp_propagator = 'Krylov' with L_storage = 'sparse'. Do not call directly; call
         self.propagate_risvrho, which set_up_exp_propagator binds to one of the propagators.
 
         Shares exp_action_Krylov with the dense variant: that code already touches L only
@@ -1537,8 +1563,7 @@ class liouville:
         elif method == "RK4":
             if self.sparse_L:
                 raise ValueError(
-                    "The RK4 solver requires a dense L, but exp_propagator = {} builds it sparse. "
-                    "Choose Pade, Taylor or Krylov for method='RK4'.".format(self.exp_propagator))
+                    "The RK4 solver requires a dense L. Set L_storage = dense for method='RK4'.")
             # Get the magnetic field pulse for the Runge-Kutta method
             self.nt, self.ts, self.Bs2, self.deltat = get_pulse_RK4_double_grid(self.Bt, self.tmin, self.tmax, self.deltat)
             # Initialize the L matrices

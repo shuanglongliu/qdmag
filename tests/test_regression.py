@@ -12,9 +12,10 @@ import pytest
 
 from cases import CASES, run_case, load_reference
 
-# Cases whose exp_propagator / method are available on the GPU
+# Cases whose exp_propagator / L_storage / method are available on the GPU
 GPU_CASES = [name for name, (example, overrides) in CASES.items()
-             if overrides[2].get("exp_propagator", "Pade") in ("Pade", "Krylov")]
+             if overrides[2].get("exp_propagator", "Pade") in ("Pade", "Krylov")
+             and overrides[2].get("L_storage", "dense") == "dense"]
 PARAMS = ([pytest.param(name, "cpu", id=name) for name in CASES] +
           [pytest.param(name, "gpu", id=name + "-gpu", marks=pytest.mark.gpu) for name in GPU_CASES])
 
@@ -31,10 +32,12 @@ RTOL_DRDT = {"drdt_coh": 1.0e-8, "drdt_dis": 1.0e-6, "drdt_tot": 1.0e-8}
 # the GPU tolerances are the CPU ones times the number of stairs.
 GPU_FACTOR_PER_STAIR = 1
 # The same holds on the CPU for the Pade staircase cases when the CPU or the BLAS build
-# differs from that of the references (AMD EPYC 9655P, Zen 5): on an EPYC 7702 (Zen 2)
-# with the same Python, NumPy and SciPy, 1spin_linear_Pade differs by 3.6e-9 muB over
-# 200 stairs and 3spin_16_Pade by 2.7e-10 muB over 100 stairs. These cases therefore get
-# the per-stair tolerance on any device. Taylor, Krylov and RK4 agree to ~1e-12 anywhere.
+# differs from that of the references (see reference/meta.json): with references made on
+# an AMD EPYC 9655P (Zen 5) and the tests run on an EPYC 7702 (Zen 2) with the same Python,
+# NumPy and SciPy, 1spin_linear_Pade differed by 3.6e-9 muB over 200 stairs and
+# 3spin_16_Pade by 2.7e-10 muB over 100 stairs (the earlier, longer cases). These cases
+# therefore get the per-stair tolerance on any device. Taylor, Krylov and RK4 agree to
+# ~1e-12 anywhere.
 
 
 def is_pade_staircase(name):

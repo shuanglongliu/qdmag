@@ -71,7 +71,7 @@ dynamics:
       tmax: 2.0e+08             # Finial time in ps
       deltat: 1.0e+03           # Time step in ps (1e3 ps = 5e-5 T per stair at 50 T/ms)
       method: staircase         # Time-integration scheme: staircase (default) | RK4
-      exp_propagator: Strang     # Staircase only. Propagator for exp(L*deltat): Pade (default) | Taylor | Krylov | Taylor_sparse | Krylov_sparse | Strang
+      exp_propagator: Strang     # Staircase only. Propagator for exp(L*deltat): Pade (default) | Taylor | Krylov | Strang. L_storage: dense (default) | sparse
 
     - save_mag: true # Calculate and save magnetization during the dynamics ?
       nt_mag: 20  # Calculate and save magnetization every nt_mag*deltat ps

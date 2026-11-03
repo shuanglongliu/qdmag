@@ -12,7 +12,9 @@ package named qdmag and put its parent first on PYTHONPATH:
     PYTHONPATH=/path/to/ref python /path/to/repo/tests/make_reference.py --commit 14f7d02 [case ...]
 
 Runs are done in the current working directory (one subdirectory per case);
-only the reference files are written into the repository.
+only the reference files are written into the repository. The reference commits call
+DataFrame._append, so they need pandas < 3; the current references (2026-11-03) were made
+with Python 3.11, NumPy 2.2.5, SciPy 1.15.2 and pandas 2.2.3, as recorded in meta.json.
 """
 import os
 import sys
@@ -30,6 +32,7 @@ os.environ["OMP_NUM_THREADS"] = os.environ["OPENBLAS_NUM_THREADS"] = OMP_NUM_THR
 
 import numpy as np
 import scipy
+import pandas
 
 from cases import CASES, REFERENCE, run_case, save_reference
 
@@ -42,7 +45,13 @@ def cpu_model():
                     return line.split(":", 1)[1].strip()
     except OSError:
         pass
-    return platform.processor()
+    try:
+        # macOS has no /proc/cpuinfo
+        import subprocess
+        return subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"], capture_output=True,
+                              text=True, check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return platform.processor()
 
 
 if __name__ == "__main__":
@@ -52,6 +61,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     run = {"commit": args.commit, "omp_num_threads": OMP_NUM_THREADS,
            "python": platform.python_version(), "numpy": np.__version__, "scipy": scipy.__version__,
+           "pandas": pandas.__version__,
            "cpu": cpu_model(), "date": time.strftime("%Y-%m-%d %H:%M:%S")}
     meta_file = REFERENCE / "meta.json"
     meta = json.loads(meta_file.read_text()) if meta_file.exists() else {"cases": {}}
