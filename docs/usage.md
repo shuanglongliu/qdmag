@@ -28,7 +28,7 @@ Both keys are optional; without them the run is on the CPU, unchanged. On the GP
 
 | Supported with `device: gpu` | Not supported (raises an error) |
 | --- | --- |
-| `method: staircase` with `exp_propagator: Pade` (recommended) or `Krylov`; `method: RK4` | `exp_propagator: Taylor`, `Taylor_sparse`, `Krylov_sparse` |
+| `method: staircase` with `exp_propagator: Pade` (recommended) or `Krylov`; `method: RK4` | `exp_propagator: Taylor`, `Taylor_sparse`, `Krylov_sparse`, `Split` |
 
 `Krylov` works on the GPU but is slower there than on the CPU, since each substep is a chain of small matrix-vector products; use `Pade`.
 

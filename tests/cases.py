@@ -58,21 +58,24 @@ CASES = {
 }
 
 
-def case_input(name, device=None):
-    """The input of case `name` as a dict (as read from input.yaml), optionally with `device` set."""
+def case_input(name, device=None, extra=None):
+    """
+    The input of case `name` as a dict (as read from input.yaml), optionally with `device`
+    set and with the further overrides `extra` ({index of the dynamics block: {key: value}}).
+    """
     example, overrides = CASES[name]
     with open(EXAMPLES / example / "input.yaml") as f:
         data = yaml.safe_load(f)
-    for iblock, options in overrides.items():
+    for iblock, options in list(overrides.items()) + list((extra or {}).items()):
         data["dynamics"][iblock].update(options)
     if device is not None:
         data["dynamics"][2]["device"] = device
     return data
 
 
-def write_input(name, rundir, device=None):
-    """Write the input.yaml of case `name` into rundir, optionally with `device` set."""
-    data = case_input(name, device)
+def write_input(name, rundir, device=None, extra=None):
+    """Write the input.yaml of case `name` into rundir, optionally with `device` set (see case_input)."""
+    data = case_input(name, device, extra)
     rundir.mkdir(parents=True, exist_ok=True)
     with open(rundir / "input.yaml", "w") as f:
         yaml.safe_dump(data, f, sort_keys=False)
@@ -88,14 +91,14 @@ def working_directory(path):
         os.chdir(cwd)
 
 
-def set_up_case(name, rundir, device=None):
+def set_up_case(name, rundir, device=None, extra=None):
     """Write the input of case `name` into rundir and return the liouville object at t = tmin."""
     from qdmag.core.common import read_input, many_spins
     from qdmag.core.effective_basis import effective_basis
     from qdmag.core.liouville import liouville
 
     rundir = Path(rundir)
-    write_input(name, rundir, device)
+    write_input(name, rundir, device, extra)
     with working_directory(rundir):
         Ss, nS, exchange, anisotropy, gfactor, BT_Bgrid, BT_Tgrid, dynamics, states, n_threads = read_input()
         spins = many_spins(Ss, nS, gfactor)
@@ -105,7 +108,7 @@ def set_up_case(name, rundir, device=None):
     return lio
 
 
-def run_case(name, rundir, device=None):
+def run_case(name, rundir, device=None, extra=None):
     """
     Run case `name` in rundir, on `device` if given (else as in the input). Returns a dict with
       'mag'    : DataFrame of t, B, Mx, My, Mz at every save point,
@@ -114,7 +117,7 @@ def run_case(name, rundir, device=None):
       'basis'  : dict of h0, Mz and X in the effective basis.
     """
     rundir = Path(rundir)
-    lio = set_up_case(name, rundir, device)
+    lio = set_up_case(name, rundir, device, extra)
     with working_directory(rundir):
         lio.evolve_rho()
         drdt = pd.read_csv(lio.fdrdt) if lio.save_drdt else None
