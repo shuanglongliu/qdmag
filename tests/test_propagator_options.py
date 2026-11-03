@@ -51,3 +51,25 @@ def test_rk4_rejects_sparse(workdir):
     lio = set_up_case(CASE, workdir, extra=options(exp_propagator="Taylor", L_storage="sparse", method="RK4"))
     with pytest.raises(ValueError, match="requires a dense L"):
         lio.evolve_rho()
+
+
+@pytest.mark.parametrize("save, tmax, message", [
+    # 10 stairs of 5 ps, but magnetization saved every 20 stairs: no save fits
+    ({"save_mag": True, "nt_mag": 20, "save_rho": False}, 50.0, "save intervals of nt_mag = 20 stairs"),
+    # 10.4 stairs and nothing saved
+    ({"save_mag": False, "save_rho": False},              52.0, "10.4 stairs"),
+])
+def test_loop_mismatch_message(save, tmax, message, workdir):
+    lio = set_up_case(CASE, workdir, extra=options(exp_propagator="Taylor"))
+    for k, v in save.items():
+        setattr(lio, k, v)
+    lio.save_drdt, lio.tmax = False, tmax
+    with pytest.raises(ValueError, match=message):
+        lio.set_up_loop()
+
+
+def test_loop_whole_save_intervals(workdir):
+    lio = set_up_case(CASE, workdir, extra=options(exp_propagator="Taylor"))
+    lio.save_mag, lio.nt_mag, lio.save_rho, lio.save_drdt = True, 5, False, False
+    lio.set_up_loop()
+    assert lio.nt == 10

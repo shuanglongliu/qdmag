@@ -955,14 +955,31 @@ class liouville:
         else:
             # the time period should be a multiple of deltat
             self.nt = round( (self.tmax - self.tmin)/self.deltat )
-        # Check if the parameters are compatible
+        # Check if the parameters are compatible: nt must cover tmax - tmin exactly
         if abs(self.tmax - (self.tmin + self.nt*self.deltat)) >= 1e-3:
-            print("deltat = {:.3f} ps".format(self.deltat))
-            print("nt = {:9d}".format(self.nt))
-            print("tmin = {:.3f} ps".format(self.tmin))
-            print("tmax = {:.3f} ps".format(self.tmax))
-            print("tmin + nt * deltat = {:.3f} ps".format(self.tmax - self.tmin + self.nt*self.deltat))
-            raise ValueError("tmax - tmin is not a multiple of deltat")
+            raise ValueError(self.loop_mismatch_message())
+
+    def loop_mismatch_message(self):
+        """
+        Error message of set_up_loop when tmax - tmin is not covered by a whole number of
+        save intervals. nt must be a multiple of the coarsest active save interval, which
+        set_up_loop has already adjusted to a multiple of the finer ones.
+        """
+        nstairs = (self.tmax - self.tmin) / self.deltat
+        head = "tmax - tmin = {:.3f} ps is {:.6g} stairs of deltat = {:.3f} ps".format(
+            self.tmax - self.tmin, nstairs, self.deltat)
+        if self.save_drdt:
+            name, interval = 'nt_drdt', self.nt_drdt
+        elif self.save_rho:
+            name, interval = 'nt_rho', self.nt_rho
+        elif self.save_mag:
+            name, interval = 'nt_mag', self.nt_mag
+        else:
+            return head + ", which is not a whole number. Choose tmax - tmin as a multiple of deltat."
+        return (head + ", which is not a whole number of save intervals of {} = {} stairs{}. "
+                "Choose tmax - tmin as a multiple of {} * deltat = {:.3f} ps, or reduce {}.").format(
+            name, interval, " (as adjusted to the finer save intervals)" if name != 'nt_mag' else "",
+            name, interval * self.deltat, name)
 
     def unit_save_rho(self, fobj, t):
         dset = fobj.create_dataset("{:.3f}".format(t), data=self.backend.to_host(self.risvrho))
