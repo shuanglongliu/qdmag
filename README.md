@@ -82,7 +82,7 @@ This work is supported by the Center for Molecular Magnetic Quantum Materials (M
 
 ## License
 
-qdmag is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. See [LICENSE](https://github.com/shuanglongliu/qdmag/blob/main/LICENSE).
+GNU General Public License v3.0; see [LICENSE](https://github.com/shuanglongliu/qdmag/blob/main/LICENSE).
 
 ## References
 

@@ -7,7 +7,7 @@ name = "qdmag"
 dynamic = ["version"]
 description = "Nonequilibrium magnetization of magnetic molecules from a generalized Lindblad quantum master equation"
 readme = "README.md"
-license = "GPL-3.0-or-later"
+license = "GPL-3.0-only"
 license-files = ["LICENSE"]
 authors = [{name = "Shuanglong Liu", email = "shuan.liu@northeastern.edu"}]
 keywords = ["quantum master equation", "Lindblad", "molecular magnetism", "single-molecule magnets", "spin dynamics", "pulsed magnetic field", "spin-phonon coupling"]
