@@ -56,7 +56,7 @@ Both keys are optional; without them the run is on the CPU, unchanged. On the GP
 
 ## Convergence
 
-The staircase propagator is exact on each stair, so the time-step error comes mostly from avoided level crossings, where the eigenstates change within a narrow field window. For two levels whose energy difference changes with the field at a rate $\Delta k$ (in cm⁻¹/T) and whose minimal gap is $\Delta$, the window has a width $\delta B = \Delta / \Delta k$.
+The staircase propagator is exact on each stair, so the time-step error comes mostly from avoided level crossings, where the eigenstates change within a narrow field window. Near an avoided crossing at $B_0$, the gap between the two levels is $[\Delta^2 + \kappa^2 (B - B_0)^2]^{1/2}$, where $\Delta$ is the minimal gap and $\kappa$ (in cm⁻¹/T) is the rate at which the energy difference of the two diabatic states (the states without their coupling) changes with the field, i.e., the difference of their magnetic moments along the field. $\kappa$ is the slope of the gap far from the crossing; the slope of the gap itself vanishes at $B_0$. The eigenstates change within a window of width $\delta B = \Delta / \kappa$.
 
 - Choose `deltat` so that the field step per stair, `sweep_rate * deltat`, is no larger than about $2\,\delta B$ of the narrowest avoided crossing between the populated levels. $\delta B$ can be estimated in advance from the Zeeman diagram (`tool_zeeman.py`). For a pulse that is not linear, use the local sweep rate at each crossing.
 - `deltat` should also be much shorter than the period of an oscillating field (`Bt_type: sin`) and of any Rabi oscillation of interest.
