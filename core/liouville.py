@@ -120,15 +120,15 @@ class liouville:
         #   'Taylor': evaluate the action with a truncated Taylor series (expm_multiply).
         #   'Krylov': project onto a Krylov subspace with Arnoldi, then exponentiate the
         #             small Hessenberg matrix. Uses L only through matrix-vector products.
+        #   'Strang': symmetric (Strang) splitting of the coherent and dissipative parts in
+        #             Hilbert space; see propagate_risvrho_Strang. Approximate, but L is never
+        #             formed, so it fits bases far beyond the reach of the other propagators.
         # Optional, defaults to 'Pade'. See set_up_exp_propagator.
         self.exp_propagator = dynamics[2].get('exp_propagator', 'Pade')
-        #   'Split' : symmetric (Strang) splitting of the coherent and dissipative parts in
-        #             Hilbert space; see propagate_risvrho_Split. Approximate, but L is never
-        #             formed, so it fits bases far beyond the reach of the other propagators.
-        # Parameters of the 'Split' propagator; ignored by the others.
-        self.split_order    = dynamics[2].get('split_order', 2)  # Taylor order of the dissipative step
-        self.split_nsub     = dynamics[2].get('split_nsub', 1)   # Substeps of the dissipative step; 0 = automatic
-        # Parameters of the 'Krylov' propagator; ignored by the other two.
+        # Parameters of the 'Strang' propagator; ignored by the others.
+        self.strang_order    = dynamics[2].get('strang_order', 2)  # Taylor order of the dissipative step
+        self.strang_nsub     = dynamics[2].get('strang_nsub', 1)   # Substeps of the dissipative step; 0 = automatic
+        # Parameters of the 'Krylov' propagator; ignored by the others.
         self.krylov_m       = min(dynamics[2].get('krylov_m', 30), self.dimds)  # Subspace dimension
         self.krylov_tol     = dynamics[2].get('krylov_tol', 1e-10)              # Per-substep tolerance
 
@@ -173,8 +173,8 @@ class liouville:
         that an unrecognized name fails here rather than at the first of ~1e5 time steps.
         """
         # name -> (propagator, is L stored sparse?)
-        if self.exp_propagator == 'Split':
-            self.set_up_split()
+        if self.exp_propagator == 'Strang':
+            self.set_up_strang()
             return
         exp_propagators = {'Pade':          (self.propagate_risvrho_Pade,          False),
                            'Taylor':        (self.propagate_risvrho_Taylor,        False),
@@ -183,7 +183,7 @@ class liouville:
                            'Krylov_sparse': (self.propagate_risvrho_Krylov_sparse, True)}
         if self.exp_propagator not in exp_propagators:
             raise ValueError("Invalid exp_propagator: {}. Choose from {}.".format(
-                self.exp_propagator, sorted(list(exp_propagators) + ['Split'])))
+                self.exp_propagator, sorted(list(exp_propagators) + ['Strang'])))
         self.propagate_risvrho, self.sparse_L = exp_propagators[self.exp_propagator]
         if self.device == 'gpu' and self.exp_propagator not in ('Pade', 'Krylov'):
             raise ValueError("exp_propagator = {} is not available with device = 'gpu'. "
@@ -198,43 +198,43 @@ class liouville:
             self.set_up_liouville()
             self.update_L = self.update_L_under_magnetic_field
 
-    # Safety factor of the automatic substeps of the 'Split' propagator: tau * ||D|| <= this.
-    split_theta = 0.5
+    # Safety factor of the automatic substeps of the 'Strang' propagator: tau * ||D|| <= this.
+    strang_theta = 0.5
 
-    def set_up_split(self):
+    def set_up_strang(self):
         """
-        Set up the 'Split' propagator, which works on the dim x dim density matrix and never
+        Set up the 'Strang' propagator, which works on the dim x dim density matrix and never
         forms the Liouville superoperator L. Called from set_up_exp_propagator.
 
         The model is the same as for the other propagators (h, X, Rhbar, the field at the
         stair midpoint); only the approximation of exp(L deltat) differs. See
-        propagate_risvrho_Split.
+        propagate_risvrho_Strang.
         """
         if self.device != 'cpu':
-            raise ValueError("exp_propagator = Split is available on the CPU only.")
+            raise ValueError("exp_propagator = Strang is available on the CPU only.")
         if self.method != 'staircase':
-            raise ValueError("exp_propagator = Split requires method = staircase.")
+            raise ValueError("exp_propagator = Strang requires method = staircase.")
         if self.save_drdt:
-            raise ValueError("save_drdt needs the Liouville superoperator, which exp_propagator = Split "
+            raise ValueError("save_drdt needs the Liouville superoperator, which exp_propagator = Strang "
                              "does not form. Set save_drdt: false.")
-        if int(self.split_order) != self.split_order or self.split_order < 1:
-            raise ValueError("split_order must be a positive integer, not {}.".format(self.split_order))
-        if int(self.split_nsub) != self.split_nsub or self.split_nsub < 0:
-            raise ValueError("split_nsub must be a non-negative integer, not {}.".format(self.split_nsub))
-        self.split_order = int(self.split_order)
-        self.split_nsub = int(self.split_nsub)
+        if int(self.strang_order) != self.strang_order or self.strang_order < 1:
+            raise ValueError("strang_order must be a positive integer, not {}.".format(self.strang_order))
+        if int(self.strang_nsub) != self.strang_nsub or self.strang_nsub < 0:
+            raise ValueError("strang_nsub must be a non-negative integer, not {}.".format(self.strang_nsub))
+        self.strang_order = int(self.strang_order)
+        self.strang_nsub = int(self.strang_nsub)
         self.sparse_L = False
-        self.propagate_risvrho = self.propagate_risvrho_Split
-        self.update_L = self.update_split_under_magnetic_field
+        self.propagate_risvrho = self.propagate_risvrho_Strang
+        self.update_L = self.update_strang_under_magnetic_field
         # Prefactor of the dissipative part, as in set_up_liouville
         self.lam = self.lambdaa**2 * np.pi * const1**2
         self.X_complex = np.asarray(self.X, dtype=np.complex128)
-        self.split_nsub_max = 0
-        self.update_split_under_magnetic_field(self.Bt(self.tmin))
+        self.strang_nsub_max = 0
+        self.update_strang_under_magnetic_field(self.Bt(self.tmin))
 
-    def update_split_under_magnetic_field(self, B):
+    def update_strang_under_magnetic_field(self, B):
         """
-        Counterpart of update_L_under_magnetic_field for the 'Split' propagator: update h at
+        Counterpart of update_L_under_magnetic_field for the 'Strang' propagator: update h at
         the field B, and the eigenbasis of h with X and Rhbar in it.
         """
         self.B_L = B
@@ -242,34 +242,34 @@ class liouville:
         self.h = self.h0 + self.h_zee
         E, V = np.linalg.eigh((self.h + self.h.conj().T) / 2)
         omegas = const1 * E
-        self.split_V = V
-        self.split_dw = omegas[:, None] - omegas[None, :]
-        self.split_XE = V.conj().T @ self.X_complex @ V
-        self.split_RE = self.split_XE * Phi(self.T, self.split_dw, self.I0, alpha=self.alpha)
+        self.strang_V = V
+        self.strang_dw = omegas[:, None] - omegas[None, :]
+        self.strang_XE = V.conj().T @ self.X_complex @ V
+        self.strang_RE = self.strang_XE * Phi(self.T, self.strang_dw, self.I0, alpha=self.alpha)
 
-    def dissipator_split(self, rho):
+    def dissipator_strang(self, rho):
         """
         The dissipative part of the quantum master equation, -lam ([X, Rhbar rho] + h.c.),
         applied to rho; all matrices in the eigenbasis of h.
         """
-        Rr = self.split_RE @ rho
-        C = self.split_XE @ Rr - Rr @ self.split_XE
+        Rr = self.strang_RE @ rho
+        C = self.strang_XE @ Rr - Rr @ self.strang_XE
         return -self.lam * (C + C.conj().T)
 
-    def propagate_risvrho_Split(self):
+    def propagate_risvrho_Strang(self):
         r"""
         Propagate risvrho over one stair with a symmetric (Strang) splitting of the coherent
         and dissipative parts [G. Strang, SIAM J. Numer. Anal. 5, 506 (1968)], as in
         experiments/pulsed_field.m of Spinach (https://github.com/IlyaKuprov/Spinach,
-        commit cc7bfb78). Selected by exp_propagator = 'Split'. Do not call directly; call
+        commit cc7bfb78). Selected by exp_propagator = 'Strang'. Do not call directly; call
         self.propagate_risvrho, which set_up_exp_propagator binds to one of the propagators.
 
         In the eigenbasis of h, with U(t) the exact coherent evolution (a phase on each
         element) and D the dissipator,
             rho <- U(deltat/2) exp(D deltat) U(deltat/2) rho,
-        where exp(D deltat) is a Taylor series of order split_order over split_nsub
-        substeps (Spinach: order 2, one substep). With split_nsub = 0 the substeps are
-        chosen so that tau * 4 lam ||X||_F ||Rhbar||_F <= split_theta, an upper bound on
+        where exp(D deltat) is a Taylor series of order strang_order over strang_nsub
+        substeps (Spinach: order 2, one substep). With strang_nsub = 0 the substeps are
+        chosen so that tau * 4 lam ||X||_F ||Rhbar||_F <= strang_theta, an upper bound on
         tau * ||D||.
 
         Only matrix products of dim x dim matrices are needed, so the cost per stair is
@@ -277,21 +277,21 @@ class liouville:
         non-commutation of the coherent and dissipative parts and grows with the rates of
         D times deltat. Check it against Pade on a smaller basis, or by halving deltat.
         """
-        V = self.split_V
+        V = self.strang_V
         Vh = V.conj().T
-        half = np.exp(-1j * self.split_dw * self.deltat / 2)
+        half = np.exp(-1j * self.strang_dw * self.deltat / 2)
         rho = self.convert_risvrho_to_rho(self.risvrho)
         r = (Vh @ rho @ V) * half
-        nsub = self.split_nsub
+        nsub = self.strang_nsub
         if nsub == 0:
-            bound = 4 * self.lam * np.linalg.norm(self.split_XE) * np.linalg.norm(self.split_RE)
-            nsub = max(1, int(np.ceil(bound * self.deltat / self.split_theta)))
-        self.split_nsub_max = max(self.split_nsub_max, nsub)
+            bound = 4 * self.lam * np.linalg.norm(self.strang_XE) * np.linalg.norm(self.strang_RE)
+            nsub = max(1, int(np.ceil(bound * self.deltat / self.strang_theta)))
+        self.strang_nsub_max = max(self.strang_nsub_max, nsub)
         tau = self.deltat / nsub
         for _ in range(nsub):
             term, acc = r, r
-            for k in range(1, self.split_order + 1):
-                term = self.dissipator_split(term) * (tau / k)
+            for k in range(1, self.strang_order + 1):
+                term = self.dissipator_strang(term) * (tau / k)
                 acc = acc + term
             r = acc
         r = r * half
@@ -963,12 +963,14 @@ class liouville:
         drisvrhodt_LC = to_host(LC @ self.risvrho)
         drisvrhodt = to_host(self.L @ self.risvrho)
 
-        # Empty DataFrame is deprecated, use list of dicts instead
-        df = pd.DataFrame()
+        # One row per diagonal element, collected as a list of dicts (DataFrame._append
+        # is private and was removed in pandas 3)
+        rows = []
         for i in range(self.dim):
             # i,j -> I = i * dim + j
             I = get_composite_index(i, i, self.dim)
-            df = df._append({'t': t, 'B': self.Bt(t), 'i': i, 'drdt_coh': drisvrhodt_LA[I], 'drdt_dis': drisvrhodt_LC[I], 'drdt_tot': drisvrhodt[I]}, ignore_index=True)
+            rows.append({'t': t, 'B': self.Bt(t), 'i': i, 'drdt_coh': drisvrhodt_LA[I], 'drdt_dis': drisvrhodt_LC[I], 'drdt_tot': drisvrhodt[I]})
+        df = pd.DataFrame(rows)
 
         # Save the data to a csv file
         df.to_csv(fobj, header=header, index=False)

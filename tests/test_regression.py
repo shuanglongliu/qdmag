@@ -4,7 +4,8 @@ or for the 3-spin cases the commit of the Condon-Shortley pool basis; see make_r
 
 Runs on the CPU, and for the Pade, Krylov and RK4 cases also on the GPU (marked gpu).
 GPU and multithreaded BLAS results are not bitwise reproducible, so the contract is a
-tolerance: 1e-10 muB on the magnetization and 1e-10 on the elements of rho.
+tolerance: 1e-10 muB on the magnetization and 1e-10 on the elements of rho, times the
+number of stairs on the GPU and for the Pade staircase cases (see below).
 """
 import numpy as np
 import pytest
@@ -18,6 +19,7 @@ PARAMS = ([pytest.param(name, "cpu", id=name) for name in CASES] +
           [pytest.param(name, "gpu", id=name + "-gpu", marks=pytest.mark.gpu) for name in GPU_CASES])
 
 ATOL_M = 1.0e-10
+RTOL_GRID = 1.0e-12
 ATOL_RHO = 1.0e-10
 # drho/dt, relative to the largest element of each column. The dissipative part is a
 # near-cancellation (|drdt_dis| ~ 1e-15 from terms ~ 1e-11), so it inherits a much
@@ -28,6 +30,16 @@ RTOL_DRDT = {"drdt_coh": 1.0e-8, "drdt_dis": 1.0e-6, "drdt_tot": 1.0e-8}
 # off by up to ~1e-10 on rho per stair for ||L deltat||_1 ~ 5e5 (journal Section 13), so
 # the GPU tolerances are the CPU ones times the number of stairs.
 GPU_FACTOR_PER_STAIR = 1
+# The same holds on the CPU for the Pade staircase cases when the CPU or the BLAS build
+# differs from that of the references (AMD EPYC 9655P, Zen 5): on an EPYC 7702 (Zen 2)
+# with the same Python, NumPy and SciPy, 1spin_linear_Pade differs by 3.6e-9 muB over
+# 200 stairs and 3spin_16_Pade by 2.7e-10 muB over 100 stairs. These cases therefore get
+# the per-stair tolerance on any device. Taylor, Krylov and RK4 agree to ~1e-12 anywhere.
+
+
+def is_pade_staircase(name):
+    options = CASES[name][1][2]
+    return options.get("method", "staircase") == "staircase" and options.get("exp_propagator", "Pade") == "Pade"
 
 
 def number_of_stairs(name, result):
@@ -40,7 +52,8 @@ def number_of_stairs(name, result):
 def test_regression(name, device, workdir):
     result = run_case(name, workdir, device)
     ref = load_reference(name)
-    factor = 1 if device == "cpu" else GPU_FACTOR_PER_STAIR * number_of_stairs(name, result)
+    per_stair = device != "cpu" or is_pade_staircase(name)
+    factor = GPU_FACTOR_PER_STAIR * number_of_stairs(name, result) if per_stair else 1
 
     # rho is compared in the effective basis, which must then be the same as for the
     # references. The Condon-Shortley pool basis is unique, so it is on any CPU and
@@ -49,8 +62,12 @@ def test_regression(name, device, workdir):
         np.testing.assert_allclose(result["basis"][key], ref["basis"][key], rtol=0, atol=1e-10, err_msg=key)
 
     assert len(result["mag"]) == len(ref["mag"])
-    np.testing.assert_allclose(result["mag"]["t"], ref["mag"]["t"], rtol=1e-15, atol=0)
-    np.testing.assert_allclose(result["mag"]["B"], ref["mag"]["B"], rtol=1e-15, atol=0)
+    # The reference CSVs were read back with the default float parser of pandas 2, which
+    # can be off in the 16th significant digit (e.g. 0.00019999999999999998 is read as
+    # 0.0001999999999999); pandas 3 parses exactly. rtol = 1e-12 still checks that the
+    # time and field grids are the same.
+    np.testing.assert_allclose(result["mag"]["t"], ref["mag"]["t"], rtol=RTOL_GRID, atol=0)
+    np.testing.assert_allclose(result["mag"]["B"], ref["mag"]["B"], rtol=RTOL_GRID, atol=0)
     for col in ("Mx", "My", "Mz"):
         np.testing.assert_allclose(result["mag"][col], ref["mag"][col], rtol=0, atol=factor * ATOL_M, err_msg=col)
     np.testing.assert_allclose(result["risvrho"], ref["risvrho"], rtol=0, atol=factor * ATOL_RHO)
@@ -63,8 +80,8 @@ def test_regression(name, device, workdir):
     # rho stays a density matrix (unit trace, Hermitian) at least as well as in the
     # reference. Neither holds exactly: each stair loses ~||L deltat|| * eps ~ 1e-11.
     # On the GPU the drift is ~10x larger (cupyx expm; journal Section 13), so the
-    # per-stair GPU tolerance is added.
-    slack = 1e-12 if device == "cpu" else factor * ATOL_RHO
+    # per-stair tolerance is added there and for the Pade staircase cases.
+    slack = factor * ATOL_RHO if per_stair else 1e-12
     rho, rho_ref = to_rho(result["risvrho"]), to_rho(ref["risvrho"])
     assert abs(np.trace(rho) - 1) <= 2 * abs(np.trace(rho_ref) - 1) + slack
     assert np.abs(rho - rho.conj().T).max() <= 2 * np.abs(rho_ref - rho_ref.conj().T).max() + slack
