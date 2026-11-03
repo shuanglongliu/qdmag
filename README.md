@@ -11,7 +11,7 @@ A Python package for simulating nonequilibrium magnetization of magnetic molecul
 
 Magnetic molecules — including transition metal complexes and lanthanide-based complexes — are open quantum systems due to their coupling to lattice vibrations (phonons). This spin-phonon coupling governs magnetization relaxation and limits quantum coherence times. Under a time-varying external magnetic field, as in pulsed-field magnetometry, the spin system is driven out of thermal equilibrium and its dynamics cannot be captured by equilibrium methods alone.
 
-`qdmag` implements the generalized Lindblad quantum master equation of Saito *et al.* [1] to simulate this nonequilibrium magnetization. It supports long-time evolution up to a few milliseconds through a staircase approximation and an effective Hamiltonian scheme for large spin systems.
+`qdmag` implements the generalized Lindblad quantum master equation of Saito *et al.* [1], as applied to magnetic molecules by Nakano and Miyashita [2], to simulate this nonequilibrium magnetization. It supports long-time evolution up to a few milliseconds through a staircase approximation and an effective Hamiltonian scheme for large spin systems.
 
 ## Features
 
@@ -37,16 +37,22 @@ Magnetic molecules — including transition metal complexes and lanthanide-based
 ## Installation
 
 ```bash
+pip install qdmag
+```
+
+This also installs the required dependencies (NumPy, SciPy ≥ 1.15, PyYAML, h5py, pandas); Python ≥ 3.10 is required. Optional extras: `pip install "qdmag[plot]"` (matplotlib), `"qdmag[gpu]"` (CuPy for CUDA 12), and `"qdmag[test]"` (pytest). See [Installation](https://shuanglongliu.github.io/qdmag/installation.html) for the GPU setup.
+
+The example inputs and the tests are not part of the package. To run them, clone the repository and install from it instead:
+
+```bash
 git clone https://github.com/shuanglongliu/qdmag.git
 cd qdmag
 pip install .
 ```
 
-This also installs the required dependencies (NumPy, SciPy ≥ 1.15, PyYAML, h5py, pandas). Optional extras: `pip install ".[plot]"` (matplotlib), `".[gpu]"` (CuPy for CUDA 12), and `".[test]"` (pytest). See [Installation](https://shuanglongliu.github.io/qdmag/installation.html) for the GPU setup.
-
 ## Quick start
 
-Every tool reads `input.yaml` from the working directory and writes its results to `output/` there. For example, the time evolution of a Ho³⁺ ion under a linear field sweep:
+Every tool reads `input.yaml` from the working directory and writes its results to `output/` there. For example, the time evolution of a Ho³⁺ ion under a linear field sweep, run in the cloned repository:
 
 ```bash
 cd examples/1-spin/linear
@@ -59,7 +65,7 @@ As shipped, this run sweeps the field from 0 to 50 T in 5 × 10⁵ stairs, which
 
 - [Theory](https://shuanglongliu.github.io/qdmag/theory.html): spin Hamiltonian, quantum master equation, staircase approximation, effective Hamiltonian, powder averaging
 - [Usage](https://shuanglongliu.github.io/qdmag/usage.html): running the code, running on a GPU, convergence, tests
-- [The input file](https://shuanglongliu.github.io/qdmag/input.html): all keys of `input.yaml`, their units and conventions (also in [docs/input.md](https://github.com/shuanglongliu/qdmag/blob/main/docs/input.md))
+- [Input reference](https://shuanglongliu.github.io/qdmag/input.html): all keys of `input.yaml`, their units and conventions (also in [docs/input.md](https://github.com/shuanglongliu/qdmag/blob/main/docs/input.md))
 - [Tools](https://shuanglongliu.github.io/qdmag/tools.html): the scripts in `tools/`
 - [Examples](https://shuanglongliu.github.io/qdmag/examples.html): the example inputs in `examples/`
 - [API reference](https://shuanglongliu.github.io/qdmag/api.html): the modules of `qdmag.core`
@@ -74,7 +80,9 @@ See [Usage](https://shuanglongliu.github.io/qdmag/usage.html#tests) for details.
 
 ## Citing qdmag
 
-See [Citing](https://shuanglongliu.github.io/qdmag/citing.html).
+If you use qdmag, please cite:
+
+S. Liu, X. Chen, A. Cupo, J. N. Fry, and H.-P. Cheng, *qdmag*: A Python package for simulating nonequilibrium magnetization of molecules using quantum master equations, submitted to *Computer Physics Communications* (2026).
 
 ## Acknowledgments
 
@@ -89,5 +97,3 @@ GNU General Public License v3.0; see [LICENSE](https://github.com/shuanglongliu/
 [1] K. Saito, S. Takesue, and S. Miyashita, Energy transport in the integrable system in contact with various types of phonon reservoirs, *Phys. Rev. E* **61**, 2397 (2000).
 
 [2] H. Nakano and S. Miyashita, Magnetization Process of Nanoscale Iron Cluster, *J. Phys. Soc. Jpn.* **70**, 2151–2157 (2001).
-
-[3] S. Liu, X. Chen, A. Cupo, J. N. Fry, and H.-P. Cheng, *qdmag*: A Python package for simulating nonequilibrium magnetization of molecules using quantum master equations, submitted to *Computer Physics Communications* (2026). 

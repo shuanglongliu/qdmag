@@ -2,7 +2,7 @@
 
 ## Input file
 
-All input parameters are loaded from an `input.yaml` file in the working directory. Example input files can be found in the `examples/` folder. All keys, their units, and the conventions for reference frames and indices are listed in [The input file](input.md).
+All input parameters are loaded from an `input.yaml` file in the working directory. Example input files can be found in the `examples/` folder. All keys, their units, and the conventions for reference frames and indices are listed in [Input reference](input.md).
 
 ## Run the code
 

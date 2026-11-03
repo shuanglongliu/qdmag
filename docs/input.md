@@ -1,4 +1,4 @@
-# The input file `input.yaml`
+# Input reference
 
 Every tool reads its parameters from `input.yaml` in the working directory. Complete examples are in `examples/`.
 

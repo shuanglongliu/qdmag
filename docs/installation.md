@@ -1,16 +1,26 @@
 # Installation
 
 ```bash
+pip install qdmag
+```
+
+This also installs the required dependencies. Optional extras: `pip install "qdmag[plot]"` (matplotlib), `"qdmag[gpu]"` (CuPy for CUDA 12), and `"qdmag[test]"` (pytest).
+
+## From the repository
+
+The example inputs in `examples/` and the test suite in `tests/` are not part of the package. To run them, clone the repository and install from it:
+
+```bash
 git clone https://github.com/shuanglongliu/qdmag.git
 cd qdmag
 pip install .
 ```
 
-This also installs the required dependencies. Optional extras: `pip install ".[plot]"` (matplotlib), `".[gpu]"` (CuPy for CUDA 12), and `".[test]"` (pytest). Alternatively, add the directory that contains qdmag to the environment variable PYTHONPATH. 
+The extras are then `pip install ".[plot]"`, `".[gpu]"`, and `".[test]"`. Alternatively, add the directory that contains qdmag to the environment variable PYTHONPATH.
 
 ## Dependencies
 
-- Python 3.x
+- Python ≥ 3.10
 - NumPy
 - SciPy ≥ 1.15 (quadrature weights, spline fitting, matrix exponential, and Euler angle transformations). The powder averaging calls `scipy.integrate.lebedev_rule`, which was added in 1.15.
 - PyYAML (parsing of `input.yaml`)

@@ -12,22 +12,22 @@ lio.evolve_rho()   # scheme taken from the 'method' key of input.yaml
 
 The time-integration scheme is chosen by the optional `method` key in the third `dynamics` block of `input.yaml`, either `staircase` (default) or `RK4`.
 
-On each stair the field is constant, and the density matrix is advanced as ρ ← exp(L Δt) ρ. How this is evaluated is chosen by the optional `exp_propagator` key in the same block, and how `L` is stored by the optional `L_storage` key (`dense`, the default, or `sparse` in CSR format). The propagators fall into three classes by accuracy:
+On each stair the field is constant, and the density matrix is advanced as $\rho \leftarrow \exp(\mathcal{L}\Delta t)\,\rho$. How this is evaluated is chosen by the optional `exp_propagator` key in the same block, and how `L` is stored by the optional `L_storage` key (`dense`, the default, or `sparse` in CSR format). The propagators fall into three classes by accuracy:
 
 | Class | `exp_propagator` | `L_storage` | Method |
 | --- | --- | --- | --- |
 | Exact | `Pade` (default) | `dense` | Forms the full matrix exponential (scaling-and-squaring Padé). Cost independent of `deltat`, but `L` must fit in memory |
 | Exact to a tolerance | `Taylor` | `dense` or `sparse` | Action of the exponential by a truncated Taylor series (`expm_multiply`). Cost grows with `\|\|L*deltat\|\|` |
 | | `Krylov` | `dense` or `sparse` | Arnoldi projection onto a Krylov subspace. Cost grows with `\|\|L*deltat\|\|`; uses `L` only through matrix-vector products. Options `krylov_m` (subspace dimension, default 30) and `krylov_tol` (default 1e-10) |
-| Approximate | `Strang` | — (forms no `L`) | Symmetric (Strang) splitting of the coherent and dissipative parts, exp(L Δt) ≈ exp(L_c Δt/2) exp(L_d Δt) exp(L_c Δt/2), on the d × d density matrix. Handles bases far too large for the others (e.g. the full 216-state Mn3 trimer). Options `strang_order` and `strang_nsub` |
+| Approximate | `Strang` | — (forms no `L`) | Symmetric (Strang) splitting of the coherent and dissipative parts, $\exp(\mathcal{L}\Delta t) \approx \exp(\mathcal{L}_\mathrm{c}\Delta t/2)\,\exp(\mathcal{L}_\mathrm{d}\Delta t)\,\exp(\mathcal{L}_\mathrm{c}\Delta t/2)$, on the $d \times d$ density matrix. Handles bases far too large for the others (e.g. the full 216-state Mn3 trimer). Options `strang_order` and `strang_nsub` |
 
-The first two classes act on the vectorized density matrix (2d² real numbers, for a d-dimensional basis) with `L` as a 2d² × 2d² matrix. `Strang` applies the same `L` without storing it: in the eigenbasis of the stair Hamiltonian, exp(L_c t) is a phase on each element of ρ, and L_d ρ is a few d × d matrix products.
+The first two classes act on the vectorized density matrix ($2d^2$ real numbers, for a $d$-dimensional basis) with `L` as a $2d^2 \times 2d^2$ matrix. `Strang` applies the same $\mathcal{L} = \mathcal{L}_\mathrm{c} + \mathcal{L}_\mathrm{d}$ without storing it: in the eigenbasis of the stair Hamiltonian, $\exp(\mathcal{L}_\mathrm{c} t)$ multiplies each element $\rho_{kn}$ by the phase $e^{-i(E_k - E_n)t/\hbar}$, and $\mathcal{L}_\mathrm{d}\rho$ takes a few $d \times d$ matrix products.
 
 The names `Taylor_sparse` and `Krylov_sparse` of earlier versions are still accepted and mean `Taylor` or `Krylov` with `L_storage: sparse`. An unrecognized name or a combination that does not exist (`Pade` or `Strang` with `L_storage: sparse`) raises at construction, and `method: RK4` requires a dense `L`.
 
-**`Strang`.** On each stair, in the eigenbasis of the stair Hamiltonian, the density matrix is propagated as U(Δt/2) exp(D Δt) U(Δt/2) ρ, where U is the exact coherent evolution and D the dissipator. This is the scheme of `experiments/pulsed_field.m` in [Spinach](https://github.com/IlyaKuprov/Spinach) (commit cc7bfb78), after G. Strang, *SIAM J. Numer. Anal.* **5**, 506 (1968). exp(D Δt) is a Taylor series of order `strang_order` (default 2, as in Spinach) over `strang_nsub` substeps (default 1; 0 picks them so that τ‖D‖ ≤ 0.5). The model (basis, X, Φ, field at the stair midpoint) is the same as for `Pade`; only the propagator is approximate. Each stair costs a few dim × dim matrix products, O(dim³), instead of O(dim⁶) for `Pade`:
+**`Strang`.** On each stair, in the eigenbasis of the stair Hamiltonian, the density matrix is propagated as $\rho \leftarrow \exp(\mathcal{L}_\mathrm{c}\Delta t/2)\,\exp(\mathcal{L}_\mathrm{d}\Delta t)\,\exp(\mathcal{L}_\mathrm{c}\Delta t/2)\,\rho$, where $\exp(\mathcal{L}_\mathrm{c} t)$ is the exact coherent evolution and $\mathcal{L}_\mathrm{d}$ the dissipator. This is the scheme of `experiments/pulsed_field.m` in [Spinach](https://github.com/IlyaKuprov/Spinach) (commit cc7bfb78), after G. Strang, *SIAM J. Numer. Anal.* **5**, 506 (1968). $\exp(\mathcal{L}_\mathrm{d}\Delta t)$ is a Taylor series of order `strang_order` (default 2, as in Spinach) over `strang_nsub` substeps of width $\tau$ (default 1; 0 picks them so that $\tau\lVert\mathcal{L}_\mathrm{d}\rVert \le 0.5$). The model (basis, X, Φ, field at the stair midpoint) is the same as for `Pade`; only the propagator is approximate. Each stair costs a few $d \times d$ matrix products, $O(d^3)$, instead of $O(d^6)$ for `Pade`:
 
-| dim | `Pade`, per stair | `Strang`, per stair (2 threads) |
+| $d$ | `Pade`, per stair | `Strang`, per stair (2 threads) |
 | --- | --- | --- |
 | 17–40 | 0.05–4.5 s (4 cores) | 0.2–0.7 ms |
 | 216 | infeasible (dense `L` of 70 GB) | 25–45 ms |

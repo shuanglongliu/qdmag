@@ -40,6 +40,8 @@ $$\rho(t + \Delta t) = \exp(\mathcal{L} \Delta t) \rho(t)$$
 
 This maintains numerical stability for time steps orders of magnitude larger than those required by Runge–Kutta methods, making millisecond simulations feasible.
 
+The exponential is evaluated exactly (Padé), or to a tolerance (Taylor, Krylov), on the Liouvillian of dimension $2d^2$ for a $d$-dimensional basis, which limits these propagators to $d$ of about 100. For larger bases, such as the full 216-state space of the Mn trimer, the `Strang` propagator approximates the same exponential on each stair by a symmetric splitting of the coherent and dissipative parts, at a cost of $O(d^3)$ per stair; see [Tools](tools.md).
+
 ## Effective Hamiltonian
 
 For large multinuclear systems where the full Hilbert space dimension N = Πᵢ(2Sᵢ+1) is too large, an effective Hamiltonian of dimension n ≪ N is constructed by selecting thermally relevant basis states. The basis states are chosen as the lowest-energy eigenstates of isotropic exchange interaction with a perturbative Zeeman term for each value of the total $S_z$ projection by default. The small perturbative Zeeman field ensures the eigenstates are also eigenstates of the total $\hat{S}_z$ operator.
@@ -68,6 +70,6 @@ Three case studies are included to demonstrate the package:
 |--------|-------------|---------------|
 | Ho(pzdo)₄ | Mononuclear Ho³⁺ complex, J = 8, ZFS up to 12th order | Full (17 states) |
 | Spin-1/2 dimer | Two coupled S = 1/2 spins, four exchange coupling types | Full (4 states) |
-| (CH₆N₃)₂MnCl₄ | Mn trimer, S = 5/2 local spins | Effective (16 or 26 states from full 216) |
+| (CH₆N₃)₂MnCl₄ | Mn trimer, S = 5/2 local spins | Effective (16 or 26 of the 216 states, Padé) and full (216 states, Strang) |
 
 The input files are described in [Examples](examples.md).

@@ -33,11 +33,11 @@ The results are written to `output/` in the same directory.
 
 ## Three spins: (CH₆N₃)₂MnCl₄ Mn trimer, S = 5/2
 
-[`examples/3-spin/`](https://github.com/shuanglongliu/qdmag/tree/main/examples/3-spin) uses the effective Hamiltonian with 16 or 26 of the 216 states.
+[`examples/3-spin/`](https://github.com/shuanglongliu/qdmag/tree/main/examples/3-spin) uses the effective Hamiltonian with 16 or 26 of the 216 states, and the full 216-state space with the `Strang` propagator (`staircase/216`).
 
 | Directory | What it computes |
 |---|---|
 | `basis_states` | The pool of candidate basis states (`main.py`) |
 | `eigen`, `magnetization` | Eigenstates and equilibrium magnetization |
 | `zeeman/16`, `zeeman/26`, `zeeman/full_space` | Zeeman diagrams in the effective and full spaces |
-| `staircase/16`, `staircase/26`, `staircase/full_space` | Dynamics in the effective and full spaces |
+| `staircase/16`, `staircase/26`, `staircase/216` | Dynamics in the effective spaces (Padé) and the full 216-state space (Strang) |
